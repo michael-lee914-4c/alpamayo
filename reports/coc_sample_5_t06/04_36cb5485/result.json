@@ -1,0 +1,186 @@
+{
+  "clip_id": "36cb5485-5c56-48c5-8219-90095851d627",
+  "chunk": 57,
+  "split": "train",
+  "event_cluster": "ANIMALS_BIRDS_ROADKILL",
+  "t0_us": 9746740,
+  "n_events": 1,
+  "gt_coc_texts": [
+    "Stop for the stop sign while waiting for pedestrians to cross the street."
+  ],
+  "pred_coc_raw": "Stop to yield to the pedestrian in the crosswalk.<|cot_end|><|traj_future_start|><|traj_future_start|>",
+  "pred_coc": "Stop to yield to the pedestrian in the crosswalk.",
+  "readable": true,
+  "jaccard": 0.21428571428571427,
+  "gt_coverage": 0.3,
+  "image_grid": [
+    [
+      "04_36cb5485/00_cross_left_120_t-0.3s.jpg",
+      "04_36cb5485/00_cross_left_120_t-0.2s.jpg",
+      "04_36cb5485/00_cross_left_120_t-0.1s.jpg",
+      "04_36cb5485/00_cross_left_120_tp0.0s.jpg"
+    ],
+    [
+      "04_36cb5485/01_front_wide_120_t-0.3s.jpg",
+      "04_36cb5485/01_front_wide_120_t-0.2s.jpg",
+      "04_36cb5485/01_front_wide_120_t-0.1s.jpg",
+      "04_36cb5485/01_front_wide_120_tp0.0s.jpg"
+    ],
+    [
+      "04_36cb5485/02_cross_right_120_t-0.3s.jpg",
+      "04_36cb5485/02_cross_right_120_t-0.2s.jpg",
+      "04_36cb5485/02_cross_right_120_t-0.1s.jpg",
+      "04_36cb5485/02_cross_right_120_tp0.0s.jpg"
+    ],
+    [
+      "04_36cb5485/03_front_tele_30_t-0.3s.jpg",
+      "04_36cb5485/03_front_tele_30_t-0.2s.jpg",
+      "04_36cb5485/03_front_tele_30_t-0.1s.jpg",
+      "04_36cb5485/03_front_tele_30_tp0.0s.jpg"
+    ]
+  ],
+  "contact_sheet": "04_36cb5485/grid.jpg",
+  "ego_plot": "04_36cb5485/ego_history.png",
+  "ego_history_xyz": [
+    [
+      -15.548999786376953,
+      -0.022700000554323196,
+      -0.12800000607967377
+    ],
+    [
+      -14.470999717712402,
+      -0.0203000009059906,
+      -0.1168999969959259
+    ],
+    [
+      -13.398300170898438,
+      -0.018799999728798866,
+      -0.10679999738931656
+    ],
+    [
+      -12.331100463867188,
+      -0.016599999740719795,
+      -0.09799999743700027
+    ],
+    [
+      -11.267800331115723,
+      -0.014600000344216824,
+      -0.09319999814033508
+    ],
+    [
+      -10.208700180053711,
+      -0.012600000016391277,
+      -0.09040000289678574
+    ],
+    [
+      -9.155400276184082,
+      -0.010599999688565731,
+      -0.0851999968290329
+    ],
+    [
+      -8.107799530029297,
+      -0.007899999618530273,
+      -0.08089999854564667
+    ],
+    [
+      -7.065100193023682,
+      -0.007199999876320362,
+      -0.07419999688863754
+    ],
+    [
+      -6.026400089263916,
+      -0.004699999932199717,
+      -0.07069999724626541
+    ],
+    [
+      -4.997300148010254,
+      -0.0031999999191612005,
+      -0.05920000001788139
+    ],
+    [
+      -3.9783999919891357,
+      -0.0017999999690800905,
+      -0.040699999779462814
+    ],
+    [
+      -2.968400001525879,
+      -0.0007999999797903001,
+      -0.023900000378489494
+    ],
+    [
+      -1.9672000408172607,
+      -0.0003000000142492354,
+      -0.012400000356137753
+    ],
+    [
+      -0.9768999814987183,
+      -0.0005000000237487257,
+      -0.004000000189989805
+    ],
+    [
+      0.0,
+      0.0,
+      0.0
+    ]
+  ],
+  "ego_history_yaw_deg": [
+    0.15000000596046448,
+    0.10599999874830246,
+    0.11699999868869781,
+    0.12099999934434891,
+    0.13899999856948853,
+    0.13099999725818634,
+    0.10499999672174454,
+    0.08699999749660492,
+    0.09000000357627869,
+    0.027000000700354576,
+    0.057999998331069946,
+    0.06400000303983688,
+    0.04600000008940697,
+    0.017000000923871994,
+    0.03099999949336052,
+    -0.0
+  ],
+  "ego_path_m": 15.549036026000977,
+  "cameras": [
+    "cross_left_120",
+    "front_wide_120",
+    "cross_right_120",
+    "front_tele_30"
+  ],
+  "top5_coc": [
+    {
+      "rank": 1,
+      "first_token": "Stop",
+      "first_token_id": 10674,
+      "first_p": 0.6418215036392212,
+      "pred_coc": "Stop to yield to the pedestrian in the crosswalk.",
+      "pred_coc_raw": "Stop to yield to the pedestrian in the crosswalk.<|cot_end|><|traj_future_start|><|traj_future_start|>",
+      "readable": true,
+      "jaccard": 0.21428571428571427,
+      "gt_coverage": 0.3
+    },
+    {
+      "rank": 2,
+      "first_token": "Stop",
+      "first_token_id": 10674,
+      "first_p": 0.6418215036392212,
+      "pred_coc": "Stop to yield to the pedestrian in the crosswalk.",
+      "pred_coc_raw": "Stop to yield to the pedestrian in the crosswalk.<|cot_end|><|traj_future_start|>ing",
+      "readable": true,
+      "jaccard": 0.21428571428571427,
+      "gt_coverage": 0.3
+    },
+    {
+      "rank": 3,
+      "first_token": "Y",
+      "first_token_id": 56,
+      "first_p": 0.2218075841665268,
+      "pred_coc": "at the stop sign due to a pedestrian because of bag NullPointerException and a pedestrian in the lane.",
+      "pred_coc_raw": "Y at the stop sign due to a pedestrian because of bag NullPointerException and a pedestrian in the lane.<|cot_end|><|traj_future_start|>Stop",
+      "readable": true,
+      "jaccard": 0.19047619047619047,
+      "gt_coverage": 0.4
+    }
+  ]
+}

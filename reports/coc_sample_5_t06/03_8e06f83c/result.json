@@ -1,0 +1,186 @@
+{
+  "clip_id": "8e06f83c-4de6-4cde-82ab-4a747645f80a",
+  "chunk": 26,
+  "split": "train",
+  "event_cluster": "PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY",
+  "t0_us": 8461666,
+  "n_events": 1,
+  "gt_coc_texts": [
+    "Yield to the pedestrians crossing the road."
+  ],
+  "pred_coc_raw": "Stop to yield to the pedestrian crossing ahead<|cot_end|><|traj_future_start|><|im_end|>",
+  "pred_coc": "Stop to yield to the pedestrian crossing ahead",
+  "readable": true,
+  "jaccard": 0.4444444444444444,
+  "gt_coverage": 0.6666666666666666,
+  "image_grid": [
+    [
+      "03_8e06f83c/00_cross_left_120_t-0.3s.jpg",
+      "03_8e06f83c/00_cross_left_120_t-0.2s.jpg",
+      "03_8e06f83c/00_cross_left_120_t-0.1s.jpg",
+      "03_8e06f83c/00_cross_left_120_tp0.0s.jpg"
+    ],
+    [
+      "03_8e06f83c/01_front_wide_120_t-0.3s.jpg",
+      "03_8e06f83c/01_front_wide_120_t-0.2s.jpg",
+      "03_8e06f83c/01_front_wide_120_t-0.1s.jpg",
+      "03_8e06f83c/01_front_wide_120_tp0.0s.jpg"
+    ],
+    [
+      "03_8e06f83c/02_cross_right_120_t-0.3s.jpg",
+      "03_8e06f83c/02_cross_right_120_t-0.2s.jpg",
+      "03_8e06f83c/02_cross_right_120_t-0.1s.jpg",
+      "03_8e06f83c/02_cross_right_120_tp0.0s.jpg"
+    ],
+    [
+      "03_8e06f83c/03_front_tele_30_t-0.3s.jpg",
+      "03_8e06f83c/03_front_tele_30_t-0.2s.jpg",
+      "03_8e06f83c/03_front_tele_30_t-0.1s.jpg",
+      "03_8e06f83c/03_front_tele_30_tp0.0s.jpg"
+    ]
+  ],
+  "contact_sheet": "03_8e06f83c/grid.jpg",
+  "ego_plot": "03_8e06f83c/ego_history.png",
+  "ego_history_xyz": [
+    [
+      -11.993200302124023,
+      -0.01759999990463257,
+      -0.015799999237060547
+    ],
+    [
+      -11.195099830627441,
+      -0.014600000344216824,
+      -0.019300000742077827
+    ],
+    [
+      -10.390600204467773,
+      -0.01209999993443489,
+      -0.02239999920129776
+    ],
+    [
+      -9.57960033416748,
+      -0.009800000116229057,
+      -0.02500000037252903
+    ],
+    [
+      -8.763199806213379,
+      -0.008500000461935997,
+      -0.02669999934732914
+    ],
+    [
+      -7.944300174713135,
+      -0.007199999876320362,
+      -0.0272000003606081
+    ],
+    [
+      -7.12529993057251,
+      -0.00559999980032444,
+      -0.02539999969303608
+    ],
+    [
+      -6.308599948883057,
+      -0.004600000102072954,
+      -0.022299999371170998
+    ],
+    [
+      -5.494900226593018,
+      -0.0034000000450760126,
+      -0.019999999552965164
+    ],
+    [
+      -4.684899806976318,
+      -0.0026000000070780516,
+      -0.01850000023841858
+    ],
+    [
+      -3.8789000511169434,
+      -0.002099999925121665,
+      -0.017000000923871994
+    ],
+    [
+      -3.0785999298095703,
+      -0.0006000000284984708,
+      -0.014999999664723873
+    ],
+    [
+      -2.286799907684326,
+      -0.0,
+      -0.012000000104308128
+    ],
+    [
+      -1.5083999633789062,
+      0.0005000000237487257,
+      -0.008500000461935997
+    ],
+    [
+      -0.7455000281333923,
+      0.0005000000237487257,
+      -0.004699999932199717
+    ],
+    [
+      0.0,
+      0.0,
+      0.0
+    ]
+  ],
+  "ego_history_yaw_deg": [
+    0.24799999594688416,
+    0.22100000083446503,
+    0.20000000298023224,
+    0.17000000178813934,
+    0.15600000321865082,
+    0.13899999856948853,
+    0.11699999868869781,
+    0.11299999803304672,
+    0.09600000083446503,
+    0.08799999952316284,
+    0.08799999952316284,
+    0.06800000369548798,
+    0.05900000035762787,
+    0.041999999433755875,
+    0.017000000923871994,
+    0.0
+  ],
+  "ego_path_m": 11.993229866027832,
+  "cameras": [
+    "cross_left_120",
+    "front_wide_120",
+    "cross_right_120",
+    "front_tele_30"
+  ],
+  "top5_coc": [
+    {
+      "rank": 1,
+      "first_token": "Stop",
+      "first_token_id": 10674,
+      "first_p": 0.1408839374780655,
+      "pred_coc": "Stop to yield to the pedestrian crossing ahead",
+      "pred_coc_raw": "Stop to yield to the pedestrian crossing ahead<|cot_end|><|traj_future_start|><|im_end|>",
+      "readable": true,
+      "jaccard": 0.4444444444444444,
+      "gt_coverage": 0.6666666666666666
+    },
+    {
+      "rank": 2,
+      "first_token": "N",
+      "first_token_id": 45,
+      "first_p": 0.5572066903114319,
+      "pred_coc": "Nudge to the left to avoid the parked car with an open door on the right.",
+      "pred_coc_raw": "Nudge to the left to avoid the parked car with an open door on the right.<|cot_end|><|traj_future_start|>Dec",
+      "readable": true,
+      "jaccard": 0.11764705882352941,
+      "gt_coverage": 0.3333333333333333
+    },
+    {
+      "rank": 3,
+      "first_token": "N",
+      "first_token_id": 45,
+      "first_p": 0.5572066903114319,
+      "pred_coc": "Nudge to the left to give space to the pedestrian near the parked car",
+      "pred_coc_raw": "Nudge to the left to give space to the pedestrian near the parked car<|cot_end|><|traj_future_start|><|traj_future_start|>",
+      "readable": true,
+      "jaccard": 0.14285714285714285,
+      "gt_coverage": 0.3333333333333333
+    }
+  ]
+}

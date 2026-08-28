@@ -9,11 +9,11 @@
     "Decelerate to maintain a safe distance from the pedestrians crossing the street.",
     "Decelerate to maintain a safe distance from the pedestrians crossing the street."
   ],
-  "pred_coc_raw": "Y<|im_end|>",
-  "pred_coc": "Y",
-  "readable": false,
-  "jaccard": 0.0,
-  "gt_coverage": 0.0,
+  "pred_coc_raw": "Stop to yield to the pedestrian in the crosswalk ahead.<|cot_end|><|traj_future_start|> experience",
+  "pred_coc": "Stop to yield to the pedestrian in the crosswalk ahead.",
+  "readable": true,
+  "jaccard": 0.11764705882352941,
+  "gt_coverage": 0.18181818181818182,
   "image_grid": [
     [
       "01_8e83f069/00_cross_left_120_t-0.3s.jpg",
@@ -152,14 +152,14 @@
   "top5_coc": [
     {
       "rank": 1,
-      "first_token": "Y",
-      "first_token_id": 56,
-      "first_p": 0.4907270073890686,
-      "pred_coc": "Y",
-      "pred_coc_raw": "Y<|im_end|>",
-      "readable": false,
-      "jaccard": 0.0,
-      "gt_coverage": 0.0
+      "first_token": "Stop",
+      "first_token_id": 10674,
+      "first_p": 0.2467530369758606,
+      "pred_coc": "Stop to yield to the pedestrian in the crosswalk ahead.",
+      "pred_coc_raw": "Stop to yield to the pedestrian in the crosswalk ahead.<|cot_end|><|traj_future_start|> experience",
+      "readable": true,
+      "jaccard": 0.11764705882352941,
+      "gt_coverage": 0.18181818181818182
     },
     {
       "rank": 2,
@@ -167,43 +167,21 @@
       "first_token_id": 10674,
       "first_p": 0.2467530369758606,
       "pred_coc": "Stop to yield to the pedestrian in the crosswalk.",
-      "pred_coc_raw": "Stop to yield to the pedestrian in the crosswalk.<|cot_end|><|traj_future_start|><|im_end|>",
+      "pred_coc_raw": "Stop to yield to the pedestrian in the crosswalk.<|cot_end|><|traj_future_start|>\ud504\ub85c\uadf8\ub7a8",
       "readable": true,
       "jaccard": 0.125,
       "gt_coverage": 0.18181818181818182
     },
     {
       "rank": 3,
-      "first_token": "N",
-      "first_token_id": 45,
-      "first_p": 0.0852755680680275,
-      "pred_coc": "N\u6df1\u6df1 right to pass the pedestrian in the crosswalk.",
-      "pred_coc_raw": "N\u6df1\u6df1 right to pass the pedestrian in the crosswalk.<|cot_end|><|traj_future_start|><|traj_future_start|>",
+      "first_token": "Y",
+      "first_token_id": 56,
+      "first_p": 0.4907270073890686,
+      "pred_coc": "Yield to the pedestrian in the crosswalk",
+      "pred_coc_raw": "Yield to the pedestrian in the crosswalk<|cot_end|><|traj_future_start|><|traj_future_start|>",
       "readable": true,
-      "jaccard": 0.11764705882352941,
+      "jaccard": 0.13333333333333333,
       "gt_coverage": 0.18181818181818182
-    },
-    {
-      "rank": 4,
-      "first_token": "Slow",
-      "first_token_id": 58289,
-      "first_p": 0.06641268730163574,
-      "pred_coc": "Slow down to yield to the pedestrian in the crosswalk.",
-      "pred_coc_raw": "Slow down to yield to the pedestrian in the crosswalk.<|cot_end|><|traj_future_start|><|im_end|>",
-      "readable": true,
-      "jaccard": 0.11764705882352941,
-      "gt_coverage": 0.18181818181818182
-    },
-    {
-      "rank": 5,
-      "first_token": "Keep",
-      "first_token_id": 19434,
-      "first_p": 0.021561041474342346,
-      "pred_coc": "Keep distance to the lead vehicle because it is stopped at the crosswalk ahead.",
-      "pred_coc_raw": "Keep distance to the lead vehicle because it is stopped at the crosswalk ahead.<|cot_end|><|traj_future_start|><|im_end|>",
-      "readable": true,
-      "jaccard": 0.14285714285714285,
-      "gt_coverage": 0.2727272727272727
     }
   ]
 }

@@ -8,11 +8,11 @@
   "gt_coc_texts": [
     "Turn left while keeping a safe distance from the construction cones on the right."
   ],
-  "pred_coc_raw": "Stop to yield to the construction flagger ahead.<|cot_end|><|traj_future_start|><|im_end|>",
-  "pred_coc": "Stop to yield to the construction flagger ahead.",
+  "pred_coc_raw": "Slow down due to a road worker directing traffic.<|cot_end|><|traj_future_start|><|im_end|>",
+  "pred_coc": "Slow down due to a road worker directing traffic.",
   "readable": true,
-  "jaccard": 0.1111111111111111,
-  "gt_coverage": 0.15384615384615385,
+  "jaccard": 0.047619047619047616,
+  "gt_coverage": 0.07692307692307693,
   "image_grid": [
     [
       "00_faff17c7/00_cross_left_120_t-0.3s.jpg",
@@ -151,58 +151,36 @@
   "top5_coc": [
     {
       "rank": 1,
-      "first_token": "Stop",
-      "first_token_id": 10674,
-      "first_p": 0.4461762011051178,
-      "pred_coc": "Stop to yield to the construction flagger ahead.",
-      "pred_coc_raw": "Stop to yield to the construction flagger ahead.<|cot_end|><|traj_future_start|><|im_end|>",
-      "readable": true,
-      "jaccard": 0.1111111111111111,
-      "gt_coverage": 0.15384615384615385
-    },
-    {
-      "rank": 2,
       "first_token": "Slow",
       "first_token_id": 58289,
       "first_p": 0.27061954140663147,
-      "pred_coc": "Slow down to yield to the construction flagger.",
-      "pred_coc_raw": "Slow down to yield to the construction flagger.<|cot_end|><|traj_future_start|><|im_end|>",
+      "pred_coc": "Slow down due to a road worker directing traffic.",
+      "pred_coc_raw": "Slow down due to a road worker directing traffic.<|cot_end|><|traj_future_start|><|im_end|>",
       "readable": true,
-      "jaccard": 0.1111111111111111,
-      "gt_coverage": 0.15384615384615385
+      "jaccard": 0.047619047619047616,
+      "gt_coverage": 0.07692307692307693
     },
     {
-      "rank": 3,
-      "first_token": "Keep",
-      "first_token_id": 19434,
-      "first_p": 0.0603833869099617,
-      "pred_coc": "Keep",
-      "pred_coc_raw": "Keep<|im_end|>",
+      "rank": 2,
+      "first_token": "Stop",
+      "first_token_id": 10674,
+      "first_p": 0.4461762011051178,
+      "pred_coc": "Stop due to",
+      "pred_coc_raw": "Stop due to<|im_end|>",
       "readable": false,
       "jaccard": 0.0,
       "gt_coverage": 0.0
     },
     {
-      "rank": 4,
-      "first_token": "N",
-      "first_token_id": 45,
-      "first_p": 0.0603833869099617,
-      "pred_coc": "NTurn on the right due to the construction worker and cones\u5c4e ahead.",
-      "pred_coc_raw": "NTurn on the right due to the construction worker and cones\u5c4e ahead.<|cot_end|><|traj_future_start|><|traj_future_start|>",
+      "rank": 3,
+      "first_token": "Stop",
+      "first_token_id": 10674,
+      "first_p": 0.4461762011051178,
+      "pred_coc": "Stop due to the construction flagger holding a stop sign.",
+      "pred_coc_raw": "Stop due to the construction flagger holding a stop sign.<|cot_end|><|traj_future_start|><|im_end|>",
       "readable": true,
-      "jaccard": 0.2631578947368421,
-      "gt_coverage": 0.38461538461538464
-    },
-    {
-      "rank": 5,
-      "first_token": "Turn",
-      "first_token_id": 19389,
-      "first_p": 0.0603833869099617,
-      "pred_coc": "Turn",
-      "pred_coc_raw": "Turn<|im_end|>",
-      "readable": false,
-      "jaccard": 0.07692307692307693,
-      "gt_coverage": 0.07692307692307693
+      "jaccard": 0.15789473684210525,
+      "gt_coverage": 0.23076923076923078
     }
   ]
 }

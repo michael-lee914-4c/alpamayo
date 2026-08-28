@@ -7,10 +7,10 @@ it is not in the CoC subset.
 
 from __future__ import annotations
 
+import argparse
 import gc
 import html
 import json
-import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -19,8 +19,8 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 from alpamayo_r1.load_physical_aiavdataset import load_physical_aiavdataset
-from mlx_port.gt_eval import list_local_coc_clips, load_clip_gt, score_coc
-from mlx_port.inference import generate_top_k_coc
+from mlx_port.gt_eval import clean_pred_coc, list_local_coc_clips, load_clip_gt, score_coc
+from mlx_port.inference import generate_top_k_coc, sample_n_coc
 from mlx_port.models.alpamayo_r1_mlx import AlpamayoR1MLX
 from mlx_port.processor import (
     DEFAULT_NUM_FRAMES,
@@ -43,7 +43,6 @@ CAM_NAMES = {
 TIME_LABELS = ["t-0.3s", "t-0.2s", "t-0.1s", "t+0.0s"]
 # NVIDIA loader requires t0 > num_history_steps * 0.1s (1.6s).
 MIN_T0_US = 1_600_001
-_SPECIAL_RE = re.compile(r"<\|[^|>]+?\|>")
 
 
 def _first_event_t0(events: object) -> int | None:
@@ -58,14 +57,6 @@ def _first_event_t0(events: object) -> int | None:
         return None
     ts = ev0.get("event_start_timestamp")
     return int(ts) if ts is not None else None
-
-
-def clean_pred_coc(text: str | None) -> str:
-    if not text:
-        return ""
-    cleaned = re.sub(r"\s+", " ", _SPECIAL_RE.sub(" ", text)).strip()
-    # Drop a leftover single-letter prefix from an aborted first token (e.g. "Y Slow…").
-    return re.sub(r"^[A-Z]\s+", "", cleaned)
 
 
 def select_local_coc_clips(n: int, seed: int) -> list[str]:
@@ -282,7 +273,18 @@ def _record_from_data(
     }
 
 
-def run_one_clip(model, processor, clip_id: str, clip_dir: Path) -> dict:
+def run_one_clip(
+    model,
+    processor,
+    clip_id: str,
+    clip_dir: Path,
+    *,
+    mode: str = "topk",
+    k: int = 5,
+    temperature: float = 0.0,
+    top_p: float = 1.0,
+    seed: int | None = None,
+) -> dict:
     gt = load_clip_gt(clip_id)
     t0_us = int(gt["events"][0]["event_start_timestamp"])
     data = load_physical_aiavdataset(
@@ -293,21 +295,41 @@ def run_one_clip(model, processor, clip_id: str, clip_dir: Path) -> dict:
         num_frames=DEFAULT_NUM_FRAMES,
     )
     inputs = _prepare_inputs(processor, data["image_frames"])
-    top5 = generate_top_k_coc(
-        model=model,
-        data={
-            "tokenized_data": inputs,
-            "ego_history_xyz": data["ego_history_xyz"],
-            "ego_history_rot": data["ego_history_rot"],
-        },
-        k=5,
-        max_generation_length=256,
-    )
-    pred_raw = top5[0]["raw"] if top5 else None
-    return _record_from_data(clip_id, clip_dir, gt, data, pred_raw, top5=top5)
+    payload = {
+        "tokenized_data": inputs,
+        "ego_history_xyz": data["ego_history_xyz"],
+        "ego_history_rot": data["ego_history_rot"],
+    }
+    if mode == "samples":
+        rows = sample_n_coc(
+            model=model,
+            data=payload,
+            n=k,
+            temperature=temperature,
+            top_p=top_p,
+            max_generation_length=256,
+            seed=seed,
+        )
+    else:
+        rows = generate_top_k_coc(
+            model=model,
+            data=payload,
+            k=k,
+            max_generation_length=256,
+        )
+    pred_raw = rows[0]["raw"] if rows else None
+    return _record_from_data(clip_id, clip_dir, gt, data, pred_raw, top5=rows)
 
 
-def _html_report(results: list[dict], generated_at: str) -> str:
+def _html_report(
+    results: list[dict],
+    generated_at: str,
+    *,
+    mode: str = "topk",
+    k: int = 5,
+    temperature: float = 0.0,
+    top_p: float = 1.0,
+) -> str:
     n_read = sum(1 for r in results if r["readable"])
     rows = []
     for i, r in enumerate(results):
@@ -369,7 +391,11 @@ def _html_report(results: list[dict], generated_at: str) -> str:
             )
         top5_html = (
             f"""<div class="mb-5 overflow-auto bg-slate-950 border border-slate-800 rounded-2xl">
-              <div class="px-4 pt-3 text-[11px] uppercase tracking-wider text-amber-500">Top-5 CoC (first-token rank, then greedy)</div>
+              <div class="px-4 pt-3 text-[11px] uppercase tracking-wider text-amber-500">{
+                f"{k} independent samples (T={temperature}, top_p={top_p})"
+                if mode == "samples"
+                else f"Top-{k} CoC (first-token rank, then greedy)"
+              }</div>
               <table class="w-full text-left text-sm mt-2">
                 <thead class="text-[11px] text-slate-500 border-b border-slate-800">
                   <tr><th class="px-2 py-1">#</th><th class="px-2 py-1">P(first)</th><th class="px-2 py-1">First</th><th class="px-2 py-1">CoC</th><th class="px-2 py-1">Readable</th></tr>
@@ -395,7 +421,11 @@ def _html_report(results: list[dict], generated_at: str) -> str:
                   <ul class="text-sm text-slate-200 list-disc pl-5">{gt_block}</ul>
                 </div>
                 <div class="bg-slate-950 border border-amber-900/50 rounded-2xl p-4">
-                  <div class="text-[11px] uppercase tracking-wider text-amber-500 mb-2">Generated CoC (greedy = top-1)</div>
+                  <div class="text-[11px] uppercase tracking-wider text-amber-500 mb-2">{
+                    "Generated CoC (sample 1)"
+                    if mode == "samples"
+                    else "Generated CoC (greedy = top-1)"
+                  }</div>
                   <p class="text-sm text-amber-100">{pred}</p>
                   {f'<p class="mt-2 text-[11px] text-slate-500 font-mono break-all">{pred_raw}</p>' if pred_raw and pred_raw != pred else ""}
                 </div>
@@ -436,8 +466,15 @@ def _html_report(results: list[dict], generated_at: str) -> str:
     <h1 class="font-display text-3xl text-white mb-2">Local PAI-CoC sample</h1>
     <p class="text-sm text-slate-400 mb-6">
       {N_CLIPS} random clips from the on-disk CoC subset (chunks 0–249, seed={SEED}).
-      Top-5 CoC: prefill once, take the 5 most likely first tokens (after the
-      expert traj-bin mask), then greedy-complete each. Rank 1 is the greedy CoC.
+      {
+        f"NVIDIA sampling: {k} independent CoCs from one prefill "
+        f"(temperature={temperature}, top_p={top_p}). Not first-token top-k."
+        if mode == "samples"
+        else (
+          f"Top-{k} CoC: prefill once, take the {k} most likely first tokens "
+          "(after the expert traj-bin mask), then greedy-complete each. Rank 1 is the greedy CoC."
+        )
+      }
       t0 is the CoC event timestamp, not NVIDIA’s 5.1 s default.
       Jaccard is cheap word overlap — read the sentences.
       Generated {html.escape(generated_at)}. Readable CoC: {n_read}/{len(results)}.
@@ -462,21 +499,48 @@ def _html_report(results: list[dict], generated_at: str) -> str:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Run CoC on random local PAI-CoC clips.")
+    parser.add_argument(
+        "--mode",
+        choices=("topk", "samples"),
+        default="topk",
+        help="topk = first-token rank + greedy. samples = NVIDIA T/top_p rollouts.",
+    )
+    parser.add_argument("--k", type=int, default=5, help="Top-k first tokens or number of samples")
+    parser.add_argument("--temperature", type=float, default=0.0)
+    parser.add_argument("--top-p", type=float, default=1.0)
+    parser.add_argument(
+        "--report-dir",
+        type=Path,
+        default=REPORT_DIR,
+        help="Write HTML/JSON here (default: reports/coc_sample_5)",
+    )
+    parser.add_argument(
+        "--no-reuse",
+        action="store_true",
+        help="Ignore cached clip result.json and rerun inference.",
+    )
+    args = parser.parse_args()
+
     n_local = len(list_local_coc_clips())
     chosen = select_local_coc_clips(N_CLIPS, SEED)
-    print(f"[coc-sample] {n_local} local CoC clips; seed={SEED}; selected:")
+    print(
+        f"[coc-sample] {n_local} local CoC clips; seed={SEED}; "
+        f"mode={args.mode} k={args.k} T={args.temperature} top_p={args.top_p}"
+    )
     for i, cid in enumerate(chosen):
         print(f"  [{i}] {cid}")
 
-    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    report_dir = args.report_dir
+    report_dir.mkdir(parents=True, exist_ok=True)
     model = None
     processor = None
     results = []
     for i, cid in enumerate(chosen):
         print(f"\n[coc-sample] === clip {i}/{N_CLIPS-1} {cid} ===")
-        clip_dir = REPORT_DIR / f"{i:02d}_{cid[:8]}"
+        clip_dir = report_dir / f"{i:02d}_{cid[:8]}"
         cached = clip_dir / "result.json"
-        rec = json.loads(cached.read_text()) if cached.exists() else None
+        rec = None if args.no_reuse else (json.loads(cached.read_text()) if cached.exists() else None)
         if rec is not None and rec.get("top5_coc"):
             print(f"[coc-sample] reuse {cached}")
         else:
@@ -486,7 +550,17 @@ def main() -> None:
                     str(CHECKPOINT), load_expert=False, dtype=mx.bfloat16
                 )
                 processor = get_processor(model.tokenizer)
-            rec = run_one_clip(model, processor, str(cid), clip_dir)
+            rec = run_one_clip(
+                model,
+                processor,
+                str(cid),
+                clip_dir,
+                mode=args.mode,
+                k=args.k,
+                temperature=args.temperature,
+                top_p=args.top_p,
+                seed=SEED + i,
+            )
             cached.write_text(json.dumps(rec, indent=2) + "\n")
             gc.collect()
             mx.clear_cache()
@@ -504,9 +578,18 @@ def main() -> None:
         )
 
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    (REPORT_DIR / "results.json").write_text(json.dumps(results, indent=2) + "\n")
-    html_path = REPORT_DIR / "index.html"
-    html_path.write_text(_html_report(results, generated_at))
+    (report_dir / "results.json").write_text(json.dumps(results, indent=2) + "\n")
+    html_path = report_dir / "index.html"
+    html_path.write_text(
+        _html_report(
+            results,
+            generated_at,
+            mode=args.mode,
+            k=args.k,
+            temperature=args.temperature,
+            top_p=args.top_p,
+        )
+    )
     print(f"\n[coc-sample] wrote {html_path}")
 
 

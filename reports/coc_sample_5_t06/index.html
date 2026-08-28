@@ -16,11 +16,10 @@
     <h1 class="font-display text-3xl text-white mb-2">Local PAI-CoC sample</h1>
     <p class="text-sm text-slate-400 mb-6">
       5 random clips from the on-disk CoC subset (chunks 0–249, seed=42).
-      Top-5 CoC: prefill once, take the 5 most likely first tokens (after the
-      expert traj-bin mask), then greedy-complete each. Rank 1 is the greedy CoC.
+      NVIDIA sampling: 3 independent CoCs from one prefill (temperature=0.6, top_p=0.98). Not first-token top-k.
       t0 is the CoC event timestamp, not NVIDIA’s 5.1 s default.
       Jaccard is cheap word overlap — read the sentences.
-      Generated 2026-08-28 19:51 UTC. Readable CoC: 4/5.
+      Generated 2026-08-28 20:27 UTC. Readable CoC: 5/5.
     </p>
     <div class="overflow-auto bg-slate-900 border border-slate-700 rounded-2xl mb-10">
       <table class="w-full text-left text-sm">
@@ -36,33 +35,33 @@
               <td class="px-3 py-2 font-mono text-[11px]"><a class="text-cyan-400 hover:underline" href="#clip-0">faff17c7…</a></td>
               <td class="px-3 py-2 text-xs">WORK_ZONES_TEMP_TRAFFIC_CONTROL</td>
               <td class="px-3 py-2 text-xs text-emerald-400">True</td>
-              <td class="px-3 py-2 text-xs tabular-nums">0.111</td>
+              <td class="px-3 py-2 text-xs tabular-nums">0.048</td>
               <td class="px-3 py-2 text-xs text-slate-300">Turn left while keeping a safe distance from the construction cones on the right.</td>
-              <td class="px-3 py-2 text-xs text-amber-200">Stop to yield to the construction flagger ahead.</td>
+              <td class="px-3 py-2 text-xs text-amber-200">Slow down due to a road worker directing traffic.</td>
             </tr><tr>
               <td class="px-3 py-2 text-slate-400">1</td>
               <td class="px-3 py-2 font-mono text-[11px]"><a class="text-cyan-400 hover:underline" href="#clip-1">8e83f069…</a></td>
               <td class="px-3 py-2 text-xs">PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY</td>
-              <td class="px-3 py-2 text-xs text-rose-400">False</td>
-              <td class="px-3 py-2 text-xs tabular-nums">0.000</td>
+              <td class="px-3 py-2 text-xs text-emerald-400">True</td>
+              <td class="px-3 py-2 text-xs tabular-nums">0.118</td>
               <td class="px-3 py-2 text-xs text-slate-300">Decelerate to maintain a safe distance from the pedestrians crossing the street.</td>
-              <td class="px-3 py-2 text-xs text-amber-200">Y</td>
+              <td class="px-3 py-2 text-xs text-amber-200">Stop to yield to the pedestrian in the crosswalk ahead.</td>
             </tr><tr>
               <td class="px-3 py-2 text-slate-400">2</td>
               <td class="px-3 py-2 font-mono text-[11px]"><a class="text-cyan-400 hover:underline" href="#clip-2">1946f1c3…</a></td>
               <td class="px-3 py-2 text-xs">PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY</td>
               <td class="px-3 py-2 text-xs text-emerald-400">True</td>
-              <td class="px-3 py-2 text-xs tabular-nums">0.333</td>
+              <td class="px-3 py-2 text-xs tabular-nums">0.273</td>
               <td class="px-3 py-2 text-xs text-slate-300">Yield to the pedestrian crossing the road.</td>
-              <td class="px-3 py-2 text-xs text-amber-200">Stop to yield to the cross-traffic vehicle crossing ahead. -translate</td>
+              <td class="px-3 py-2 text-xs text-amber-200">Stop to yield to the cross-traffic vehicle ahead.</td>
             </tr><tr>
               <td class="px-3 py-2 text-slate-400">3</td>
               <td class="px-3 py-2 font-mono text-[11px]"><a class="text-cyan-400 hover:underline" href="#clip-3">8e06f83c…</a></td>
               <td class="px-3 py-2 text-xs">PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY</td>
               <td class="px-3 py-2 text-xs text-emerald-400">True</td>
-              <td class="px-3 py-2 text-xs tabular-nums">0.154</td>
+              <td class="px-3 py-2 text-xs tabular-nums">0.444</td>
               <td class="px-3 py-2 text-xs text-slate-300">Yield to the pedestrians crossing the road.</td>
-              <td class="px-3 py-2 text-xs text-amber-200">Nudge to the left to give space to the pedestrian ahead. Slow</td>
+              <td class="px-3 py-2 text-xs text-amber-200">Stop to yield to the pedestrian crossing ahead</td>
             </tr><tr>
               <td class="px-3 py-2 text-slate-400">4</td>
               <td class="px-3 py-2 font-mono text-[11px]"><a class="text-cyan-400 hover:underline" href="#clip-4">36cb5485…</a></td>
@@ -80,7 +79,7 @@
                   <div class="font-display text-xl text-white">Clip 0 · <span class="font-mono text-sm text-cyan-300">faff17c7-4572-472a-be28-0f035bb88a37</span></div>
                   <div class="text-xs text-slate-400 mt-1">chunk=4 · train · WORK_ZONES_TEMP_TRAFFIC_CONTROL · t0_us=5627325 · path 9.7 m</div>
                 </div>
-                <div class="text-xs text-slate-400">readable=<span class="text-emerald-400">True</span> · jaccard=0.111 · gt_coverage=0.154</div>
+                <div class="text-xs text-slate-400">readable=<span class="text-emerald-400">True</span> · jaccard=0.048 · gt_coverage=0.077</div>
               </div>
               <div class="grid md:grid-cols-2 gap-4 mb-5">
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
@@ -88,18 +87,18 @@
                   <ul class="text-sm text-slate-200 list-disc pl-5"><li class='mb-1'>Turn left while keeping a safe distance from the construction cones on the right.</li></ul>
                 </div>
                 <div class="bg-slate-950 border border-amber-900/50 rounded-2xl p-4">
-                  <div class="text-[11px] uppercase tracking-wider text-amber-500 mb-2">Generated CoC (greedy = top-1)</div>
-                  <p class="text-sm text-amber-100">Stop to yield to the construction flagger ahead.</p>
-                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Stop to yield to the construction flagger ahead.&lt;|cot_end|&gt;&lt;|traj_future_start|&gt;&lt;|im_end|&gt;</p>
+                  <div class="text-[11px] uppercase tracking-wider text-amber-500 mb-2">Generated CoC (sample 1)</div>
+                  <p class="text-sm text-amber-100">Slow down due to a road worker directing traffic.</p>
+                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Slow down due to a road worker directing traffic.&lt;|cot_end|&gt;&lt;|traj_future_start|&gt;&lt;|im_end|&gt;</p>
                 </div>
               </div>
               <div class="mb-5 overflow-auto bg-slate-950 border border-slate-800 rounded-2xl">
-              <div class="px-4 pt-3 text-[11px] uppercase tracking-wider text-amber-500">Top-5 CoC (first-token rank, then greedy)</div>
+              <div class="px-4 pt-3 text-[11px] uppercase tracking-wider text-amber-500">3 independent samples (T=0.6, top_p=0.98)</div>
               <table class="w-full text-left text-sm mt-2">
                 <thead class="text-[11px] text-slate-500 border-b border-slate-800">
                   <tr><th class="px-2 py-1">#</th><th class="px-2 py-1">P(first)</th><th class="px-2 py-1">First</th><th class="px-2 py-1">CoC</th><th class="px-2 py-1">Readable</th></tr>
                 </thead>
-                <tbody><tr><td class='px-2 py-1 text-slate-400'>1</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.446</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Stop</td><td class='px-2 py-1 text-amber-100'>Stop to yield to the construction flagger ahead.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>2</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.271</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Slow</td><td class='px-2 py-1 text-amber-100'>Slow down to yield to the construction flagger.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>3</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.060</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Keep</td><td class='px-2 py-1 text-amber-100'>Keep</td><td class='px-2 py-1 text-xs text-rose-400'>False</td></tr><tr><td class='px-2 py-1 text-slate-400'>4</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.060</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>N</td><td class='px-2 py-1 text-amber-100'>NTurn on the right due to the construction worker and cones屎 ahead.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>5</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.060</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Turn</td><td class='px-2 py-1 text-amber-100'>Turn</td><td class='px-2 py-1 text-xs text-rose-400'>False</td></tr></tbody>
+                <tbody><tr><td class='px-2 py-1 text-slate-400'>1</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.271</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Slow</td><td class='px-2 py-1 text-amber-100'>Slow down due to a road worker directing traffic.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>2</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.446</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Stop</td><td class='px-2 py-1 text-amber-100'>Stop due to</td><td class='px-2 py-1 text-xs text-rose-400'>False</td></tr><tr><td class='px-2 py-1 text-slate-400'>3</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.446</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Stop</td><td class='px-2 py-1 text-amber-100'>Stop due to the construction flagger holding a stop sign.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr></tbody>
               </table>
             </div>
               <div class="text-sm font-semibold text-slate-300 mb-2">16-image history (4 cameras × 4 frames)</div>
@@ -170,7 +169,7 @@
                   <div class="font-display text-xl text-white">Clip 1 · <span class="font-mono text-sm text-cyan-300">8e83f069-5fc5-4329-8589-4527de19d03e</span></div>
                   <div class="text-xs text-slate-400 mt-1">chunk=176 · train · PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY · t0_us=1733299 · path 12.4 m</div>
                 </div>
-                <div class="text-xs text-slate-400">readable=<span class="text-rose-400">False</span> · jaccard=0.000 · gt_coverage=0.000</div>
+                <div class="text-xs text-slate-400">readable=<span class="text-emerald-400">True</span> · jaccard=0.118 · gt_coverage=0.182</div>
               </div>
               <div class="grid md:grid-cols-2 gap-4 mb-5">
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
@@ -178,18 +177,18 @@
                   <ul class="text-sm text-slate-200 list-disc pl-5"><li class='mb-1'>Decelerate to maintain a safe distance from the pedestrians crossing the street.</li><li class='mb-1'>Decelerate to maintain a safe distance from the pedestrians crossing the street.</li></ul>
                 </div>
                 <div class="bg-slate-950 border border-amber-900/50 rounded-2xl p-4">
-                  <div class="text-[11px] uppercase tracking-wider text-amber-500 mb-2">Generated CoC (greedy = top-1)</div>
-                  <p class="text-sm text-amber-100">Y</p>
-                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Y&lt;|im_end|&gt;</p>
+                  <div class="text-[11px] uppercase tracking-wider text-amber-500 mb-2">Generated CoC (sample 1)</div>
+                  <p class="text-sm text-amber-100">Stop to yield to the pedestrian in the crosswalk ahead.</p>
+                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Stop to yield to the pedestrian in the crosswalk ahead.&lt;|cot_end|&gt;&lt;|traj_future_start|&gt; experience</p>
                 </div>
               </div>
               <div class="mb-5 overflow-auto bg-slate-950 border border-slate-800 rounded-2xl">
-              <div class="px-4 pt-3 text-[11px] uppercase tracking-wider text-amber-500">Top-5 CoC (first-token rank, then greedy)</div>
+              <div class="px-4 pt-3 text-[11px] uppercase tracking-wider text-amber-500">3 independent samples (T=0.6, top_p=0.98)</div>
               <table class="w-full text-left text-sm mt-2">
                 <thead class="text-[11px] text-slate-500 border-b border-slate-800">
                   <tr><th class="px-2 py-1">#</th><th class="px-2 py-1">P(first)</th><th class="px-2 py-1">First</th><th class="px-2 py-1">CoC</th><th class="px-2 py-1">Readable</th></tr>
                 </thead>
-                <tbody><tr><td class='px-2 py-1 text-slate-400'>1</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.491</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Y</td><td class='px-2 py-1 text-amber-100'>Y</td><td class='px-2 py-1 text-xs text-rose-400'>False</td></tr><tr><td class='px-2 py-1 text-slate-400'>2</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.247</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Stop</td><td class='px-2 py-1 text-amber-100'>Stop to yield to the pedestrian in the crosswalk.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>3</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.085</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>N</td><td class='px-2 py-1 text-amber-100'>N深深 right to pass the pedestrian in the crosswalk.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>4</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.066</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Slow</td><td class='px-2 py-1 text-amber-100'>Slow down to yield to the pedestrian in the crosswalk.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>5</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.022</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Keep</td><td class='px-2 py-1 text-amber-100'>Keep distance to the lead vehicle because it is stopped at the crosswalk ahead.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr></tbody>
+                <tbody><tr><td class='px-2 py-1 text-slate-400'>1</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.247</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Stop</td><td class='px-2 py-1 text-amber-100'>Stop to yield to the pedestrian in the crosswalk ahead.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>2</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.247</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Stop</td><td class='px-2 py-1 text-amber-100'>Stop to yield to the pedestrian in the crosswalk.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>3</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.491</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Y</td><td class='px-2 py-1 text-amber-100'>Yield to the pedestrian in the crosswalk</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr></tbody>
               </table>
             </div>
               <div class="text-sm font-semibold text-slate-300 mb-2">16-image history (4 cameras × 4 frames)</div>
@@ -260,7 +259,7 @@
                   <div class="font-display text-xl text-white">Clip 2 · <span class="font-mono text-sm text-cyan-300">1946f1c3-8638-4648-8944-506e6bffc4df</span></div>
                   <div class="text-xs text-slate-400 mt-1">chunk=177 · train · PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY · t0_us=5699907 · path 6.7 m</div>
                 </div>
-                <div class="text-xs text-slate-400">readable=<span class="text-emerald-400">True</span> · jaccard=0.333 · gt_coverage=0.667</div>
+                <div class="text-xs text-slate-400">readable=<span class="text-emerald-400">True</span> · jaccard=0.273 · gt_coverage=0.500</div>
               </div>
               <div class="grid md:grid-cols-2 gap-4 mb-5">
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
@@ -268,18 +267,18 @@
                   <ul class="text-sm text-slate-200 list-disc pl-5"><li class='mb-1'>Yield to the pedestrian crossing the road.</li></ul>
                 </div>
                 <div class="bg-slate-950 border border-amber-900/50 rounded-2xl p-4">
-                  <div class="text-[11px] uppercase tracking-wider text-amber-500 mb-2">Generated CoC (greedy = top-1)</div>
-                  <p class="text-sm text-amber-100">Stop to yield to the cross-traffic vehicle crossing ahead. -translate</p>
-                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Stop to yield to the cross-traffic vehicle crossing ahead.&lt;|cot_end|&gt;&lt;|traj_future_start|&gt;-translate</p>
+                  <div class="text-[11px] uppercase tracking-wider text-amber-500 mb-2">Generated CoC (sample 1)</div>
+                  <p class="text-sm text-amber-100">Stop to yield to the cross-traffic vehicle ahead.</p>
+                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Stop to yield to the cross-traffic vehicle ahead.&lt;|cot_end|&gt;&lt;|traj_future_start|&gt;located</p>
                 </div>
               </div>
               <div class="mb-5 overflow-auto bg-slate-950 border border-slate-800 rounded-2xl">
-              <div class="px-4 pt-3 text-[11px] uppercase tracking-wider text-amber-500">Top-5 CoC (first-token rank, then greedy)</div>
+              <div class="px-4 pt-3 text-[11px] uppercase tracking-wider text-amber-500">3 independent samples (T=0.6, top_p=0.98)</div>
               <table class="w-full text-left text-sm mt-2">
                 <thead class="text-[11px] text-slate-500 border-b border-slate-800">
                   <tr><th class="px-2 py-1">#</th><th class="px-2 py-1">P(first)</th><th class="px-2 py-1">First</th><th class="px-2 py-1">CoC</th><th class="px-2 py-1">Readable</th></tr>
                 </thead>
-                <tbody><tr><td class='px-2 py-1 text-slate-400'>1</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.439</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Stop</td><td class='px-2 py-1 text-amber-100'>Stop to yield to the cross-traffic vehicle crossing ahead. -translate</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>2</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.387</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Y</td><td class='px-2 py-1 text-amber-100'>YY toRAPNudge to yield to the oncoming car. valves</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>3</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.111</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Keep</td><td class='px-2 py-1 text-amber-100'>Keep distance to the lead vehicle because it is stopped ahead. -translate</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>4</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.028</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>N</td><td class='px-2 py-1 text-amber-100'>Nseek to keep distance from the oncoming car. Authorize</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>5</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.028</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Slow</td><td class='px-2 py-1 text-amber-100'>Slow down to yield to the cross-traffic vehicle ahead. -translate</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr></tbody>
+                <tbody><tr><td class='px-2 py-1 text-slate-400'>1</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.439</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Stop</td><td class='px-2 py-1 text-amber-100'>Stop to yield to the cross-traffic vehicle ahead.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>2</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.387</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Y</td><td class='px-2 py-1 text-amber-100'>control to keep a safe gap to thewan economist area.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>3</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.439</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Stop</td><td class='px-2 py-1 text-amber-100'>Stop to keep distance to the lead LibertN</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr></tbody>
               </table>
             </div>
               <div class="text-sm font-semibold text-slate-300 mb-2">16-image history (4 cameras × 4 frames)</div>
@@ -350,7 +349,7 @@
                   <div class="font-display text-xl text-white">Clip 3 · <span class="font-mono text-sm text-cyan-300">8e06f83c-4de6-4cde-82ab-4a747645f80a</span></div>
                   <div class="text-xs text-slate-400 mt-1">chunk=26 · train · PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY · t0_us=8461666 · path 12.0 m</div>
                 </div>
-                <div class="text-xs text-slate-400">readable=<span class="text-emerald-400">True</span> · jaccard=0.154 · gt_coverage=0.333</div>
+                <div class="text-xs text-slate-400">readable=<span class="text-emerald-400">True</span> · jaccard=0.444 · gt_coverage=0.667</div>
               </div>
               <div class="grid md:grid-cols-2 gap-4 mb-5">
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
@@ -358,18 +357,18 @@
                   <ul class="text-sm text-slate-200 list-disc pl-5"><li class='mb-1'>Yield to the pedestrians crossing the road.</li></ul>
                 </div>
                 <div class="bg-slate-950 border border-amber-900/50 rounded-2xl p-4">
-                  <div class="text-[11px] uppercase tracking-wider text-amber-500 mb-2">Generated CoC (greedy = top-1)</div>
-                  <p class="text-sm text-amber-100">Nudge to the left to give space to the pedestrian ahead. Slow</p>
-                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Nudge to the left to give space to the pedestrian ahead.&lt;|cot_end|&gt;&lt;|traj_future_start|&gt;Slow</p>
+                  <div class="text-[11px] uppercase tracking-wider text-amber-500 mb-2">Generated CoC (sample 1)</div>
+                  <p class="text-sm text-amber-100">Stop to yield to the pedestrian crossing ahead</p>
+                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Stop to yield to the pedestrian crossing ahead&lt;|cot_end|&gt;&lt;|traj_future_start|&gt;&lt;|im_end|&gt;</p>
                 </div>
               </div>
               <div class="mb-5 overflow-auto bg-slate-950 border border-slate-800 rounded-2xl">
-              <div class="px-4 pt-3 text-[11px] uppercase tracking-wider text-amber-500">Top-5 CoC (first-token rank, then greedy)</div>
+              <div class="px-4 pt-3 text-[11px] uppercase tracking-wider text-amber-500">3 independent samples (T=0.6, top_p=0.98)</div>
               <table class="w-full text-left text-sm mt-2">
                 <thead class="text-[11px] text-slate-500 border-b border-slate-800">
                   <tr><th class="px-2 py-1">#</th><th class="px-2 py-1">P(first)</th><th class="px-2 py-1">First</th><th class="px-2 py-1">CoC</th><th class="px-2 py-1">Readable</th></tr>
                 </thead>
-                <tbody><tr><td class='px-2 py-1 text-slate-400'>1</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.557</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>N</td><td class='px-2 py-1 text-amber-100'>Nudge to the left to give space to the pedestrian ahead. Slow</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>2</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.141</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Stop</td><td class='px-2 py-1 text-amber-100'>Stop to yield to the pedestrian crossing the road. Slow</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>3</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.124</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Keep</td><td class='px-2 py-1 text-amber-100'>Keep distance to the pedestrian ahead because the pedestrian is walking in the lane.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>4</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.110</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Slow</td><td class='px-2 py-1 text-amber-100'>Slow down to yield to the pedestrian crossing the road. Slow</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>5</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.031</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Y</td><td class='px-2 py-1 text-amber-100'>Y</td><td class='px-2 py-1 text-xs text-rose-400'>False</td></tr></tbody>
+                <tbody><tr><td class='px-2 py-1 text-slate-400'>1</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.141</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Stop</td><td class='px-2 py-1 text-amber-100'>Stop to yield to the pedestrian crossing ahead</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>2</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.557</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>N</td><td class='px-2 py-1 text-amber-100'>Nudge to the left to avoid the parked car with an open door on the right.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>3</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.557</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>N</td><td class='px-2 py-1 text-amber-100'>Nudge to the left to give space to the pedestrian near the parked car</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr></tbody>
               </table>
             </div>
               <div class="text-sm font-semibold text-slate-300 mb-2">16-image history (4 cameras × 4 frames)</div>
@@ -448,18 +447,18 @@
                   <ul class="text-sm text-slate-200 list-disc pl-5"><li class='mb-1'>Stop for the stop sign while waiting for pedestrians to cross the street.</li></ul>
                 </div>
                 <div class="bg-slate-950 border border-amber-900/50 rounded-2xl p-4">
-                  <div class="text-[11px] uppercase tracking-wider text-amber-500 mb-2">Generated CoC (greedy = top-1)</div>
+                  <div class="text-[11px] uppercase tracking-wider text-amber-500 mb-2">Generated CoC (sample 1)</div>
                   <p class="text-sm text-amber-100">Stop to yield to the pedestrian in the crosswalk.</p>
                   <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Stop to yield to the pedestrian in the crosswalk.&lt;|cot_end|&gt;&lt;|traj_future_start|&gt;&lt;|traj_future_start|&gt;</p>
                 </div>
               </div>
               <div class="mb-5 overflow-auto bg-slate-950 border border-slate-800 rounded-2xl">
-              <div class="px-4 pt-3 text-[11px] uppercase tracking-wider text-amber-500">Top-5 CoC (first-token rank, then greedy)</div>
+              <div class="px-4 pt-3 text-[11px] uppercase tracking-wider text-amber-500">3 independent samples (T=0.6, top_p=0.98)</div>
               <table class="w-full text-left text-sm mt-2">
                 <thead class="text-[11px] text-slate-500 border-b border-slate-800">
                   <tr><th class="px-2 py-1">#</th><th class="px-2 py-1">P(first)</th><th class="px-2 py-1">First</th><th class="px-2 py-1">CoC</th><th class="px-2 py-1">Readable</th></tr>
                 </thead>
-                <tbody><tr><td class='px-2 py-1 text-slate-400'>1</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.642</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Stop</td><td class='px-2 py-1 text-amber-100'>Stop to yield to the pedestrian in the crosswalk.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>2</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.222</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Y</td><td class='px-2 py-1 text-amber-100'>at the stop sign to yield to the pedestrian in the crosswalk. due</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>3</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.077</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>N</td><td class='px-2 py-1 text-amber-100'>NYSlow to yield to the pedestrian in the crosswalk. due</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>4</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.026</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Slow</td><td class='px-2 py-1 text-amber-100'>Slow down to yield to the pedestrian in the crosswalk.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>5</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.004</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'> stop</td><td class='px-2 py-1 text-amber-100'>stop to yield to the pedestrian in the crosswalk.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr></tbody>
+                <tbody><tr><td class='px-2 py-1 text-slate-400'>1</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.642</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Stop</td><td class='px-2 py-1 text-amber-100'>Stop to yield to the pedestrian in the crosswalk.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>2</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.642</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Stop</td><td class='px-2 py-1 text-amber-100'>Stop to yield to the pedestrian in the crosswalk.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>3</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.222</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Y</td><td class='px-2 py-1 text-amber-100'>at the stop sign due to a pedestrian because of bag NullPointerException and a pedestrian in the lane.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr></tbody>
               </table>
             </div>
               <div class="text-sm font-semibold text-slate-300 mb-2">16-image history (4 cameras × 4 frames)</div>

@@ -1,6 +1,6 @@
 {
   "model": "grok-4.6",
-  "generated_at": "2026-08-28 18:10 UTC",
+  "generated_at": "2026-08-28 19:59 UTC",
   "results_path": "/Users/michaellee/Projects/alpamayo/reports/coc_sample_5/results.json",
   "evaluations": [
     {
@@ -17,7 +17,7 @@
       "pred_readable": true,
       "best_match_source": "greedy",
       "best_match_rank": 1,
-      "rationale": "GT is a left turn while clearing construction cones on the right. The greedy pred stays in the work-zone family but names a different actor (flagger) and a different action (stop/yield). Top-5 lines are also work-zone related or garbled and none is a closer semantic match to turning left for cones."
+      "rationale": "GT is a left turn while staying clear of construction cones on the right. The greedy pred is a work-zone instruction but names a different actor (flagger, not cones) and a different action (stop/yield, not turn left). That is the same scene family with a different specific hazard and maneuver, so related rather than a match. Top-5 items are either the same flagger-yield idea, fragments, or garbled wrong-direction text, so none is a closer usable match than greedy."
     },
     {
       "clip_id": "8e83f069-5fc5-4329-8589-4527de19d03e",
@@ -26,15 +26,15 @@
         "Decelerate to maintain a safe distance from the pedestrians crossing the street.",
         "Decelerate to maintain a safe distance from the pedestrians crossing the street."
       ],
-      "pred_coc": "Slow yield to the pedestrian in the crosswalk.",
-      "verdict": "match",
-      "label_alignment": 4,
-      "same_hazard": true,
-      "same_action": true,
-      "pred_readable": true,
+      "pred_coc": "Y",
+      "verdict": "unreadable",
+      "label_alignment": 1,
+      "same_hazard": false,
+      "same_action": false,
+      "pred_readable": false,
       "best_match_source": "top5",
       "best_match_rank": 4,
-      "rationale": "GT is decelerating for pedestrians crossing the street (safe distance). Greedy is the same hazard family and a compatible slow/yield action, though it frames a single crosswalk pedestrian rather than plural proximity. Top-5 #4 (slow down to yield) is slightly closer to GT decelerate than the telegraphic greedy phrasing."
+      "rationale": "Greedy output is just 'Y', not a coherent driving reason, so it cannot match GT (decelerate for pedestrians crossing). Top-5 #4 is the closest usable sentence: slow down / yield to a pedestrian in the crosswalk, same hazard family and a compatible decelerate action. #2 is similar but uses stop rather than slow down."
     },
     {
       "clip_id": "1946f1c3-8638-4648-8944-506e6bffc4df",
@@ -50,7 +50,7 @@
       "pred_readable": true,
       "best_match_source": "greedy",
       "best_match_rank": 1,
-      "rationale": "GT is yield to a pedestrian in the roadway. Greedy (and all top-5) instead cite a vehicle (cross-traffic/oncoming/lead) with no pedestrian actor, so the primary hazard is invented/wrong despite a similar yield/stop action."
+      "rationale": "GT is yield to a pedestrian crossing; greedy (and all top-5) cite a vehicle (cross-traffic/oncoming/lead) instead. Action is similar (stop/yield) but the primary actor/hazard is different, so this is a mismatch. No candidate is closer to GT."
     },
     {
       "clip_id": "8e06f83c-4de6-4cde-82ab-4a747645f80a",
@@ -66,7 +66,7 @@
       "pred_readable": true,
       "best_match_source": "top5",
       "best_match_rank": 2,
-      "rationale": "GT is yield to pedestrians crossing. Greedy keeps the pedestrian hazard but changes the action to a left nudge/give-space, which the related definition treats as a different maneuver. Rank-2 (and rank-4) top-5 lines match GT much more closely with stop/slow yield to a crossing pedestrian."
+      "rationale": "Greedy cites a pedestrian but a different maneuver (nudge left / give space) than GT yield-to-crossing. Top-5 #2 is a paraphrase match of the GT yield/crossing reason."
     },
     {
       "clip_id": "36cb5485-5c56-48c5-8219-90095851d627",
@@ -82,7 +82,7 @@
       "pred_readable": true,
       "best_match_source": "top5",
       "best_match_rank": 2,
-      "rationale": "GT and greedy both require stopping/yielding for pedestrians crossing (crosswalk vs street is a paraphrase). GT also names the stop sign as the control, which greedy omits, so alignment is 4 not 5. Rank-2 names the stop sign plus the pedestrian and is therefore closer."
+      "rationale": "GT and greedy both require stopping/yielding for pedestrians crossing; that is the same primary actor and a compatible action. GT also names the stop sign, which greedy omits, so alignment is 4 not 5. Top-5 #2 is closer because it includes the stop sign plus the pedestrian yield."
     }
   ]
 }

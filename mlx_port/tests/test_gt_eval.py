@@ -31,6 +31,14 @@ def test_clean_pred_coc_strips_specials_and_prefix():
     assert clean_pred_coc(raw) == "Slow yield to the pedestrian."
 
 
+def test_clean_pred_coc_drops_token_after_cot_end():
+    raw = (
+        "Stop to yield to the pedestrian in the crosswalk."
+        "<|cot_end|><|traj_future_start|> experience"
+    )
+    assert clean_pred_coc(raw) == "Stop to yield to the pedestrian in the crosswalk."
+
+
 def test_score_coc_perfect_match():
     gt = ["Slow down for the pedestrian in the crosswalk."]
     s = score_coc(gt[0], gt)

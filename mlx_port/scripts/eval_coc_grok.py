@@ -50,9 +50,11 @@ Definitions:
 
 Score label_alignment 1–5 on semantic agreement with GT (5 = same reason).
 pred_readable is about the greedy/primary prediction.
-If any top-5 candidate is closer to GT than the greedy sentence, set
+If any listed alternative is closer to GT than the primary sentence, set
 best_match_source to "top5" and best_match_rank to that rank; otherwise
-"greedy" and 1, or "none" if nothing is usable.
+"greedy" and 1 (primary), or "none" if nothing is usable. Alternative
+rows may be greedy first-token completions or independent temperature
+samples — treat them as other candidate sentences, not a ranked top-k.
 """
 
 EVAL_SCHEMA: dict[str, Any] = {
@@ -109,16 +111,16 @@ def _build_user_prompt(rec: dict[str, Any]) -> str:
         f"clip_id: {rec.get('clip_id')}\n"
         f"event_cluster: {rec.get('event_cluster')}\n"
         f"GT CoC:\n" + "\n".join(f"  - {t}" for t in gts) + "\n"
-        f"Primary / greedy prediction:\n  {rec.get('pred_coc')}\n"
+        f"Primary prediction (sample 1 / greedy):\n  {rec.get('pred_coc')}\n"
         + (
-            "Top-5 first-token completions (optional context):\n"
+            "Other candidate CoCs (optional context):\n"
             + "\n".join(top5_lines)
             + "\n"
             if top5_lines
             else ""
         )
-        + "Evaluate the primary prediction against GT. Use top-5 only to fill "
-        "best_match_source / best_match_rank."
+        + "Evaluate the primary prediction against GT. Use other candidates only "
+        "to fill best_match_source / best_match_rank."
     )
 
 

@@ -259,6 +259,122 @@ def _greedy_continue_from_first(
     return generated
 
 
+def _sample_continue(
+    vlm,
+    cache,
+    first_logits: mx.array,
+    logits_processor: ExpertLogitsProcessor,
+    stopper,
+    max_new_tokens: int,
+    temperature: float,
+    top_p: float,
+) -> list[int]:
+    """Sample a full CoC from saved prefill logits, then decode with the same policy."""
+    first = sample_next_token(first_logits, temperature=temperature, top_p=top_p)
+    first_id = int(first.item())
+    generated = [first_id]
+    if stopper(mx.array([generated])):
+        return generated
+    outputs = vlm(input_ids=mx.array([[first_id]]), cache=cache)
+    mx.eval(outputs.logits)
+    for _ in range(max(0, max_new_tokens - 1)):
+        logits = logits_processor(generated, outputs.logits[:, -1, :])
+        next_id = int(sample_next_token(logits, temperature=temperature, top_p=top_p).item())
+        generated.append(next_id)
+        if stopper(mx.array([generated])):
+            break
+        outputs = vlm(input_ids=mx.array([[next_id]]), cache=cache)
+        mx.eval(outputs.logits)
+    return generated
+
+
+def sample_n_coc(
+    model: AlpamayoR1MLX,
+    data: Dict[str, Any],
+    n: int = 3,
+    temperature: float = 0.6,
+    top_p: float = 0.98,
+    max_generation_length: int = 256,
+    seed: int | None = None,
+) -> list[dict]:
+    """NVIDIA-style CoC samples: one prefill, then ``n`` independent rollouts.
+
+    This is ``num_return_sequences`` under HF generate (temperature / top_p),
+    not top-k first-token ranking. Prefill logits are reused; the KV cache is
+    rewound between samples so vision is not recomputed.
+    """
+    if seed is not None:
+        mx.random.seed(seed)
+
+    tokenized_data = data["tokenized_data"]
+    input_ids = tokenized_data["input_ids"]
+    if isinstance(input_ids, list):
+        input_ids = mx.array(input_ids)
+    image_kwargs = _image_kwargs_from_tokenized(tokenized_data)
+    input_ids = _fuse_and_report(
+        model,
+        input_ids,
+        {
+            "ego_history_xyz": data["ego_history_xyz"],
+            "ego_history_rot": data["ego_history_rot"],
+        },
+    )
+
+    eos_token_id = model.tokenizer.convert_tokens_to_ids("<|traj_future_start|>")
+    if eos_token_id is None:
+        eos_token_id = model.tokenizer.eos_token_id
+    logits_processor = ExpertLogitsProcessor(
+        traj_token_offset=model.traj_token_start_idx,
+        traj_vocab_size=model.traj_vocab_size,
+        traj_token_ids=getattr(model, "traj_token_id_list", None),
+    )
+
+    vlm = model.vlm
+    n_layers = len(vlm.language_model.model.layers)
+    cache = [KVCache() for _ in range(n_layers)]
+    with MemoryMonitor(poll_interval=0.05, label="vlm_prefill"):
+        outputs = vlm(input_ids=input_ids, **image_kwargs, cache=cache)
+    mx.eval(outputs.logits)
+    prefill_offset = int(cache[0].offset)
+
+    raw_last = outputs.logits[:, -1, :].astype(mx.float32)
+    processed = logits_processor([], mx.array(np.array(raw_last)))
+    probs = np.asarray(mx.softmax(processed.astype(mx.float32), axis=-1)[0])
+
+    rows = []
+    for i in range(n):
+        _rewind_kv_cache(cache, prefill_offset)
+        tokens = _sample_continue(
+            vlm,
+            cache,
+            processed,
+            logits_processor,
+            make_vlm_generate_stop(model.tokenizer, int(eos_token_id)),
+            max_generation_length,
+            temperature,
+            top_p,
+        )
+        extra = extract_text_tokens(model.tokenizer, mx.array([tokens]))
+        raw = extra["cot"][0] if extra and extra.get("cot") else model.tokenizer.decode(tokens)
+        tid = int(tokens[0])
+        first = _decode_id(model.tokenizer, tid)
+        print(
+            f"[SAMPLE {i + 1}/{n}] T={temperature} top_p={top_p} "
+            f"first={first!r} p0={probs[tid]:.4f} coc={raw!r}"
+        )
+        rows.append(
+            {
+                "rank": i + 1,
+                "first_token": first,
+                "first_token_id": tid,
+                "first_p": float(probs[tid]),
+                "raw": raw,
+                "tokens": tokens,
+            }
+        )
+    return rows
+
+
 def generate_top_k_coc(
     model: AlpamayoR1MLX,
     data: Dict[str, Any],
@@ -537,11 +653,16 @@ def sample_trajectories_from_data_with_vlm_rollout(
     )
 
     want_extra = bool(return_extra) or bool(kwargs.get("return_extra", False))
-    if vlm_only or want_extra:
-        extra = extract_text_tokens(model.tokenizer, vlm_outputs.sequences)
+    extra = (
+        extract_text_tokens(model.tokenizer, vlm_outputs.sequences)
+        if (vlm_only or want_extra)
+        else None
+    )
+    if vlm_only:
         return None, None, extra
 
-    return None, None, None
+    # Expert diffusion (NVIDIA step_fn + VLM KV prefix) is not wired yet.
+    return None, None, extra
 
 
 # ------------------------------------------------------------------

@@ -41,6 +41,12 @@ def clean_pred_coc(text: str | None) -> str:
     """Strip Alpamayo special tokens and leftover single-letter prefixes."""
     if not text:
         return ""
+    # Generation includes one extra token after traj_future_start (HF StopAfterEOS).
+    # Prefer cot_end so recoverable text after an early <|im_end|> is kept.
+    for marker in ("<|cot_end|>", "<|traj_future_start|>"):
+        if marker in text:
+            text = text.split(marker, 1)[0]
+            break
     cleaned = re.sub(r"\s+", " ", _SPECIAL_RE.sub(" ", text)).strip()
     return re.sub(r"^[A-Z]\s+", "", cleaned)
 

@@ -11,7 +11,7 @@
     <h1 class="text-3xl text-white mb-2">Grok CoC evaluator</h1>
     <p class="text-sm text-slate-400 mb-6">
       Model grok-4.6. Semantic judge vs human GT (not Jaccard).
-      2026-08-28 19:59 UTC. Verdicts: match=1 · mismatch=1 · related=2 · unreadable=1.
+      2026-08-28 20:28 UTC. Verdicts: match=3 · mismatch=1 · related=1.
       Source sample: <a class="text-cyan-400" href="index.html">coc_sample_5</a>
     </p>
     <div class="overflow-auto bg-slate-900 border border-slate-700 rounded-2xl mb-8">
@@ -31,16 +31,16 @@
               <td class="px-3 py-2 text-xs">False</td>
               <td class="px-3 py-2 text-xs">False</td>
               <td class="px-3 py-2 text-xs text-slate-300">Turn left while keeping a safe distance from the construction cones on the right.</td>
-              <td class="px-3 py-2 text-xs text-amber-100">Stop to yield to the construction flagger ahead.</td>
+              <td class="px-3 py-2 text-xs text-amber-100">Slow down due to a road worker directing traffic.</td>
             </tr><tr>
               <td class="px-3 py-2 text-slate-400">1</td>
               <td class="px-3 py-2 font-mono text-[11px]">8e83f069…</td>
-              <td class="px-3 py-2 text-xs text-slate-400 font-semibold">unreadable</td>
-              <td class="px-3 py-2 tabular-nums">1</td>
-              <td class="px-3 py-2 text-xs">False</td>
-              <td class="px-3 py-2 text-xs">False</td>
+              <td class="px-3 py-2 text-xs text-emerald-400 font-semibold">match</td>
+              <td class="px-3 py-2 tabular-nums">4</td>
+              <td class="px-3 py-2 text-xs">True</td>
+              <td class="px-3 py-2 text-xs">True</td>
               <td class="px-3 py-2 text-xs text-slate-300">Decelerate to maintain a safe distance from the pedestrians crossing the street.</td>
-              <td class="px-3 py-2 text-xs text-amber-100">Y</td>
+              <td class="px-3 py-2 text-xs text-amber-100">Stop to yield to the pedestrian in the crosswalk ahead.</td>
             </tr><tr>
               <td class="px-3 py-2 text-slate-400">2</td>
               <td class="px-3 py-2 font-mono text-[11px]">1946f1c3…</td>
@@ -49,16 +49,16 @@
               <td class="px-3 py-2 text-xs">False</td>
               <td class="px-3 py-2 text-xs">True</td>
               <td class="px-3 py-2 text-xs text-slate-300">Yield to the pedestrian crossing the road.</td>
-              <td class="px-3 py-2 text-xs text-amber-100">Stop to yield to the cross-traffic vehicle crossing ahead. -translate</td>
+              <td class="px-3 py-2 text-xs text-amber-100">Stop to yield to the cross-traffic vehicle ahead.</td>
             </tr><tr>
               <td class="px-3 py-2 text-slate-400">3</td>
               <td class="px-3 py-2 font-mono text-[11px]">8e06f83c…</td>
-              <td class="px-3 py-2 text-xs text-amber-300 font-semibold">related</td>
-              <td class="px-3 py-2 tabular-nums">3</td>
+              <td class="px-3 py-2 text-xs text-emerald-400 font-semibold">match</td>
+              <td class="px-3 py-2 tabular-nums">5</td>
               <td class="px-3 py-2 text-xs">True</td>
-              <td class="px-3 py-2 text-xs">False</td>
+              <td class="px-3 py-2 text-xs">True</td>
               <td class="px-3 py-2 text-xs text-slate-300">Yield to the pedestrians crossing the road.</td>
-              <td class="px-3 py-2 text-xs text-amber-100">Nudge to the left to give space to the pedestrian ahead. Slow</td>
+              <td class="px-3 py-2 text-xs text-amber-100">Stop to yield to the pedestrian crossing ahead</td>
             </tr><tr>
               <td class="px-3 py-2 text-slate-400">4</td>
               <td class="px-3 py-2 font-mono text-[11px]">36cb5485…</td>
@@ -78,19 +78,19 @@
                 · action=False · best=greedy#1</div>
               <div class="grid md:grid-cols-2 gap-3 text-sm mb-3">
                 <div><div class="text-[11px] uppercase text-slate-500">GT</div><p>Turn left while keeping a safe distance from the construction cones on the right.</p></div>
-                <div><div class="text-[11px] uppercase text-amber-500">Pred</div><p class="text-amber-100">Stop to yield to the construction flagger ahead.</p></div>
+                <div><div class="text-[11px] uppercase text-amber-500">Pred</div><p class="text-amber-100">Slow down due to a road worker directing traffic.</p></div>
               </div>
-              <p class="text-sm text-slate-300">GT is a left turn while staying clear of construction cones on the right. The greedy pred is a work-zone instruction but names a different actor (flagger, not cones) and a different action (stop/yield, not turn left). That is the same scene family with a different specific hazard and maneuver, so related rather than a match. Top-5 items are either the same flagger-yield idea, fragments, or garbled wrong-direction text, so none is a closer usable match than greedy.</p>
+              <p class="text-sm text-slate-300">GT is a left turn while staying clear of construction cones. The primary cites a road worker and slowing, which is the same work-zone family but a different actor and action. No alternative is closer to the cone/turn-left reason.</p>
             </section><section class="bg-slate-900 border border-slate-700 rounded-2xl p-5 mb-5">
               <div class="font-mono text-sm text-cyan-300 mb-2">8e83f069-5fc5-4329-8589-4527de19d03e</div>
-              <div class="text-xs text-slate-400 mb-3">verdict=<span class="text-white">unreadable</span>
-                · align=1 · hazard=False
-                · action=False · best=top5#4</div>
+              <div class="text-xs text-slate-400 mb-3">verdict=<span class="text-white">match</span>
+                · align=4 · hazard=True
+                · action=True · best=greedy#1</div>
               <div class="grid md:grid-cols-2 gap-3 text-sm mb-3">
                 <div><div class="text-[11px] uppercase text-slate-500">GT</div><p>Decelerate to maintain a safe distance from the pedestrians crossing the street.</p></div>
-                <div><div class="text-[11px] uppercase text-amber-500">Pred</div><p class="text-amber-100">Y</p></div>
+                <div><div class="text-[11px] uppercase text-amber-500">Pred</div><p class="text-amber-100">Stop to yield to the pedestrian in the crosswalk ahead.</p></div>
               </div>
-              <p class="text-sm text-slate-300">Greedy output is just &#x27;Y&#x27;, not a coherent driving reason, so it cannot match GT (decelerate for pedestrians crossing). Top-5 #4 is the closest usable sentence: slow down / yield to a pedestrian in the crosswalk, same hazard family and a compatible decelerate action. #2 is similar but uses stop rather than slow down.</p>
+              <p class="text-sm text-slate-300">GT and the primary both reason about slowing for pedestrians who are crossing (street/crosswalk). Stop/yield vs decelerate-to-keep-distance is a compatible paraphrase, with only minor number/location differences, so this is a match rather than a different actor or maneuver.</p>
             </section><section class="bg-slate-900 border border-slate-700 rounded-2xl p-5 mb-5">
               <div class="font-mono text-sm text-cyan-300 mb-2">1946f1c3-8638-4648-8944-506e6bffc4df</div>
               <div class="text-xs text-slate-400 mb-3">verdict=<span class="text-white">mismatch</span>
@@ -98,29 +98,29 @@
                 · action=True · best=greedy#1</div>
               <div class="grid md:grid-cols-2 gap-3 text-sm mb-3">
                 <div><div class="text-[11px] uppercase text-slate-500">GT</div><p>Yield to the pedestrian crossing the road.</p></div>
-                <div><div class="text-[11px] uppercase text-amber-500">Pred</div><p class="text-amber-100">Stop to yield to the cross-traffic vehicle crossing ahead. -translate</p></div>
+                <div><div class="text-[11px] uppercase text-amber-500">Pred</div><p class="text-amber-100">Stop to yield to the cross-traffic vehicle ahead.</p></div>
               </div>
-              <p class="text-sm text-slate-300">GT is yield to a pedestrian crossing; greedy (and all top-5) cite a vehicle (cross-traffic/oncoming/lead) instead. Action is similar (stop/yield) but the primary actor/hazard is different, so this is a mismatch. No candidate is closer to GT.</p>
+              <p class="text-sm text-slate-300">GT is yield to a pedestrian in the roadway; the primary pred instead yields to a cross-traffic vehicle. Same stop/yield action type but a different primary actor/hazard, so mismatch. No alternative is closer to the pedestrian reason.</p>
             </section><section class="bg-slate-900 border border-slate-700 rounded-2xl p-5 mb-5">
               <div class="font-mono text-sm text-cyan-300 mb-2">8e06f83c-4de6-4cde-82ab-4a747645f80a</div>
-              <div class="text-xs text-slate-400 mb-3">verdict=<span class="text-white">related</span>
-                · align=3 · hazard=True
-                · action=False · best=top5#2</div>
+              <div class="text-xs text-slate-400 mb-3">verdict=<span class="text-white">match</span>
+                · align=5 · hazard=True
+                · action=True · best=greedy#1</div>
               <div class="grid md:grid-cols-2 gap-3 text-sm mb-3">
                 <div><div class="text-[11px] uppercase text-slate-500">GT</div><p>Yield to the pedestrians crossing the road.</p></div>
-                <div><div class="text-[11px] uppercase text-amber-500">Pred</div><p class="text-amber-100">Nudge to the left to give space to the pedestrian ahead. Slow</p></div>
+                <div><div class="text-[11px] uppercase text-amber-500">Pred</div><p class="text-amber-100">Stop to yield to the pedestrian crossing ahead</p></div>
               </div>
-              <p class="text-sm text-slate-300">Greedy cites a pedestrian but a different maneuver (nudge left / give space) than GT yield-to-crossing. Top-5 #2 is a paraphrase match of the GT yield/crossing reason.</p>
+              <p class="text-sm text-slate-300">Primary and GT both require yielding/stopping for pedestrian(s) crossing the road ahead; wording is a close paraphrase of the same actor and action. Other candidates (parked-car nudge) are weaker and not used.</p>
             </section><section class="bg-slate-900 border border-slate-700 rounded-2xl p-5 mb-5">
               <div class="font-mono text-sm text-cyan-300 mb-2">36cb5485-5c56-48c5-8219-90095851d627</div>
               <div class="text-xs text-slate-400 mb-3">verdict=<span class="text-white">match</span>
                 · align=4 · hazard=True
-                · action=True · best=top5#2</div>
+                · action=True · best=greedy#1</div>
               <div class="grid md:grid-cols-2 gap-3 text-sm mb-3">
                 <div><div class="text-[11px] uppercase text-slate-500">GT</div><p>Stop for the stop sign while waiting for pedestrians to cross the street.</p></div>
                 <div><div class="text-[11px] uppercase text-amber-500">Pred</div><p class="text-amber-100">Stop to yield to the pedestrian in the crosswalk.</p></div>
               </div>
-              <p class="text-sm text-slate-300">GT and greedy both require stopping/yielding for pedestrians crossing; that is the same primary actor and a compatible action. GT also names the stop sign, which greedy omits, so alignment is 4 not 5. Top-5 #2 is closer because it includes the stop sign plus the pedestrian yield.</p>
+              <p class="text-sm text-slate-300">GT and the primary pred share the same core reason: stop/yield for pedestrians crossing. Pred omits the stop-sign detail in GT but the actor and action are compatible paraphrases, so this is a match (alignment 4, not 5). Other candidates are duplicates or unreadable and are not closer.</p>
             </section>
   </div>
 </body>
