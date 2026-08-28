@@ -267,8 +267,11 @@ def enforce_alpamayo_temporal_grouping(
     Alpamayo was fine-tuned with 4 cameras × 4 frames per camera, expecting
     the vision tower's Conv3D (temporal_patch_size=2) to see temporally
     coherent stacks. This function reorganizes image_grid_thw so that each
-    camera's 4 frames form a single temporal group with T=4 (or T=2×2 if
-    we want to respect the patch size).
+    camera's 4 frames form a single temporal group with T=4.
+
+    Language-model RoPE still uses one HF image grid per frame-level
+    image-pad run (16×[1,H,W]); grouped T>1 rows are split back in
+    get_rope_index.
 
     For now we use T=4 per camera (4 groups total). This keeps the total
     patch count identical (16×68×120 = 130560) while giving the language
@@ -308,3 +311,123 @@ def enforce_alpamayo_temporal_grouping(
     inputs = dict(inputs)  # shallow copy so we don't mutate caller's dict
     inputs["image_grid_thw"] = new_grid
     return inputs
+
+
+def dump_vision_inputs(label: str, inputs: dict) -> None:
+    """Print grid / pixel stats for a processor output dict."""
+    ids = np.asarray(inputs.get("input_ids"))
+    print(f"[{label}] input_ids shape={getattr(ids, 'shape', None)}")
+    if "image_grid_thw" in inputs:
+        grid = np.asarray(inputs["image_grid_thw"])
+        print(f"[{label}] image_grid_thw shape={grid.shape}\n{grid}")
+    else:
+        print(f"[{label}] image_grid_thw missing")
+    for key in ("pixel_values", "pixel_values_videos"):
+        if key not in inputs:
+            continue
+        arr = np.asarray(inputs[key])
+        print(
+            f"[{label}] {key} shape={arr.shape} dtype={arr.dtype} "
+            f"min={float(arr.min()):.4f} max={float(arr.max()):.4f} "
+            f"mean={float(arr.mean()):.4f}"
+        )
+
+
+def _frame_to_hwc_uint8(frame: Any) -> np.ndarray:
+    """CHW/HWC tensor or array → HWC uint8, matching create_message."""
+    if torch is not None and isinstance(frame, torch.Tensor):
+        arr = frame.detach().cpu().numpy()
+    else:
+        arr = np.asarray(frame)
+    if arr.ndim == 3 and arr.shape[0] in (1, 3):
+        arr = np.transpose(arr, (1, 2, 0))
+    if arr.dtype != np.uint8:
+        if arr.max() <= 1.0:
+            arr = (arr * 255).astype(np.uint8)
+        else:
+            arr = arr.astype(np.uint8)
+    return arr
+
+
+def compare_nvidia_tokenization(mlx_inputs: dict, frames, tokenizer) -> None:
+    """Diff MLX tokenize vs NVIDIA helper.create_message + the same processor.
+
+    Native ``apply_chat_template(..., tokenize=True)`` hits the nested-image
+    unpack bug on this stack, so images are flattened the same way as
+    ``alpamayo_apply_chat_template``. This still compares chat text and
+    pixels from NVIDIA's raw tensors vs MLX's PIL path.
+    """
+    from alpamayo_r1 import helper
+
+    print("[PARITY] NVIDIA-style tokenize (helper.create_message + flat processor)")
+    nv_messages = helper.create_message(frames)
+    nv_proc = get_processor(tokenizer, LOCAL_QWEN_PROCESSOR_PATH)
+    print(f"[PARITY] processor={LOCAL_QWEN_PROCESSOR_PATH}")
+
+    nv_text = nv_proc.apply_chat_template(
+        nv_messages,
+        tokenize=False,
+        add_generation_prompt=False,
+        continue_final_message=True,
+    )
+    print(f"[PARITY] nvidia_text_len={len(nv_text)}")
+    print(f"[PARITY] nvidia_text_tail={nv_text[-180:]!r}")
+
+    nv_images = []
+    for item in nv_messages[1]["content"]:
+        if isinstance(item, dict) and item.get("type") == "image":
+            arr = _frame_to_hwc_uint8(item["image"])
+            nv_images.append(Image.fromarray(arr, mode="RGB" if arr.shape[2] == 3 else "L"))
+    print(f"[PARITY] nvidia_images={len(nv_images)} first_hw={nv_images[0].size if nv_images else None}")
+
+    nv_inputs = nv_proc(
+        text=nv_text,
+        images=nv_images,
+        return_tensors="np",
+        padding=True,
+    )
+    dump_vision_inputs("NVIDIA", nv_inputs)
+
+    mlx_ids = np.asarray(mlx_inputs["input_ids"])
+    nv_ids = np.asarray(nv_inputs["input_ids"])
+    print(f"[PARITY] input_ids mlx={mlx_ids.shape} nvidia={nv_ids.shape}")
+    if mlx_ids.shape == nv_ids.shape:
+        n_diff = int((mlx_ids != nv_ids).sum())
+        print(f"[PARITY] input_ids mismatches={n_diff}/{mlx_ids.size}")
+        if n_diff:
+            bad = np.argwhere(mlx_ids != nv_ids)
+            for r, c in bad[:12]:
+                print(
+                    f"[PARITY]   pos[{int(r)},{int(c)}] mlx={int(mlx_ids[r, c])} "
+                    f"nvidia={int(nv_ids[r, c])}"
+                )
+    else:
+        print("[PARITY] input_ids shapes differ; no elementwise compare")
+
+    mlx_grid = np.asarray(mlx_inputs.get("image_grid_thw"))
+    nv_grid = np.asarray(nv_inputs.get("image_grid_thw"))
+    if mlx_grid.shape == nv_grid.shape:
+        print(f"[PARITY] image_grid_thw equal={np.array_equal(mlx_grid, nv_grid)}")
+    else:
+        print(f"[PARITY] image_grid_thw mlx={mlx_grid.shape} nvidia={nv_grid.shape}")
+
+    for key in ("pixel_values", "pixel_values_videos"):
+        if key not in mlx_inputs or key not in nv_inputs:
+            continue
+        a = np.asarray(mlx_inputs[key], dtype=np.float32)
+        b = np.asarray(nv_inputs[key], dtype=np.float32)
+        if a.shape != b.shape:
+            print(f"[PARITY] {key} shapes mlx={a.shape} nvidia={b.shape}")
+            continue
+        diff = np.abs(a - b)
+        print(
+            f"[PARITY] {key} max_abs_diff={float(diff.max()):.6f} "
+            f"mean_abs_diff={float(diff.mean()):.6f}"
+        )
+
+    # Raw dataset range so we know whether PIL uint8 conversion quantized anything.
+    raw = frames.detach().cpu().numpy() if hasattr(frames, "detach") else np.asarray(frames)
+    print(
+        f"[PARITY] raw_frames shape={raw.shape} dtype={raw.dtype} "
+        f"min={float(raw.min()):.4f} max={float(raw.max()):.4f}"
+    )

@@ -1,0 +1,88 @@
+{
+  "model": "grok-4.6",
+  "generated_at": "2026-08-28 18:10 UTC",
+  "results_path": "/Users/michaellee/Projects/alpamayo/reports/coc_sample_5/results.json",
+  "evaluations": [
+    {
+      "clip_id": "faff17c7-4572-472a-be28-0f035bb88a37",
+      "event_cluster": "WORK_ZONES_TEMP_TRAFFIC_CONTROL",
+      "gt_coc_texts": [
+        "Turn left while keeping a safe distance from the construction cones on the right."
+      ],
+      "pred_coc": "Stop to yield to the construction flagger ahead.",
+      "verdict": "related",
+      "label_alignment": 2,
+      "same_hazard": false,
+      "same_action": false,
+      "pred_readable": true,
+      "best_match_source": "greedy",
+      "best_match_rank": 1,
+      "rationale": "GT is a left turn while clearing construction cones on the right. The greedy pred stays in the work-zone family but names a different actor (flagger) and a different action (stop/yield). Top-5 lines are also work-zone related or garbled and none is a closer semantic match to turning left for cones."
+    },
+    {
+      "clip_id": "8e83f069-5fc5-4329-8589-4527de19d03e",
+      "event_cluster": "PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY",
+      "gt_coc_texts": [
+        "Decelerate to maintain a safe distance from the pedestrians crossing the street.",
+        "Decelerate to maintain a safe distance from the pedestrians crossing the street."
+      ],
+      "pred_coc": "Slow yield to the pedestrian in the crosswalk.",
+      "verdict": "match",
+      "label_alignment": 4,
+      "same_hazard": true,
+      "same_action": true,
+      "pred_readable": true,
+      "best_match_source": "top5",
+      "best_match_rank": 4,
+      "rationale": "GT is decelerating for pedestrians crossing the street (safe distance). Greedy is the same hazard family and a compatible slow/yield action, though it frames a single crosswalk pedestrian rather than plural proximity. Top-5 #4 (slow down to yield) is slightly closer to GT decelerate than the telegraphic greedy phrasing."
+    },
+    {
+      "clip_id": "1946f1c3-8638-4648-8944-506e6bffc4df",
+      "event_cluster": "PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY",
+      "gt_coc_texts": [
+        "Yield to the pedestrian crossing the road."
+      ],
+      "pred_coc": "Stop to yield to the cross-traffic vehicle crossing ahead. -translate",
+      "verdict": "mismatch",
+      "label_alignment": 1,
+      "same_hazard": false,
+      "same_action": true,
+      "pred_readable": true,
+      "best_match_source": "greedy",
+      "best_match_rank": 1,
+      "rationale": "GT is yield to a pedestrian in the roadway. Greedy (and all top-5) instead cite a vehicle (cross-traffic/oncoming/lead) with no pedestrian actor, so the primary hazard is invented/wrong despite a similar yield/stop action."
+    },
+    {
+      "clip_id": "8e06f83c-4de6-4cde-82ab-4a747645f80a",
+      "event_cluster": "PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY",
+      "gt_coc_texts": [
+        "Yield to the pedestrians crossing the road."
+      ],
+      "pred_coc": "Nudge to the left to give space to the pedestrian ahead. Slow",
+      "verdict": "related",
+      "label_alignment": 3,
+      "same_hazard": true,
+      "same_action": false,
+      "pred_readable": true,
+      "best_match_source": "top5",
+      "best_match_rank": 2,
+      "rationale": "GT is yield to pedestrians crossing. Greedy keeps the pedestrian hazard but changes the action to a left nudge/give-space, which the related definition treats as a different maneuver. Rank-2 (and rank-4) top-5 lines match GT much more closely with stop/slow yield to a crossing pedestrian."
+    },
+    {
+      "clip_id": "36cb5485-5c56-48c5-8219-90095851d627",
+      "event_cluster": "ANIMALS_BIRDS_ROADKILL",
+      "gt_coc_texts": [
+        "Stop for the stop sign while waiting for pedestrians to cross the street."
+      ],
+      "pred_coc": "Stop to yield to the pedestrian in the crosswalk.",
+      "verdict": "match",
+      "label_alignment": 4,
+      "same_hazard": true,
+      "same_action": true,
+      "pred_readable": true,
+      "best_match_source": "top5",
+      "best_match_rank": 2,
+      "rationale": "GT and greedy both require stopping/yielding for pedestrians crossing (crosswalk vs street is a paraphrase). GT also names the stop sign as the control, which greedy omits, so alignment is 4 not 5. Rank-2 names the stop sign plus the pedestrian and is therefore closer."
+    }
+  ]
+}

@@ -1,34 +1,177 @@
 """Surgical Alpamayo-specific overrides for mlx_vlm Qwen3-VL classes.
 
-These subclasses fix two issues discovered during Alpamayo-R1-10B porting:
+These subclasses fix issues discovered during Alpamayo-R1-10B porting:
 
-1. get_rope_index: The stock implementation sums vision_start token positions
-   instead of collecting them, causing mrope_position_deltas = [[0]] for
-   16-image (4 cameras × 4 frames) prompts.
+1. get_rope_index: HF Qwen3-VL layout (get_vision_position_ids + compact
+   max(H,W)//merge advance). Stock mlx_vlm follows older Qwen2-VL indexing.
 
-2. get_input_embeddings: The stock code unconditionally clears
-   self.language_model._position_ids on every decode step (when pixel_values
-   is None). This discards the cached multimodal RoPE state that Alpamayo
-   needs for correct continuation.
+2. get_input_embeddings / __call__: do not let pixel_values wipe cached
+   3-row mRoPE; decode continues with arange(L) + cache_offset + rope_deltas.
 
 Only these two methods are overridden; everything else (vision tower,
 weight loading, KV cache, etc.) remains identical to mlx_vlm 0.5.0.
 """
 
+import os
 from typing import Any, List, Optional, Tuple
 
 import mlx.core as mx
 import mlx.nn as nn
 import numpy as np
 
-from mlx_vlm.models.qwen3_vl.language import LanguageModel
+_DEBUG = os.environ.get("ALPAMAYO_DEBUG", "0") in ("1", "true", "True")
+
+
+def _dbg(msg: str) -> None:
+    if _DEBUG:
+        print(msg)
+
+from mlx_vlm.models.qwen3_vl.language import Attention, LanguageModel
 from mlx_vlm.models.qwen3_vl.qwen3_vl import Model, InputEmbeddingsFeatures
+from mlx_lm.models.base import create_causal_mask
+
+from mlx_port.models.rope_index_mlx import compute_hf_rope_index_mx
+
+
+class DiagnosticAttentionWrapper(nn.Module):
+    """Wraps an Attention module to log the exact mask reaching the kernel.
+
+    Used for Option B deeper diagnostics: reveals what mask shape/dtype the
+    base mlx_vlm code constructs from the 'causal' sentinel or from an
+    explicit mask we supply.
+    """
+
+    def __init__(self, orig_attn: Attention, layer_idx: int):
+        super().__init__()
+        self._orig_attn = orig_attn
+        self._layer_idx = layer_idx
+        self._call_count = 0
+
+    def __call__(
+        self,
+        x: mx.array,
+        mask: Optional[mx.array] = None,
+        cache: Optional[Any] = None,
+        position_ids: Optional[mx.array] = None,
+    ) -> mx.array:
+        self._call_count += 1
+        step = "DECODE" if (mask is None and cache is not None) else "PREFILL"
+        if mask is None:
+            mask_info = "None"
+        else:
+            try:
+                m = np.asarray(mask)
+                mask_info = f"shape={m.shape} dtype={m.dtype} min={float(m.min()):.2f} max={float(m.max()):.2f}"
+                # Show a small corner for triangular inspection
+                if m.ndim >= 2:
+                    corner = m[..., :3, :3]
+                    mask_info += f" corner={corner.tolist()}"
+            except Exception:
+                mask_info = f"type={type(mask)}"
+        cache_info = "None"
+        if cache is not None:
+            off = getattr(cache, "offset", None)
+            idx = getattr(cache, "_idx", None)
+            cache_info = f"offset={off} _idx={idx}"
+        pos_info = "None"
+        if position_ids is not None:
+            try:
+                p = np.asarray(position_ids)
+                pos_info = f"shape={p.shape} T0={int(p[0,0,0])}..{int(p[0,0,-1])}"
+            except Exception:
+                pos_info = "?"
+        print(
+            f"[ATTN_KERNEL] L{self._layer_idx:02d} call#{self._call_count:03d} | {step} | "
+            f"mask={mask_info} | cache={cache_info} | position_ids={pos_info}"
+        )
+        return self._orig_attn(x, mask=mask, cache=cache, position_ids=position_ids)
+
+
+def install_attention_diagnostics(model: "AlpamayoLanguageModel", max_layers: int = None) -> int:
+    """Replace each decoder layer's self_attn with a DiagnosticAttentionWrapper.
+
+    Returns the number of layers instrumented. Call this after from_existing
+    to enable Option B deeper mask logging for Alpamayo runs.
+    """
+    if not hasattr(model, "model") or not hasattr(model.model, "layers"):
+        print("[ATTN_KERNEL] Could not find model.layers; diagnostics not installed.")
+        return 0
+    layers = model.model.layers
+    n = len(layers) if max_layers is None else min(max_layers, len(layers))
+    for i in range(n):
+        layer = layers[i]
+        if hasattr(layer, "self_attn"):
+            orig = layer.self_attn
+            wrapper = DiagnosticAttentionWrapper(orig, layer_idx=i)
+            layer.self_attn = wrapper
+    print(f"[ATTN_KERNEL] Installed DiagnosticAttentionWrapper on {n} layers.")
+    return n
+
+
+def inspect_decode_mask_construction(seq_len: int = 1, cache_offset: int = 32766) -> None:
+    """Reproduce the mask that mlx_lm / mlx_vlm would build for a decode step.
+
+    For N=1 (decode), create_attention_mask returns None and the kernel
+    constructs causality internally using the cache offset. This helper prints
+    what the base code sees so we can compare with our stored full-triangular mask.
+    """
+    from mlx_lm.models.base import create_attention_mask, create_causal_mask
+
+    # Simulate a 1-token decode input
+    h = mx.zeros((1, seq_len, 1))  # dummy hidden states
+    # Create a fake cache with the given offset
+    class FakeCache:
+        def __init__(self, offset):
+            self.offset = offset
+        def make_mask(self, N, return_array=False, window_size=None):
+            # The real KVCache.make_mask would return a (1, kv_len) mask
+            kv_len = self.offset + N
+            if return_array:
+                return create_causal_mask(kv_len, window_size=window_size)
+            return "causal"
+
+    cache = FakeCache(cache_offset)
+    mask = create_attention_mask(h, cache=cache, return_array=False)
+    mask_array = create_attention_mask(h, cache=cache, return_array=True)
+
+    print(f"[MASK_INSPECT] decode step: seq_len={seq_len}, cache_offset={cache_offset}")
+    print(f"[MASK_INSPECT]   create_attention_mask(...) -> {mask!r}")
+    if mask_array is not None:
+        print(f"[MASK_INSPECT]   return_array=True -> shape={mask_array.shape}, dtype={mask_array.dtype}")
+        # Show the last few columns that would be used for this decode token
+        tail = mask_array[0, -min(8, mask_array.shape[1]):]
+        print(f"[MASK_INSPECT]   last 8 cols of row 0: {tail.tolist()}")
+    else:
+        print("[MASK_INSPECT]   return_array=True -> None (kernel will build internally)")
 
 
 class AlpamayoLanguageModel(LanguageModel):
     """LanguageModel with corrected vision-aware RoPE index computation and
     guaranteed preservation of multimodal position state across decode steps.
     """
+
+    @classmethod
+    def from_existing(cls, base: LanguageModel) -> "AlpamayoLanguageModel":
+        """Create an AlpamayoLanguageModel instance from a loaded base.
+
+        This method returns a true AlpamayoLanguageModel (proper type and MRO)
+        while preserving all loaded weights and submodules.
+        """
+        # Use promotion internally for robustness with nn.Module registration,
+        # but expose it through an explicit from_existing API as requested.
+        base.__class__ = cls
+        # Initialize Alpamayo-specific state if not already present
+        if not hasattr(base, "_position_ids"):
+            base._position_ids = None
+        if not hasattr(base, "_rope_deltas"):
+            base._rope_deltas = None
+        if not hasattr(base, "_attention_mask"):
+            base._attention_mask = None
+        # Explicit validity flag for the idempotency guard (more robust than
+        # checking attribute presence, which can be affected by nn.Module internals)
+        if not hasattr(base, "_pos_valid"):
+            base._pos_valid = False
+        return base
 
     def __call__(
         self,
@@ -40,11 +183,23 @@ class AlpamayoLanguageModel(LanguageModel):
         deepstack_visual_embeds: Optional[mx.array] = None,
         **kwargs,
     ):
-        # --- DIAGNOSTIC: attention / mask / cache state (FORCED - no latch) ---
-        is_decode_step = (
-            getattr(self, "_position_ids", None) is not None
-            and inputs.shape[1] < self._position_ids.shape[2]
-        )
+        # --- DIAGNOSTIC: mask / cache / 3-row mRoPE position_ids interaction (prioritized) ---
+        cache_offset0 = 0
+        if cache is not None and len(cache) > 0:
+            for c in cache:
+                if c is None:
+                    continue
+                off = getattr(c, "offset", 0)
+                if hasattr(off, "shape"):
+                    off_i = int(np.asarray(off).reshape(-1)[0])
+                else:
+                    off_i = int(off or 0)
+                # Always sync. A stale _idx=0 left from prefill made decode
+                # slice position_ids[:, :, 0:1] (the first column, all zeros).
+                c._idx = off_i
+            if cache[0] is not None:
+                cache_offset0 = int(getattr(cache[0], "_idx", 0) or 0)
+        is_decode_step = inputs.shape[1] == 1 and bool(cache_offset0)
         step_kind = "DECODE" if is_decode_step else "PREFILL"
         mask_info = "None" if mask is None else f"shape={mask.shape} dtype={mask.dtype}"
         cache_info = "None"
@@ -53,27 +208,31 @@ class AlpamayoLanguageModel(LanguageModel):
             offset = getattr(c0, "offset", None)
             idx = getattr(c0, "_idx", None)
             cache_info = f"len={len(cache)} offset={offset} _idx={idx}"
-        print(f"[ATTN_DIAG] {step_kind} | mask={mask_info} | cache={cache_info} | inputs.shape={inputs.shape}")
 
-        # --- Alpamayo continuation guard (refined) ---
-        position_ids = kwargs.pop("position_ids", None)
-        rope_deltas_kw = kwargs.pop("rope_deltas", None)
+        # Capture position_ids that will be injected (the 3-row mRoPE state)
+        pos_in_kwargs = kwargs.get("position_ids", None)
+        pos_info = "None"
+        if pos_in_kwargs is not None:
+            try:
+                pos_np = np.asarray(pos_in_kwargs)
+                pos_info = f"shape={pos_np.shape} T=[{int(pos_np[0,0,0])}..{int(pos_np[0,0,-1])}] H=[{int(pos_np[1,0,0])}..{int(pos_np[1,0,-1])}] W=[{int(pos_np[2,0,0])}..{int(pos_np[2,0,-1])}]"
+            except Exception:
+                pos_info = f"shape={getattr(pos_in_kwargs, 'shape', '?')}"
 
+        _dbg(f"[ATTN_DIAG] {step_kind} | mask={mask_info} | cache={cache_info} | inputs.shape={inputs.shape} | position_ids={pos_info}")
+
+        # Prefill-only: the stored mask is (S, S). Applying it on L=1 decode
+        # (when _position_ids was wiped and is_decode_step became False) is what
+        # made decode look like another prefill. Let the kernel use cache offset.
+        stored = getattr(self, "_attention_mask", None)
         if (
-            getattr(self, "_position_ids", None) is not None
-            and position_ids is None
-            and inputs.shape[1] < self._position_ids.shape[2]
+            mask is None
+            and stored is not None
+            and hasattr(stored, "shape")
+            and inputs.shape[1] == stored.shape[-1]
         ):
-            seq_length = inputs.shape[1]
-            position_ids = self._position_ids[:, :, -seq_length:]
-            if getattr(self, "_rope_deltas", None) is None:
-                last_pos = int(self._position_ids[0, 0, -1].item())
-                self._rope_deltas = mx.array([[last_pos]], dtype=self._position_ids.dtype)
-
-        if position_ids is not None:
-            kwargs["position_ids"] = position_ids
-        if rope_deltas_kw is not None:
-            kwargs["rope_deltas"] = rope_deltas_kw
+            mask = stored
+            _dbg("[ATTN_DIAG]   using stored prefill mask (seq_len matches)")
 
         outputs = super().__call__(
             inputs,
@@ -85,17 +244,19 @@ class AlpamayoLanguageModel(LanguageModel):
             **kwargs,
         )
 
-        # --- DIAGNOSTIC: first-decode logits snapshot (FORCED) ---
-        if is_decode_step:
+        if _DEBUG and is_decode_step:
             try:
-                logits = outputs.logits  # [B, 1, V]
+                logits = outputs.logits
                 mx.eval(logits)
                 logits_np = np.asarray(logits[0, 0, :])
                 top_idx = int(np.argmax(logits_np))
                 top_val = float(np.max(logits_np))
-                print(f"[ATTN_DIAG] first-decode logits: shape={logits.shape} max={top_val:.3f} argmax={top_idx}")
+                _dbg(
+                    f"[ATTN_DIAG] first-decode logits: shape={logits.shape} "
+                    f"max={top_val:.3f} argmax={top_idx}"
+                )
             except Exception as e:
-                print(f"[ATTN_DIAG] first-decode logits inspect failed: {e}")
+                _dbg(f"[ATTN_DIAG] first-decode logits inspect failed: {e}")
 
         return outputs
 
@@ -105,189 +266,47 @@ class AlpamayoLanguageModel(LanguageModel):
         image_grid_thw: Optional[mx.array] = None,
         video_grid_thw: Optional[mx.array] = None,
         attention_mask: Optional[mx.array] = None,
+        mm_token_type_ids: Optional[mx.array] = None,
     ) -> Tuple[mx.array, mx.array]:
-        # --- Core logic copied from mlx_vlm with one critical fix ---
-        batch_size, seq_length = input_ids.shape
-        position_ids = mx.arange(seq_length, dtype=mx.int32)
-        position_ids = mx.broadcast_to(position_ids[None, :], (batch_size, seq_length))
-        spatial_merge_size = self.config.vision_config.spatial_merge_size
-        image_token_id = self.config.image_token_id
-        video_token_id = self.config.video_token_id
-        vision_start_token_id = self.config.vision_start_token_id
-        mrope_position_deltas: list[int] = []
+        # Idempotency: prefill computes 3-row mRoPE once; decode uses
+        # arange(L) + cache_offset + _rope_deltas in the base LanguageModel.
+        if getattr(self, "_pos_valid", False) and getattr(self, "_position_ids", None) is not None:
+            _dbg("[ROPE_DEBUG] guard short-circuit (cached HF RoPE)")
+            return self._position_ids, getattr(self, "_rope_deltas", None)
+        if getattr(self, "_pos_valid", False) and getattr(self, "_position_ids", None) is None:
+            _dbg("[ROPE_DEBUG] guard skipped: _pos_valid but _position_ids is None")
+            self._pos_valid = False
 
         if input_ids is not None and (image_grid_thw is not None or video_grid_thw is not None):
-            total_input_ids = input_ids
-            if attention_mask is None:
-                attention_mask = mx.ones_like(input_ids)
-            position_ids = mx.ones((3, batch_size, seq_length), dtype=input_ids.dtype)
-            image_index, video_index = 0, 0
-            for i, input_ids_row in enumerate(total_input_ids):
-                input_ids_row = mx.where(
-                    attention_mask[i] == 1, input_ids_row, mx.zeros_like(input_ids_row)
-                )
-                # === THE FIX: collect real indices (list comprehension) ===
-                input_tokens = input_ids_row.tolist()
-                vision_start_indices = [
-                    idx for idx, tok in enumerate(input_tokens) if tok == vision_start_token_id
-                ]
-                image_nums = sum(
-                    1 for idx in vision_start_indices
-                    if input_tokens[idx + 1] == image_token_id
-                )
-                video_nums = sum(
-                    1 for idx in vision_start_indices
-                    if input_tokens[idx + 1] == video_token_id
-                )
-
-                print(f"[ROPE_DEBUG] batch{i}: seq_len={len(input_tokens)}, vision_start_indices={vision_start_indices}")
-                print(f"[ROPE_DEBUG]   image_nums={image_nums}, video_nums={video_nums}, image_grid_thw={image_grid_thw.tolist() if image_grid_thw is not None else None}")
-
-                # Pre-compute actual vision token count per block from the token positions.
-                # This is the exact number of vision tokens the processor inserted between
-                # two consecutive <vision_start> markers (or to the end of the prompt).
-                per_block_vision_token_count = []
-                for k in range(len(vision_start_indices)):
-                    start = vision_start_indices[k]
-                    if k + 1 < len(vision_start_indices):
-                        end = vision_start_indices[k + 1]
-                    else:
-                        end = len(input_tokens)
-                    # The block contains the <vision_start> token itself + the image patches
-                    # that follow it until the next vision_start. We only want the patch count.
-                    count = end - start - 1   # subtract the <vision_start> token
-                    per_block_vision_token_count.append(count)
-                print(f"[ROPE_DEBUG]   per_block_vision_token_count (first 5): {per_block_vision_token_count[:5]} ... total={sum(per_block_vision_token_count)}")
-
-                llm_pos_ids_list: list[mx.array] = []
-                st = 0
-                remain_images, remain_videos = image_nums, video_nums
-                vision_block_idx = 0  # 0..15 for Alpamayo 4×4 layout
-                # Running position counter for RoPE indices.
-                # Incremented by the actual token count of each segment (text or vision).
-                # This ensures st_idx grows by ~2040 per vision block instead of by the
-                # small spatial-grid range (≈ 60).
-                current_pos = 0
-                for _ in range(image_nums + video_nums):
-                    if image_token_id in input_tokens and remain_images > 0:
-                        ed_image = input_tokens.index(image_token_id, st)
-                    else:
-                        ed_image = len(input_tokens) + 1
-                    if video_token_id in input_tokens and remain_videos > 0:
-                        ed_video = input_tokens.index(video_token_id, st)
-                    else:
-                        ed_video = len(input_tokens) + 1
-                    if ed_image < ed_video:
-                        # Map the current vision block to the correct grouped row
-                        camera_id = vision_block_idx // 4          # 0..3
-                        frame_in_camera = vision_block_idx % 4     # 0..3
-                        grid_row = camera_id
-                        t, h, w = (
-                            image_grid_thw[grid_row][0],
-                            image_grid_thw[grid_row][1],
-                            image_grid_thw[grid_row][2],
-                        )
-                        image_index += 1
-                        remain_images -= 1
-                        ed = ed_image
-                    else:
-                        t, h, w = (
-                            video_grid_thw[video_index][0],
-                            video_grid_thw[video_index][1],
-                            video_grid_thw[video_index][2],
-                        )
-                        video_index += 1
-                        remain_videos -= 1
-                        ed = ed_video
-                    llm_grid_t = int(t.item())
-                    llm_grid_h = int(h.item()) // spatial_merge_size
-                    llm_grid_w = int(w.item()) // spatial_merge_size
-                    text_len = ed - st
-                    # Use the running position counter instead of the previous block's max value.
-                    st_idx = current_pos
-
-                    print(f"[ROPE_DEBUG]   block#{vision_block_idx}: st={st}, ed={ed}, text_len={text_len}, st_idx={st_idx}, grid=({llm_grid_t},{llm_grid_h},{llm_grid_w}), cam={camera_id}, frame={frame_in_camera}")
-
-                    index = mx.arange(text_len).reshape(1, text_len)
-                    index = mx.broadcast_to(index, (3, text_len)) + st_idx
-                    llm_pos_ids_list.append(index)
-                    current_pos += text_len   # advance by text tokens
-
-                    # Construct a full 2-D spatial grid of size (llm_grid_h, llm_grid_w)
-                    # = (34, 60) and flatten it. This guarantees every vision block
-                    # receives exactly 2040 distinct (h, w) RoPE indices.
-                    h_2d = mx.arange(llm_grid_h)[:, None]
-                    w_2d = mx.arange(llm_grid_w)[None, :]
-                    h_grid, w_grid = mx.broadcast_arrays(h_2d, w_2d)
-                    h_index = h_grid.flatten()
-                    w_index = w_grid.flatten()
-                    t_index = mx.full((llm_grid_h * llm_grid_w,), frame_in_camera, dtype=mx.int32)
-
-                    vision_indices = mx.stack([t_index, h_index, w_index]) + text_len + st_idx
-
-                    # If the actual token count for this block is larger than the
-                    # spatial grid (2040), append extra RoPE positions for the
-                    # additional placeholder / special tokens. These extra tokens
-                    # receive the same (t, h_last, w_last) coordinate so they stay
-                    # spatially aligned with the last patch of the frame.
-                    actual_vision_tokens_per_block = per_block_vision_token_count[vision_block_idx]
-                    n_grid = llm_grid_h * llm_grid_w          # 2040
-                    extra = actual_vision_tokens_per_block - n_grid
-                    if extra > 0:
-                        last_h = h_index[-1:]
-                        last_w = w_index[-1:]
-                        extra_t = mx.full((extra,), frame_in_camera, dtype=mx.int32)
-                        extra_h = mx.tile(last_h, (extra,))
-                        extra_w = mx.tile(last_w, (extra,))
-                        extra_indices = mx.stack([extra_t, extra_h, extra_w]) + text_len + st_idx
-                        vision_indices = mx.concatenate([vision_indices, extra_indices], axis=1)
-
-                    llm_pos_ids_list.append(vision_indices)
-                    if vision_indices.size > 0:
-                        vision_pos_max = int(vision_indices.max().item())
-                        print(f"[ROPE_DEBUG]     appended vision block: vision_pos_range=[{st_idx + text_len}, {vision_pos_max}], new_st={st}")
-                    else:
-                        print(f"[ROPE_DEBUG]     appended vision block: EMPTY (grid=({llm_grid_t},{llm_grid_h},{llm_grid_w}))")
-
-                    # Advance the RoPE position counter and the token pointer by the
-                    # true token count for this block (2040 vision patches + any extra
-                    # placeholder tokens). This keeps the length of the constructed
-                    # llm_positions identical to the original sequence length.
-                    current_pos += actual_vision_tokens_per_block
-                    st = ed + actual_vision_tokens_per_block
-                    vision_block_idx += 1
-
-                if st < len(input_tokens):
-                    # Use the running position counter for the final text segment.
-                    st_idx = current_pos
-                    text_len = len(input_tokens) - st
-                    print(f"[ROPE_DEBUG]   final_text_segment: st={st}, text_len={text_len}, st_idx={st_idx}")
-                    t_index = mx.arange(text_len).reshape(1, text_len)
-                    t_index = mx.broadcast_to(t_index, (3, text_len))
-                    llm_pos_ids_list.append(t_index + st_idx)
-                    current_pos += text_len
-
-                llm_positions = mx.concatenate(llm_pos_ids_list, axis=1).reshape(3, -1)
-                print(f"[ROPE_DEBUG]   llm_positions shape={llm_positions.shape}, min={int(llm_positions.min().item())}, max={int(llm_positions.max().item())}")
-                mask = mx.array(attention_mask[i] == 1)
-                expanded_mask = mx.expand_dims(mask, axis=0)
-                expanded_mask = mx.broadcast_to(expanded_mask, (3, 1, mask.shape[0]))
-                expanded_positions = mx.expand_dims(llm_positions, axis=1)
-                new_positions = mx.where(
-                    expanded_mask, expanded_positions, position_ids[:, i : i + 1, :]
-                )
-                updated_position_ids = mx.concatenate(
-                    [position_ids[:, :i, :], new_positions, position_ids[:, i + 1 :, :]],
-                    axis=1,
-                )
-                position_ids = updated_position_ids
-                mrope_position_deltas.append(int(llm_positions.max().item()) + 1 - len(total_input_ids[i]))
-
-            mrope_position_deltas = mx.array(mrope_position_deltas).reshape(-1, 1)
-            print(f"[ROPE_DEBUG] vision_path_return: position_ids.shape={position_ids.shape}, max_pos={int(position_ids.max().item())}, mrope_deltas={mrope_position_deltas.tolist()}")
+            spatial_merge_size = int(self.config.vision_config.spatial_merge_size)
+            position_ids, mrope_position_deltas = compute_hf_rope_index_mx(
+                input_ids,
+                image_grid_thw=image_grid_thw,
+                video_grid_thw=video_grid_thw,
+                attention_mask=attention_mask,
+                mm_token_type_ids=mm_token_type_ids,
+                image_token_id=int(self.config.image_token_id),
+                video_token_id=int(self.config.video_token_id),
+                spatial_merge_size=spatial_merge_size,
+            )
+            max_pos = int(np.asarray(position_ids).max())
+            _dbg(
+                f"[ROPE_DEBUG] HF get_rope_index: shape={position_ids.shape} "
+                f"max_pos={max_pos} mrope_deltas={np.asarray(mrope_position_deltas).tolist()} "
+                f"seq_len={input_ids.shape[1]}"
+            )
+            try:
+                tail_ids = np.asarray(input_ids[0, -8:]).tolist()
+                tail_pos = np.asarray(position_ids[:, 0, -8:])
+                _dbg(f"[ROPE_DEBUG] last_8_input_ids={tail_ids}")
+                _dbg(f"[ROPE_DEBUG] last_8_THW={tail_pos.tolist()}")
+            except Exception as e:
+                _dbg(f"[ROPE_DEBUG] tail diagnostic failed: {e}")
+            self._position_ids = position_ids
+            self._rope_deltas = mrope_position_deltas
+            self._pos_valid = True
             return position_ids, mrope_position_deltas
 
-        # --- fallback (no vision) ---
         if attention_mask is not None:
             position_ids = mx.cumsum(attention_mask.astype(mx.int64), axis=-1) - 1
             position_ids = mx.where(attention_mask == 0, mx.ones_like(position_ids), position_ids)
@@ -304,6 +323,16 @@ class AlpamayoLanguageModel(LanguageModel):
 class AlpamayoModel(Model):
     """Model that preserves cached multimodal position state across decode steps."""
 
+    @classmethod
+    def from_existing(cls, base: Model) -> "AlpamayoModel":
+        """Create an AlpamayoModel instance from a loaded base VLM.
+
+        Returns a true AlpamayoModel (proper type) while preserving all
+        loaded weights, vision tower, and language model.
+        """
+        base.__class__ = cls
+        return base
+
     def get_input_embeddings(
         self,
         input_ids: Optional[mx.array] = None,
@@ -313,7 +342,7 @@ class AlpamayoModel(Model):
         # --- FORCED DIAGNOSTIC (get_input_embeddings path, which is always hit) ---
         m = kwargs.get("mask", None)
         mask_info = "None" if m is None else f"shape={m.shape} dtype={m.dtype}"
-        print(f"[ATTN_DIAG] get_input_embeddings | mask={mask_info} | pixel_values={'present' if pixel_values is not None else 'None'} | input_ids.shape={input_ids.shape if input_ids is not None else 'None'}")
+        _dbg(f"[ATTN_DIAG] get_input_embeddings | mask={mask_info} | pixel_values={'present' if pixel_values is not None else 'None'} | input_ids.shape={input_ids.shape if input_ids is not None else 'None'}")
 
         image_grid_thw = kwargs.get("image_grid_thw", None)
         video_grid_thw = kwargs.get("video_grid_thw", None)
@@ -324,30 +353,9 @@ class AlpamayoModel(Model):
             pixel_values = kwargs.get("pixel_values_videos", None)
 
         if pixel_values is None:
-            # Decode / text-only continuation path.
-            # 1. Advance the cached _position_ids (vision-aware layout + text continuation)
-            #    by appending last_col + 1. This keeps the full T/H/W layout from prefill.
-            # 2. Explicitly preserve _rope_deltas (the mrope_position_deltas offset).
-            #    The base LanguageModel.__call__ computes delta = cache_offset + _rope_deltas.
-            #    If _rope_deltas is None on the first decode, recalc_condition triggers a
-            #    full get_rope_index recompute that produces the 104 → 261 jump.
-            lm = self.language_model
-
-            if getattr(lm, "_position_ids", None) is not None:
-                pos = lm._position_ids                 # (3, batch, seq_len)
-                last_col = pos[:, :, -1:]              # (3, 1, 1)
-                next_col = last_col + 1                # advance text continuation
-                lm._position_ids = mx.concatenate([pos, next_col], axis=2)
-
-            # Preserve _rope_deltas across decode steps (do not let it become None).
-            # It is a constant offset computed once during prefill; we only need it to survive.
-            if getattr(lm, "_rope_deltas", None) is None and getattr(lm, "_position_ids", None) is not None:
-                # Fallback: if _rope_deltas was somehow cleared but we have _position_ids,
-                # derive a minimal delta from the current last position (best-effort).
-                # This keeps generation alive even if prefill state was partially lost.
-                last_pos = int(lm._position_ids[0, 0, -1].item())
-                lm._rope_deltas = mx.array([[last_pos]], dtype=lm._position_ids.dtype)
-
+            # Decode / text-only: do not mutate _position_ids. Official Qwen3-VL
+            # continuation is position = arange(L) + cache_offset + _rope_deltas,
+            # computed inside LanguageModel.__call__ when those fields survive.
             return InputEmbeddingsFeatures(
                 inputs_embeds=self.language_model.model.embed_tokens(input_ids)
             )
@@ -379,21 +387,60 @@ class AlpamayoModel(Model):
         visual_pos_masks = image_mask
         mx.eval(deepstack_visual_embeds)
 
-        # Note: self.language_model here is still the base mlx_vlm LanguageModel
-        # instance. However, AlpamayoR1MLX.from_pretrained() monkey-patches
-        # vlm.language_model.get_rope_index with AlpamayoLanguageModel's
-        # corrected implementation (the one that collects all 16 vision_start
-        # indices instead of summing them). Therefore this call executes the
-        # fixed Alpamayo-specific logic even though the runtime type is base.
         if image_grid_thw is not None or video_grid_thw is not None:
+            # Explicitly store the ROPE state on the language model so that
+            # the base LanguageModel.__call__ sees it immediately (avoiding
+            # the "position_ids is None" fallback path).
             position_ids, rope_deltas = self.language_model.get_rope_index(
-                input_ids, image_grid_thw, video_grid_thw, mask
+                input_ids,
+                image_grid_thw,
+                video_grid_thw,
+                mask,
+                kwargs.get("mm_token_type_ids"),
             )
             self.language_model._position_ids = position_ids
             self.language_model._rope_deltas = rope_deltas
+            self.language_model._pos_valid = True
+
+            # Build explicit causal mask here, together with the ROPE state we just computed.
+            # This keeps mask construction inside the Alpamayo-managed path so the base
+            # class does not trigger a second get_rope_index call when it sees a mask.
+            if mask is None:
+                causal_mask = create_causal_mask(input_ids.shape[1])
+                self.language_model._attention_mask = causal_mask
+                _dbg(f"[ATTN_DIAG]   built explicit causal mask inside get_input_embeddings (seq_len={input_ids.shape[1]})")
 
         return InputEmbeddingsFeatures(
             inputs_embeds=inputs_embeds,
             visual_pos_masks=visual_pos_masks,
             deepstack_visual_embeds=deepstack_visual_embeds,
         )
+
+    def __call__(
+        self,
+        input_ids: mx.array,
+        pixel_values: Optional[mx.array] = None,
+        mask: Optional[mx.array] = None,
+        cache=None,
+        **kwargs,
+    ):
+        """Merge vision embeds, then run the LM *without* pixel_values.
+
+        mlx_vlm LanguageModel.__call__ treats pixel_values as "new image" and
+        sets ``_position_ids = _rope_deltas = None``. Our get_rope_index guard
+        then returned (None, None), so attention fell back to a flat arange and
+        CoC logits collapsed after step 1.
+        """
+        feats = self.get_input_embeddings(input_ids, pixel_values, **kwargs)
+        kwargs.update({k: v for k, v in feats.to_dict().items() if v is not None})
+        kwargs.pop("pixel_values", None)
+        lm = self.language_model
+        if getattr(lm, "_rope_deltas", None) is not None:
+            kwargs["rope_deltas"] = lm._rope_deltas
+        _dbg(
+            f"[ROPE] LM call without pixel_values | "
+            f"_pos_valid={getattr(lm, '_pos_valid', None)} "
+            f"_position_ids={'set' if getattr(lm, '_position_ids', None) is not None else 'None'} "
+            f"_rope_deltas={getattr(lm, '_rope_deltas', None)}"
+        )
+        return lm(input_ids, mask=mask, cache=cache, **kwargs)

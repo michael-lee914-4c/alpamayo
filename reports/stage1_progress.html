@@ -38,7 +38,7 @@
                     <i class="fa-solid fa-sync fa-xs"></i>
                     <span>Updated</span>
                 </div>
-                <div class="text-xs text-slate-500">May 13, 2026 • M4 Pro Max</div>
+                <div class="text-xs text-slate-500">May 19, 2026 • M4 Pro Max</div>
             </div>
         </div>
 
@@ -680,9 +680,9 @@ Row 10 (dtype enforcement) completed:
                     </div>
                 </div>
 
-                <!-- Clean Subclass-Based Solution (2026-05-18) -->
+                <!-- Clean Subclass-Based Solution (2026-05-19) -->
                 <div class="mt-6">
-                    <div class="font-semibold text-emerald-400 mb-2">Clean Surgical Fix: Alpamayo-Specific Subclasses</div>
+                    <div class="font-semibold text-emerald-400 mb-2">Clean Surgical Fix: Alpamayo-Specific Subclasses (Class Promotion)</div>
                     <div class="bg-slate-950 border border-emerald-700 rounded-2xl p-4 text-xs">
                         <!-- 4×4 Temporal Grouping Diagram moved here per user request -->
                         <div class="mb-4">
@@ -693,16 +693,18 @@ Row 10 (dtype enforcement) completed:
                             <div class="text-[10px] text-slate-500 mt-1">The diagram illustrates the mapping that the corrected <code>get_rope_index</code> implements so that all 16 vision blocks receive distinct (t,h,w) RoPE indices while preserving the 4-row grouped layout expected by Alpamayo’s Conv3D.</div>
                         </div>
 
-                        <p class="text-slate-300 mb-2"><strong>Approach</strong>: Instead of layering post-processing after every VLM call, we created two minimal subclasses in <code>mlx_port/models/alpamayo_qwen3vl.py</code>:</p>
+                        <p class="text-slate-300 mb-2"><strong>Approach</strong>: Instead of method-level patching, we now promote the loaded VLM and its <code>language_model</code> to the Alpamayo subclasses at runtime:</p>
+                        <pre class="bg-slate-900 text-emerald-300 p-2 rounded text-[10px] mb-2">vlm.language_model.__class__ = AlpamayoLanguageModel
+vlm.__class__ = AlpamayoModel</pre>
 
                         <ul class="list-disc list-inside text-slate-300 mb-2 space-y-0.5">
-                            <li><code>AlpamayoLanguageModel</code> — overrides only <code>get_rope_index</code> to correctly collect <code>vision_start</code> token indices (instead of summing them). This fixes <code>mrope_position_deltas = [[0]]</code> for 16-image (4×4 temporal) prompts.</li>
-                            <li><code>AlpamayoModel</code> — overrides <code>get_input_embeddings</code> to avoid unconditionally clearing <code>_position_ids</code> / <code>_rope_deltas</code> on decode steps when <code>pixel_values is None</code>.</li>
+                            <li><code>AlpamayoLanguageModel</code> — overrides <code>get_rope_index</code> (correct 16-image vision-start collection) and <code>__call__</code> (continuation guard that forces cached multimodal <code>_position_ids</code> / <code>_rope_deltas</code> on decode steps).</li>
+                            <li><code>AlpamayoModel</code> — overrides <code>get_input_embeddings</code> (preserves RoPE state on text-only continuation) and now carries forced <code>[ATTN_DIAG]</code> instrumentation.</li>
                         </ul>
 
-                        <p class="text-emerald-400 text-xs"><strong>Result</strong>: The manual generation loop in the new <code>inference.py</code> is now completely clean — no rope_deltas or position_ids post-processing. All fixes are encapsulated inside the two overridden methods. The rest of the <code>mlx_vlm</code> stack (vision tower, KV cache, weight loading, etc.) remains untouched.</p>
+                        <p class="text-emerald-400 text-xs"><strong>Result</strong>: Every reference to <code>LanguageModel</code> or <code>Model</code> in the Alpamayo path is now an <code>Alpamayo*</code> instance. No more manual <code>.__get__</code> patching. All fixes (RoPE, position continuation, attention diagnostics) live inside the subclasses.</p>
 
-                        <div class="mt-3 text-emerald-400 text-xs">Legacy patch tests removed. All 19 unit tests pass. End-to-end 10-step test now runs with the full surgical fix: both <code>AlpamayoLanguageModel.get_rope_index</code> (correct 16-image vision-start detection) and <code>AlpamayoModel.get_input_embeddings</code> (preserve cached RoPE state) are active. <code>mrope_position_deltas</code> is now non-zero; generation reaches the requested 10 steps without early termination.</div>
+                        <div class="mt-3 text-emerald-400 text-xs">All 19 unit tests pass. 256-step E2E test completed (matching NVIDIA <code>max_generation_length=256</code>). Exact per-ID trajectory token masking implemented — raw <code>&lt;iN&gt;</code> tokens no longer pollute CoC. Forced <code>[ATTN_DIAG]</code> prints confirm <code>mask=None</code> on every prefill and decode step. <code>mx.fast.scaled_dot_product_attention</code> (Metal Flash-Attn-2 equivalent) is used; attention weights from the Alpamayo checkpoint are loaded, but the Metal kernel vs. NVIDIA’s CUDA+FlashAttn2 path remains the key numerical difference.</div>
                     </div>
                 </div>
 
@@ -740,16 +742,232 @@ Row 10 (dtype enforcement) completed:
             </div>
         </div>
 
+        <!-- Prioritized Investigation: Mask & mRoPE + KV Cache -->
+        <div class="mb-8">
+            <div class="section-header">
+                <i class="fa-solid fa-search text-rose-400"></i>
+                <div class="font-semibold text-xl">Prioritized Investigation: Mask Construction &amp; 3-row mRoPE + KV Cache Interaction</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 text-sm">
+                <p class="text-slate-300 mb-3">After the successful class promotion and exact trajectory-token masking, the remaining CoC quality gap is hypothesized to stem from differences in how the attention mask is built and how the 3-row mRoPE <code>position_ids</code> interact with the causal mask and KV-cache state inside <code>mx.fast.scaled_dot_product_attention</code> vs. NVIDIA’s Flash-Attn-2 path.</p>
+
+                <div class="font-semibold text-amber-400 mb-1">Current diagnostic findings (from forced [ATTN_DIAG])</div>
+                <ul class="list-disc list-inside text-slate-300 text-xs mb-3 space-y-0.5">
+                    <li><code>mask=None</code> reaches <code>AlpamayoLanguageModel.__call__</code> on both prefill (32k vision tokens) and every decode step.</li>
+                    <li>3-row mRoPE <code>position_ids</code> are correctly preserved and monotonically advanced (T/H/W each +1 per decode step).</li>
+                    <li>KV-cache <code>offset</code> grows correctly; <code>_idx</code> is not exposed on plain <code>KVCache</code>.</li>
+                    <li>No explicit triangular mask is ever supplied — the base implementation falls back to internal <code>"causal"</code> sentinel or <code>None</code>.</li>
+                </ul>
+
+                <div class="font-semibold text-emerald-400 mb-1">Options under consideration</div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                    <div class="bg-slate-950 border border-slate-700 rounded-xl p-3">
+                        <div class="font-mono text-emerald-400 mb-1">Option A (implemented)</div>
+                        <div class="text-slate-300">Build the explicit causal mask inside <code>AlpamayoModel.get_input_embeddings</code> immediately after the authoritative <code>get_rope_index</code> call. The mask is stored on the language model together with <code>_position_ids</code> / <code>_rope_deltas</code>. On every decode step <code>AlpamayoLanguageModel.__call__</code> substitutes the stored mask when the incoming <code>mask=None</code>. This guarantees mask and ROPE state are always consistent and prevents the base class from re-invoking <code>get_rope_index</code> with degraded inputs.</div>
+                    </div>
+                    <div class="bg-slate-950 border border-emerald-700 rounded-xl p-3">
+                        <div class="font-mono text-emerald-400 mb-1">Option B (implementing now)</div>
+                        <div class="text-slate-300">Wrap each decoder layer’s <code>self_attn</code> (the <code>Attention</code> instance) with <code>DiagnosticAttentionWrapper</code>. On every <code>__call__</code> the wrapper prints the exact <code>mask</code> (shape, dtype, numeric range, 3×3 corner) that reaches <code>scaled_dot_product_attention</code>, plus the accompanying <code>cache</code> offset/idx and 3-row <code>position_ids</code>. This reveals whether the base code builds a triangular mask from the sentinel or simply passes <code>None</code> and relies on the kernel’s internal causal logic.</div>
+                    </div>
+                    <div class="bg-slate-950 border border-slate-700 rounded-xl p-3">
+                        <div class="font-mono text-amber-400 mb-1">Option C</div>
+                        <div class="text-slate-300">Experiment with a 4-D mask that incorporates the 3-row mRoPE <code>position_ids</code> (similar to certain Qwen3-VL implementations that combine <code>position_ids</code> with <code>attention_mask</code> before the attention kernel). Tests whether the rotary embedding and mask must be jointly constructed for parity.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Single-image CoC vs GT (2026-08-28) -->
+        <div class="mb-8">
+            <div class="section-header">
+                <i class="fa-solid fa-image text-cyan-400"></i>
+                <div class="font-semibold text-xl">Single-image CoC vs GT (2026-08-28)</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 text-sm space-y-3">
+                <div class="text-slate-300">
+                    Script: <code>mlx_port/tests/test_single_image_coc.py</code> • clip
+                    <code>0abe118e-aa79-41f6-a719-f2df8abaf1ea</code> • one front-wide frame at the
+                    CoC event <code>t0_us=8757247</code> • greedy (<code>temperature=0</code> →
+                    <code>argmax</code>) • 256 tokens • no 4×4 grouping.
+                    Prefill was 2136 tokens, <code>image_grid_thw=[[1,68,120]]</code>.
+                </div>
+                <img src="stage1_single_image_front_wide.png" alt="Front-wide t0 frame used for single-image CoC" class="w-full max-w-3xl rounded-2xl border border-slate-700">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                    <div class="bg-slate-950 border border-emerald-800 rounded-xl p-3">
+                        <div class="font-semibold text-emerald-400 mb-1">GT CoC</div>
+                        <div class="text-slate-200">Strong deceleration to yield to the pedestrian crossing the crosswalk.</div>
+                    </div>
+                    <div class="bg-slate-950 border border-amber-800 rounded-xl p-3">
+                        <div class="font-semibold text-amber-400 mb-1">Pred CoC (greedy, after ID fix)</div>
+                        <div class="text-slate-300 font-mono">Come a low&lt;|im_end|&gt;visibility conditions.</div>
+                    </div>
+                </div>
+                <div class="text-xs text-slate-400">
+                    Re-run 2026-08-28 after tokenizer add-order fix (28.4 s). Layout confirmed:
+                    <code>vocab=155697 i0=151669 cot_start=155677 traj_future_start=155681</code>.
+                    First-step top-3 is English: <code>Slow(0.694) Keep(0.078) Come(0.057)</code> — no
+                    <code>&lt;|prompt_start|&gt;</code>. Decode stopped at 10 tokens on
+                    <code>&lt;|cot_end|&gt;</code> then <code>&lt;|traj_future_start|&gt;</code>.
+                    Scores: <code>readable=True</code> (starts with a letter) • Jaccard <strong>0.000</strong> •
+                    GT coverage <strong>0.000</strong> • minADE n/a (expert not run).
+                </div>
+                <div class="text-amber-300 text-xs">
+                    Placeholders are gone; Stage 1 quality gate is still failed. The sentence is
+                    short, inserts <code>&lt;|im_end|&gt;</code> mid-phrase, and does not mention
+                    the pedestrian / yield / crosswalk in the GT label.
+                </div>
+            </div>
+        </div>
+
+        <!-- Placeholder token root cause (2026-08-28) -->
+        <div class="mb-8">
+            <div class="section-header">
+                <i class="fa-solid fa-bug text-rose-400"></i>
+                <div class="font-semibold text-xl">Placeholder tokens: tokenizer ID mismatch (2026-08-28)</div>
+            </div>
+            <div class="bg-slate-900 border border-rose-800 rounded-3xl p-6 text-sm space-y-3">
+                <div class="text-slate-300">
+                    Alpamayo-R1-10B ships <strong>no</strong> <code>tokenizer.json</code>.
+                    NVIDIA builds IDs at runtime: add all <code>traj_vocab_size=4000</code>
+                    discrete <code>&lt;iN&gt;</code> tokens first, then <code>SPECIAL_TOKENS</code>.
+                    That layout is stored in <code>config.json</code>
+                    (<code>traj_token_start_idx=151669</code>, <code>vocab_size=155697</code>,
+                    <code>traj_token_ids.future_start=155681</code>, etc.).
+                    <code>&lt;|image_pad|&gt;</code> already exists in Qwen (id 151655), so only 28 new specials are added.
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                    <div class="bg-slate-950 border border-rose-800 rounded-xl p-3">
+                        <div class="font-semibold text-rose-400 mb-1">Broken MLX order (768 then specials then rest)</div>
+                        <div class="text-slate-300 font-mono space-y-1">
+                            <div>&lt;|prompt_start|&gt; → 152437 = checkpoint &lt;i768&gt;</div>
+                            <div>&lt;|cot_start|&gt; → 152445 = checkpoint &lt;i776&gt;</div>
+                            <div>id 155681 decodes as &lt;i3984&gt; (real traj_future_start)</div>
+                        </div>
+                    </div>
+                    <div class="bg-slate-950 border border-emerald-800 rounded-xl p-3">
+                        <div class="font-semibold text-emerald-400 mb-1">NVIDIA / checkpoint order</div>
+                        <div class="text-slate-300 font-mono space-y-1">
+                            <div>&lt;i0&gt;…&lt;i3999&gt; = 151669–155668</div>
+                            <div>&lt;|prompt_start|&gt; = 155669</div>
+                            <div>&lt;|cot_start|&gt; = 155677</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-slate-300 text-xs">
+                    Causal chain: prompt encoded <code>&lt;|cot_start|&gt;</code> as a traj-bin row;
+                    <code>ExpertLogitsProcessor</code> masked the real <code>&lt;iN&gt;</code> IDs but
+                    <strong>not</strong> 152437–152464 (labeled specials, actually <code>&lt;i768&gt;–&lt;i795&gt;</code>);
+                    greedy argmax emitted those bins; decode printed
+                    <code>&lt;|prompt_start|&gt;</code>, <code>&lt;|image_pre_tkn|&gt;</code>,
+                    <code>&lt;|traj_future_end|&gt;</code>, <code>&lt;|answer_start|&gt;</code>.
+                    The specials themselves did not need a CoC mask.
+                </div>
+                <div class="text-emerald-300 text-xs">
+                    Fix: <code>DEFAULT_TRAJ_VOCAB_SIZE=4000</code>, add all discrete tokens before specials,
+                    assert IDs against <code>config.json</code> in <code>from_pretrained</code>.
+                    Test: <code>mlx_port/tests/test_tokenizer_id_parity.py</code>.
+                    Re-run single-image CoC next to see if English starts cleanly after the correct
+                    <code>&lt;|cot_start|&gt;</code> embedding.
+                </div>
+            </div>
+        </div>
+
+        <!-- 16-image CoC after ID fix + nucleus (2026-08-28) -->
+        <div class="mb-8">
+            <div class="section-header">
+                <i class="fa-solid fa-layer-group text-cyan-400"></i>
+                <div class="font-semibold text-xl">16-image CoC at event t0 (2026-08-28)</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 text-sm space-y-3">
+                <div class="text-slate-300">
+                    NVIDIA input: 4×4 frames, 4×4 grouping <code>image_grid_thw=[[4,68,120]]×4</code>,
+                    32766 prompt tokens, <code>temperature=0.6</code>, <code>top_p=0.98</code> (now
+                    actually applied), <code>t0_us=8757247</code>. ~108 s.
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                    <div class="bg-slate-950 border border-rose-800 rounded-xl p-3">
+                        <div class="font-semibold text-rose-400 mb-1">Fusion (broken)</div>
+                        <div class="text-slate-300 font-mono">hist_pad=155684  pads 48→32  &lt;iN&gt; 0→16</div>
+                        <div class="text-slate-400 mt-1">MLX uses DiscreteTrajectoryTokenizer (action bins). NVIDIA history path is DeltaTrajectoryTokenizer: 16 steps × xyz = 48 tokens.</div>
+                    </div>
+                    <div class="bg-slate-950 border border-amber-800 rounded-xl p-3">
+                        <div class="font-semibold text-amber-400 mb-1">Pred CoC (nucleus)</div>
+                        <div class="text-slate-300">Starts “ahead by…” then multilingual / code fragments. Ends on real <code>&lt;|cot_end|&gt;</code> (155678) + <code>&lt;|traj_future_start|&gt;</code> (155681). Jaccard 0 / coverage 0.</div>
+                    </div>
+                </div>
+                <div class="text-xs text-slate-400">
+                    Sampling is wired: step 1 <code>ahead(0.138)</code> was in the nucleus set.
+                    After step 2 the top-3 mass collapses (~0.000) so top_p≈1 and the sampler
+                    draws junk. Special-token IDs are correct. Next: port
+                    <code>DeltaTrajectoryTokenizer</code> so all 48 history pads are replaced.
+                </div>
+            </div>
+        </div>
+
         <!-- Next Steps -->
         <div class="bg-indigo-950/50 border border-indigo-800 rounded-3xl p-8">
             <div class="font-semibold text-indigo-400 mb-3 flex items-center gap-x-2">
                 <i class="fa-solid fa-arrow-right"></i>
                 <span>Next Steps</span>
             </div>
-            <div class="text-sm text-slate-300">
-                Full surgical fix active: <code>AlpamayoLanguageModel.get_rope_index</code> (correct vision-start detection for 4×4 temporal grouping) + <code>AlpamayoModel.get_input_embeddings</code> (preserve cached RoPE state). End-to-end 10-step test passes. CoC generation now runs the full requested length with non-zero <code>mrope_position_deltas</code>. Remaining: CoC text quality is still trajectory-token heavy; next focus on vision-language alignment / fine-tune specific RoPE expectations.
+            <div class="text-sm text-slate-300 space-y-3">
+                <div class="font-semibold text-amber-400">Stage 1 gate (locked): stay here until CoC and action expert match GT on the local PAI-CoC subset (<code>/Volumes/MicronSSD/pai_coc</code>). 370 labeled CoC clips in chunks 0–249. Default clip <code>0abe118e-aa79-41f6-a719-f2df8abaf1ea</code> — GT CoC: “Strong deceleration to yield to the pedestrian crossing the crosswalk.” Trajectory GT is <code>ego_future_xyz</code> via minADE. Helper: <code>mlx_port/gt_eval.py</code>. Stages 2–3 stay blocked.</div>
+
+                <div class="font-semibold text-emerald-400">Practical next steps to close the CoC quality gap</div>
+
+                <ol class="list-decimal list-inside space-y-1 text-xs">
+                    <li class="text-amber-400">
+                        <strong>RoPE wipe + last-block suffix — PARTIAL</strong><br>
+                        Prefill no longer drops 3-row ids (<code>pixel_values</code> not forwarded).
+                        Decode is <code>cache_offset + rope_deltas</code> (32766 → 32766).
+                        Last-block vision span no longer eats <code>&lt;|cot_start|&gt;</code>.
+                        Step 1 is English driving words; <code>&lt;|im_end|&gt;</code> still leaks and layout is not yet HF
+                        (<code>current_pos += max(h,w)//merge</code> = 60, not 2041).
+                    </li>
+                    <li class="text-emerald-400">
+                        <strong>History fusion 48/48 — FIXED</strong><br>
+                        <code>DeltaTrajectoryTokenizerMLX</code> matches NVIDIA encode (16 × xyz).
+                        Fuse line is now <code>pads 48→0</code>, <code>&lt;iN&gt; 0→48</code>.
+                    </li>
+                    <li class="text-emerald-400">
+                        <strong>16-image NVIDIA input + nucleus sampling — RUN</strong><br>
+                        Event t0, 16 images, top_p applied. CoC still fails quality (jaccard 0). IDs are correct.
+                    </li>
+                    <li class="text-emerald-400">
+                        <strong>Tokenizer add-order vs checkpoint IDs — FIXED</strong><br>
+                        Root cause of <code>&lt;|prompt_start|&gt;</code> / <code>&lt;|image_pre_tkn|&gt;</code> CoC placeholders.
+                    </li>
+                    <li class="text-emerald-400">
+                        <strong>Force stored mask on every decode step — IMPLEMENTED + TESTED</strong><br>
+                        Guard changed to unconditional <code>mask = self._attention_mask</code>. 256-step E2E test passed (exit 0, ~100 s). New diagnostic <code>[ATTN_DIAG] forcing stored mask</code> appears on prefill and every decode. CoC still dominated by placeholder tokens; quality gap persists.
+                    </li>
+                    <li class="text-slate-500">
+                        <strong>Disable explicit mask entirely</strong> — <span class="font-semibold">ruled out</span>.<br>
+                        The CoC quality gap already existed before any explicit mask injection. Reverting to stock mask construction will not improve parity.
+                    </li>
+                    <li class="text-emerald-400">
+                        <strong>Inspect the mask the base code builds for a decode step — DONE</strong><br>
+                        <code>inspect_decode_mask_construction(seq_len=1, cache_offset=32766)</code> shows: <code>create_attention_mask</code> returns <code>'causal'</code> sentinel; <code>return_array=True</code> yields a full <code>(32767, 32767)</code> bool mask. Last 8 cols of row 0 are all False (causal). Our stored mask is also full-triangular but built at prefill time with <code>create_causal_mask(input_ids.shape[1])</code>. The kernel receives the sentinel or a full array, not a sliced <code>(1, kv_len)</code> row.
+                    </li>
+                    <li class="text-emerald-400">
+                        <strong>Capture one real decode-step mask with the wrapper — DONE</strong><br>
+                        <code>[ATTN_KERNEL] L00 call#002 | DECODE | mask=None | cache=offset=9 _idx=None | position_ids=shape=(3, 1, 1) T0=9..9</code><br>
+                        On decode, <code>mask=None</code> reaches the kernel; causality is handled internally via cache offset + 3-row mRoPE tail. This matches the stock <code>mlx_vlm</code> path exactly.
+                    </li>
+                    <li class="text-emerald-400">
+                        <strong>Verify 3-row position_ids continuity at the prefill→decode boundary — COMPLETE</strong><br>
+                        <code>[POS_CONTINUITY] prefill_last_col: T=9 H=9 W=9</code><br>
+                        <code>[POS_CONTINUITY] decode_first_tail: T=10 H=10 W=10</code><br>
+                        <code>[POS_CONTINUITY] monotonicity: T+1=True H+1=True W+1=True OK</code><br>
+                        All five practical steps addressed. The placeholder-token CoC was a tokenizer ID bug, not a Metal vs Flash-Attn-2 issue; re-evaluate quality after the 4000-then-specials add-order fix.
+                    </li>
+                </ol>
+
+                <div class="pt-2 text-xs text-emerald-400">All five practical steps complete. Final 256-step E2E validation run (robust guard): <strong>PASSED</strong> (~104 s, exit 0). Log saved to <code>/tmp/test_256_robust_guard_20260520_150258.log</code>. Guard now short-circuits on every re-entrant call (18+ times during generation) with <code>pos_valid=True</code>. No degenerate <code>max_pos=1</code> overwrite. Position_ids state preserved across prefill→decode boundary.</div>
+                <div class="pt-1 text-xs text-amber-400">ROPE guard robustness fix (May 20): Replaced attribute-presence check with explicit <code>_pos_valid</code> flag set after first successful <code>get_rope_index</code> vision-path computation. This prevents the guard from being bypassed due to nn.Module internal bookkeeping after class promotion.</div>
+                <div class="pt-1 text-xs text-emerald-400">Persistence fix: Explicit assignment of <code>_position_ids</code>, <code>_rope_deltas</code>, and <code>_pos_valid</code> in <code>AlpamayoModel.get_input_embeddings</code> immediately after <code>get_rope_index</code> ensures the base <code>LanguageModel</code> sees the state during the same forward pass, eliminating the "position_ids is None (will be computed inside Qwen3VLModel)" fallback.</div>
             </div>
-            <div class="mt-4 text-xs font-mono text-indigo-400">Report saved to: reports/stage1_progress.html</div>
+            <div class="mt-4 text-xs font-mono text-indigo-400">Report saved to: reports/stage1_progress.html • Updated 2026-08-28</div>
         </div>
     </div>
 </body>

@@ -1,7 +1,8 @@
 """End-to-end inference test for the MLX port of AlpamayoR1.
 
 This mirrors src/alpamayo_r1/test_inference.py using the MLX-native components.
-It loads a clip from the local PAI-CoC subset, runs the full rollout, and prints the CoC.
+It loads a CoC-labeled clip from the local PAI-CoC subset, runs the full rollout, and prints the CoC.
+NVIDIA's published example clip is not in the CoC subset, so it is not used here.
 
 History lengths used (matching NVIDIA defaults):
     - Camera frames: DEFAULT_NUM_FRAMES = 4 per camera (visual history)
@@ -18,21 +19,29 @@ from mlx_port.processor import (
     create_message,
     get_processor,
     alpamayo_apply_chat_template,
-    enforce_alpamayo_temporal_grouping,
     DEFAULT_NUM_FRAMES,
-    DEFAULT_NUM_HISTORY_STEPS,
-    DEFAULT_HISTORY_TRAJ_TOKENS,
 )
 from mlx_port.models.alpamayo_r1_mlx import AlpamayoR1MLX
 from mlx_port.inference import sample_trajectories_from_data_with_vlm_rollout
 from mlx_port.profiling import profile_section, is_profiling_enabled
+from mlx_port.gt_eval import (
+    DEFAULT_EVAL_CLIP_ID,
+    clean_pred_coc,
+    format_gt_report,
+    load_clip_gt,
+    score_coc,
+)
 
 
-# Same clip used in test_data_loading.py (available in the local subset)
-CLIP_ID = "25cd4769-5dcf-4b53-a351-bf2c5deb6124"
-LOCAL_DIR = "/Volumes/MicronSSD/pai_coc"  # Local PAI-CoC subset (matches test_data_loading.py)
+# CoC-labeled clip in local chunks 0–249 (cameras + egomotion downloaded).
+# NVIDIA test_inference.py uses 030c760c-… / 5.1s, which has no CoC label.
+CLIP_ID = DEFAULT_EVAL_CLIP_ID
+LOCAL_DIR = "/Volumes/MicronSSD/pai_coc"
+# Last confirmed greedy (temperature=0, 16×[1,H,W], event t0) CoC on CLIP_ID.
+EXPECTED_GREEDY_COC_PREFIX = "Stop for the stop sign"
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("max_gen_len", [256])
 def test_end_to_end_inference_prints_coc_vlm_only(max_gen_len):
     """Run inference on one clip using only the VLM (no diffusion expert loaded).
@@ -45,16 +54,30 @@ def test_end_to_end_inference_prints_coc_vlm_only(max_gen_len):
     the full pre-trained expert weights.
     """
     print(f"\n[End-to-End Test] Loading dataset for clip_id: {CLIP_ID}...")
+    gt = load_clip_gt(CLIP_ID)
+    t0_us = int(gt["events"][0]["event_start_timestamp"])
+    print(f"[End-to-End Test] t0_us={t0_us} (CoC event, not default 5.1s)")
+    print("[End-to-End Test] GT CoC labels:")
+    for text in gt["gt_coc_texts"]:
+        print(f"  - {text}")
     data = load_physical_aiavdataset(
         CLIP_ID,
-        t0_us=5_100_000,
+        t0_us=t0_us,
         local_dir=LOCAL_DIR,
         maybe_stream=True,
+        num_frames=DEFAULT_NUM_FRAMES,
     )
     print("[End-to-End Test] Dataset loaded.")
+    frames = data["image_frames"]
+    print(
+        f"[End-to-End Test] image_frames shape={tuple(frames.shape)} "
+        f"(expect 4 cameras × {DEFAULT_NUM_FRAMES} frames)"
+    )
 
     # Create chat messages (MLX version of helper.create_message)
-    messages = create_message(data["image_frames"].flatten(0, 1))
+    messages = create_message(frames.flatten(0, 1))
+    n_images = sum(1 for m in messages for c in m.get("content", []) if c.get("type") == "image")
+    print(f"[End-to-End Test] chat images={n_images} (expect 16)")
 
     # Load MLX model (weights from local Alpamayo-R1-10B checkpoint)
     print("[End-to-End Test] Loading AlpamayoR1MLX (this may take a while)...")
@@ -68,8 +91,7 @@ def test_end_to_end_inference_prints_coc_vlm_only(max_gen_len):
     # Processor (injects Alpamayo tokenizer)
     with profile_section("get_processor", enabled=is_profiling_enabled()):
         processor = get_processor(model.tokenizer)
-    # The real hist_traj_tokenizer is now attached inside from_pretrained
-    # (DiscreteTrajectoryTokenizerMLX), so strict parity checks pass.
+    # History fusion uses DeltaTrajectoryTokenizerMLX (16 × xyz = 48 tokens).
 
     # Use the Alpamayo-controlled apply_chat_template helper.
     # This guarantees a flat images list and therefore a correct image_grid_thw,
@@ -85,27 +107,7 @@ def test_end_to_end_inference_prints_coc_vlm_only(max_gen_len):
             return_tensors="np",
         )
 
-    # Enforce proper 4-camera × 4-frame temporal grouping on image_grid_thw.
-    # The processor (even with a flat list) emits 16 independent [1,H,W] rows.
-    # Alpamayo expects 4 groups with T=4 so the Conv3D sees temporally coherent
-    # stacks and the language model's RoPE receives correct multimodal positions.
-    inputs = enforce_alpamayo_temporal_grouping(inputs, num_cameras=4, num_frames_per_camera=4)
-    if "image_grid_thw" in inputs:
-        print("[DEBUG] image_grid_thw after temporal grouping:")
-        print(inputs["image_grid_thw"])
-
-    # Debug: show the final prompt text (truncated for readability)
-    if "input_ids" in inputs:
-        print("[DEBUG] Tokenized input_ids shape:", inputs["input_ids"].shape)
-    if "image_grid_thw" in inputs:
-        grid = inputs["image_grid_thw"]
-        print("[DEBUG] image_grid_thw shape:", grid.shape)
-        print("[DEBUG] image_grid_thw FULL content:")
-        print(grid)
-    if "video_grid_thw" in inputs:
-        print("[DEBUG] video_grid_thw present:", inputs["video_grid_thw"].shape)
-    if "pixel_values_videos" in inputs:
-        print("[DEBUG] pixel_values_videos present:", inputs["pixel_values_videos"].shape)
+    # NVIDIA processor emits 16×[1,H,W]. Do not collapse to 4×[4,H,W].
 
     # Normalize pixel_values to channels-first for the Alpamayo-loaded Conv3D.
     for key in ("pixel_values", "pixel_values_videos"):
@@ -121,12 +123,12 @@ def test_end_to_end_inference_prints_coc_vlm_only(max_gen_len):
     }
 
     # Run rollout with return_extra=True so we get the CoC
-    print("[End-to-End Test] Running sample_trajectories_from_data_with_vlm_rollout...")
+    print("[End-to-End Test] Running greedy VLM rollout (temperature=0, no grouping)...")
     pred_xyz, pred_rot, extra = sample_trajectories_from_data_with_vlm_rollout(
         model=model,
         data=model_inputs,
-        top_p=0.98,
-        temperature=0.6,
+        top_p=1.0,
+        temperature=0.0,
         num_traj_samples=1,
         max_generation_length=max_gen_len,
         return_extra=True,
@@ -153,11 +155,35 @@ def test_end_to_end_inference_prints_coc_vlm_only(max_gen_len):
             f"(final Metal memory was lower; this is the true high-water mark during VLM execution)"
         )
 
-    # Print CoC exactly like NVIDIA's script
+    pred_coc = None
     if extra and "cot" in extra:
-        print("\nChain-of-Causation (per trajectory):\n", extra["cot"][0])
+        pred_coc = extra["cot"][0]
+        pred_clean = clean_pred_coc(pred_coc)
+        print("\nChain-of-Causation (per trajectory):\n", pred_coc)
+        score = score_coc(pred_coc, gt["gt_coc_texts"])
+        print(
+            f"[End-to-End Test] readable={score['readable']} "
+            f"jaccard={score['jaccard']:.3f} gt_coverage={score['gt_coverage']:.3f} "
+            f"cleaned={pred_clean!r}"
+        )
+        assert score["readable"], f"greedy CoC is not readable: {pred_coc!r}"
+        assert pred_clean.startswith(EXPECTED_GREEDY_COC_PREFIX), (
+            f"greedy CoC drifted from pinned output.\n"
+            f"  expected prefix: {EXPECTED_GREEDY_COC_PREFIX!r}\n"
+            f"  got: {pred_clean!r}"
+        )
     else:
         print("\n[End-to-End Test] No CoC extracted (extra=", extra, ")")
+
+    print("\n[GT comparison]")
+    print(
+        format_gt_report(
+            gt,
+            pred_coc=pred_coc,
+            pred_xyz=pred_xyz,
+            ego_future_xyz=data.get("ego_future_xyz"),
+        )
+    )
 
     # Print future trajectory (pred_xyz / pred_rot) produced by the action expert
     print("\nFuture Trajectory (from action expert):")

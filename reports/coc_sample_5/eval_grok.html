@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grok CoC eval</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-200">
+  <div class="max-w-6xl mx-auto px-6 py-10">
+    <h1 class="text-3xl text-white mb-2">Grok CoC evaluator</h1>
+    <p class="text-sm text-slate-400 mb-6">
+      Model grok-4.6. Semantic judge vs human GT (not Jaccard).
+      2026-08-28 18:10 UTC. Verdicts: match=2 · mismatch=1 · related=2.
+      Source sample: <a class="text-cyan-400" href="index.html">coc_sample_5</a>
+    </p>
+    <div class="overflow-auto bg-slate-900 border border-slate-700 rounded-2xl mb-8">
+      <table class="w-full text-left text-sm">
+        <thead class="text-[11px] uppercase text-slate-500 border-b border-slate-800">
+          <tr>
+            <th class="px-3 py-2">#</th><th class="px-3 py-2">Clip</th><th class="px-3 py-2">Verdict</th>
+            <th class="px-3 py-2">Align</th><th class="px-3 py-2">Hazard</th><th class="px-3 py-2">Action</th>
+            <th class="px-3 py-2">GT</th><th class="px-3 py-2">Pred</th>
+          </tr>
+        </thead>
+        <tbody><tr>
+              <td class="px-3 py-2 text-slate-400">0</td>
+              <td class="px-3 py-2 font-mono text-[11px]">faff17c7…</td>
+              <td class="px-3 py-2 text-xs text-amber-300 font-semibold">related</td>
+              <td class="px-3 py-2 tabular-nums">2</td>
+              <td class="px-3 py-2 text-xs">False</td>
+              <td class="px-3 py-2 text-xs">False</td>
+              <td class="px-3 py-2 text-xs text-slate-300">Turn left while keeping a safe distance from the construction cones on the right.</td>
+              <td class="px-3 py-2 text-xs text-amber-100">Stop to yield to the construction flagger ahead.</td>
+            </tr><tr>
+              <td class="px-3 py-2 text-slate-400">1</td>
+              <td class="px-3 py-2 font-mono text-[11px]">8e83f069…</td>
+              <td class="px-3 py-2 text-xs text-emerald-400 font-semibold">match</td>
+              <td class="px-3 py-2 tabular-nums">4</td>
+              <td class="px-3 py-2 text-xs">True</td>
+              <td class="px-3 py-2 text-xs">True</td>
+              <td class="px-3 py-2 text-xs text-slate-300">Decelerate to maintain a safe distance from the pedestrians crossing the street.</td>
+              <td class="px-3 py-2 text-xs text-amber-100">Slow yield to the pedestrian in the crosswalk.</td>
+            </tr><tr>
+              <td class="px-3 py-2 text-slate-400">2</td>
+              <td class="px-3 py-2 font-mono text-[11px]">1946f1c3…</td>
+              <td class="px-3 py-2 text-xs text-rose-400 font-semibold">mismatch</td>
+              <td class="px-3 py-2 tabular-nums">1</td>
+              <td class="px-3 py-2 text-xs">False</td>
+              <td class="px-3 py-2 text-xs">True</td>
+              <td class="px-3 py-2 text-xs text-slate-300">Yield to the pedestrian crossing the road.</td>
+              <td class="px-3 py-2 text-xs text-amber-100">Stop to yield to the cross-traffic vehicle crossing ahead. -translate</td>
+            </tr><tr>
+              <td class="px-3 py-2 text-slate-400">3</td>
+              <td class="px-3 py-2 font-mono text-[11px]">8e06f83c…</td>
+              <td class="px-3 py-2 text-xs text-amber-300 font-semibold">related</td>
+              <td class="px-3 py-2 tabular-nums">3</td>
+              <td class="px-3 py-2 text-xs">True</td>
+              <td class="px-3 py-2 text-xs">False</td>
+              <td class="px-3 py-2 text-xs text-slate-300">Yield to the pedestrians crossing the road.</td>
+              <td class="px-3 py-2 text-xs text-amber-100">Nudge to the left to give space to the pedestrian ahead. Slow</td>
+            </tr><tr>
+              <td class="px-3 py-2 text-slate-400">4</td>
+              <td class="px-3 py-2 font-mono text-[11px]">36cb5485…</td>
+              <td class="px-3 py-2 text-xs text-emerald-400 font-semibold">match</td>
+              <td class="px-3 py-2 tabular-nums">4</td>
+              <td class="px-3 py-2 text-xs">True</td>
+              <td class="px-3 py-2 text-xs">True</td>
+              <td class="px-3 py-2 text-xs text-slate-300">Stop for the stop sign while waiting for pedestrians to cross the street.</td>
+              <td class="px-3 py-2 text-xs text-amber-100">Stop to yield to the pedestrian in the crosswalk.</td>
+            </tr></tbody>
+      </table>
+    </div>
+    <section class="bg-slate-900 border border-slate-700 rounded-2xl p-5 mb-5">
+              <div class="font-mono text-sm text-cyan-300 mb-2">faff17c7-4572-472a-be28-0f035bb88a37</div>
+              <div class="text-xs text-slate-400 mb-3">verdict=<span class="text-white">related</span>
+                · align=2 · hazard=False
+                · action=False · best=greedy#1</div>
+              <div class="grid md:grid-cols-2 gap-3 text-sm mb-3">
+                <div><div class="text-[11px] uppercase text-slate-500">GT</div><p>Turn left while keeping a safe distance from the construction cones on the right.</p></div>
+                <div><div class="text-[11px] uppercase text-amber-500">Pred</div><p class="text-amber-100">Stop to yield to the construction flagger ahead.</p></div>
+              </div>
+              <p class="text-sm text-slate-300">GT is a left turn while clearing construction cones on the right. The greedy pred stays in the work-zone family but names a different actor (flagger) and a different action (stop/yield). Top-5 lines are also work-zone related or garbled and none is a closer semantic match to turning left for cones.</p>
+            </section><section class="bg-slate-900 border border-slate-700 rounded-2xl p-5 mb-5">
+              <div class="font-mono text-sm text-cyan-300 mb-2">8e83f069-5fc5-4329-8589-4527de19d03e</div>
+              <div class="text-xs text-slate-400 mb-3">verdict=<span class="text-white">match</span>
+                · align=4 · hazard=True
+                · action=True · best=top5#4</div>
+              <div class="grid md:grid-cols-2 gap-3 text-sm mb-3">
+                <div><div class="text-[11px] uppercase text-slate-500">GT</div><p>Decelerate to maintain a safe distance from the pedestrians crossing the street.</p></div>
+                <div><div class="text-[11px] uppercase text-amber-500">Pred</div><p class="text-amber-100">Slow yield to the pedestrian in the crosswalk.</p></div>
+              </div>
+              <p class="text-sm text-slate-300">GT is decelerating for pedestrians crossing the street (safe distance). Greedy is the same hazard family and a compatible slow/yield action, though it frames a single crosswalk pedestrian rather than plural proximity. Top-5 #4 (slow down to yield) is slightly closer to GT decelerate than the telegraphic greedy phrasing.</p>
+            </section><section class="bg-slate-900 border border-slate-700 rounded-2xl p-5 mb-5">
+              <div class="font-mono text-sm text-cyan-300 mb-2">1946f1c3-8638-4648-8944-506e6bffc4df</div>
+              <div class="text-xs text-slate-400 mb-3">verdict=<span class="text-white">mismatch</span>
+                · align=1 · hazard=False
+                · action=True · best=greedy#1</div>
+              <div class="grid md:grid-cols-2 gap-3 text-sm mb-3">
+                <div><div class="text-[11px] uppercase text-slate-500">GT</div><p>Yield to the pedestrian crossing the road.</p></div>
+                <div><div class="text-[11px] uppercase text-amber-500">Pred</div><p class="text-amber-100">Stop to yield to the cross-traffic vehicle crossing ahead. -translate</p></div>
+              </div>
+              <p class="text-sm text-slate-300">GT is yield to a pedestrian in the roadway. Greedy (and all top-5) instead cite a vehicle (cross-traffic/oncoming/lead) with no pedestrian actor, so the primary hazard is invented/wrong despite a similar yield/stop action.</p>
+            </section><section class="bg-slate-900 border border-slate-700 rounded-2xl p-5 mb-5">
+              <div class="font-mono text-sm text-cyan-300 mb-2">8e06f83c-4de6-4cde-82ab-4a747645f80a</div>
+              <div class="text-xs text-slate-400 mb-3">verdict=<span class="text-white">related</span>
+                · align=3 · hazard=True
+                · action=False · best=top5#2</div>
+              <div class="grid md:grid-cols-2 gap-3 text-sm mb-3">
+                <div><div class="text-[11px] uppercase text-slate-500">GT</div><p>Yield to the pedestrians crossing the road.</p></div>
+                <div><div class="text-[11px] uppercase text-amber-500">Pred</div><p class="text-amber-100">Nudge to the left to give space to the pedestrian ahead. Slow</p></div>
+              </div>
+              <p class="text-sm text-slate-300">GT is yield to pedestrians crossing. Greedy keeps the pedestrian hazard but changes the action to a left nudge/give-space, which the related definition treats as a different maneuver. Rank-2 (and rank-4) top-5 lines match GT much more closely with stop/slow yield to a crossing pedestrian.</p>
+            </section><section class="bg-slate-900 border border-slate-700 rounded-2xl p-5 mb-5">
+              <div class="font-mono text-sm text-cyan-300 mb-2">36cb5485-5c56-48c5-8219-90095851d627</div>
+              <div class="text-xs text-slate-400 mb-3">verdict=<span class="text-white">match</span>
+                · align=4 · hazard=True
+                · action=True · best=top5#2</div>
+              <div class="grid md:grid-cols-2 gap-3 text-sm mb-3">
+                <div><div class="text-[11px] uppercase text-slate-500">GT</div><p>Stop for the stop sign while waiting for pedestrians to cross the street.</p></div>
+                <div><div class="text-[11px] uppercase text-amber-500">Pred</div><p class="text-amber-100">Stop to yield to the pedestrian in the crosswalk.</p></div>
+              </div>
+              <p class="text-sm text-slate-300">GT and greedy both require stopping/yielding for pedestrians crossing (crosswalk vs street is a paraphrase). GT also names the stop sign as the control, which greedy omits, so alignment is 4 not 5. Rank-2 names the stop sign plus the pedestrian and is therefore closer.</p>
+            </section>
+  </div>
+</body>
+</html>

@@ -60,8 +60,10 @@ SPECIAL_TOKENS_KEYS = [
 
 SPECIAL_TOKENS = {k: "<|" + k + "|>" for k in SPECIAL_TOKENS_KEYS}
 
-# Default Alpamayo trajectory vocab size (from NVIDIA config)
-DEFAULT_TRAJ_VOCAB_SIZE = 768
+# Must match Alpamayo-R1-10B config.json (traj_vocab_size). Adding fewer <iN>
+# tokens before SPECIAL_TOKENS shifts every later ID and makes CoC decode as
+# placeholder strings (see mlx_port/tests/test_tokenizer_id_parity.py).
+DEFAULT_TRAJ_VOCAB_SIZE = 4000
 
 
 def _add_alpamayo_tokens(tokenizer: Any, traj_vocab_size: int = DEFAULT_TRAJ_VOCAB_SIZE) -> None:
@@ -147,7 +149,7 @@ def load_vlm_with_alpamayo_tokens(
 
     Args:
         model_path: Path to the local Qwen3-VL checkpoint directory.
-        traj_vocab_size: Number of discrete trajectory tokens to add (default 768).
+        traj_vocab_size: Number of discrete trajectory tokens to add (default 4000).
 
     Returns:
         (model, processor) where processor.tokenizer contains the new tokens

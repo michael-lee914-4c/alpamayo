@@ -219,3 +219,10 @@ __marimo__/
 pre-trained/
 .DS_Store
 .cursor/
+
+# Large generated inspection frames (keep HTML/JSON reports)
+reports/coc_sample_5/**/*.jpg
+reports/coc_sample_5/**/*.png
+reports/stage1_raw_16/
+reports/stage1_raw_16_grid.jpg
+reports/stage1_single_image_front_wide.png

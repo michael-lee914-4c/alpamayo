@@ -1,0 +1,208 @@
+{
+  "clip_id": "faff17c7-4572-472a-be28-0f035bb88a37",
+  "chunk": 4,
+  "split": "train",
+  "event_cluster": "WORK_ZONES_TEMP_TRAFFIC_CONTROL",
+  "t0_us": 5627325,
+  "n_events": 1,
+  "gt_coc_texts": [
+    "Turn left while keeping a safe distance from the construction cones on the right."
+  ],
+  "pred_coc_raw": "Stop to yield to the construction flagger ahead.<|cot_end|><|traj_future_start|><|im_end|>",
+  "pred_coc": "Stop to yield to the construction flagger ahead.",
+  "readable": true,
+  "jaccard": 0.1111111111111111,
+  "gt_coverage": 0.15384615384615385,
+  "image_grid": [
+    [
+      "00_faff17c7/00_cross_left_120_t-0.3s.jpg",
+      "00_faff17c7/00_cross_left_120_t-0.2s.jpg",
+      "00_faff17c7/00_cross_left_120_t-0.1s.jpg",
+      "00_faff17c7/00_cross_left_120_tp0.0s.jpg"
+    ],
+    [
+      "00_faff17c7/01_front_wide_120_t-0.3s.jpg",
+      "00_faff17c7/01_front_wide_120_t-0.2s.jpg",
+      "00_faff17c7/01_front_wide_120_t-0.1s.jpg",
+      "00_faff17c7/01_front_wide_120_tp0.0s.jpg"
+    ],
+    [
+      "00_faff17c7/02_cross_right_120_t-0.3s.jpg",
+      "00_faff17c7/02_cross_right_120_t-0.2s.jpg",
+      "00_faff17c7/02_cross_right_120_t-0.1s.jpg",
+      "00_faff17c7/02_cross_right_120_tp0.0s.jpg"
+    ],
+    [
+      "00_faff17c7/03_front_tele_30_t-0.3s.jpg",
+      "00_faff17c7/03_front_tele_30_t-0.2s.jpg",
+      "00_faff17c7/03_front_tele_30_t-0.1s.jpg",
+      "00_faff17c7/03_front_tele_30_tp0.0s.jpg"
+    ]
+  ],
+  "contact_sheet": "00_faff17c7/grid.jpg",
+  "ego_plot": "00_faff17c7/ego_history.png",
+  "ego_history_xyz": [
+    [
+      -9.386500358581543,
+      2.5597000122070312,
+      -0.1265999972820282
+    ],
+    [
+      -8.860400199890137,
+      2.256700038909912,
+      -0.1160999983549118
+    ],
+    [
+      -8.317399978637695,
+      1.968999981880188,
+      -0.10419999808073044
+    ],
+    [
+      -7.758699893951416,
+      1.6964000463485718,
+      -0.0908999964594841
+    ],
+    [
+      -7.184599876403809,
+      1.441100001335144,
+      -0.07699999958276749
+    ],
+    [
+      -6.59630012512207,
+      1.2039999961853027,
+      -0.061400000005960464
+    ],
+    [
+      -5.994200229644775,
+      0.9866999983787537,
+      -0.04569999873638153
+    ],
+    [
+      -5.378600120544434,
+      0.7886000275611877,
+      -0.030899999663233757
+    ],
+    [
+      -4.750699996948242,
+      0.6101999878883362,
+      -0.017000000923871994
+    ],
+    [
+      -4.109000205993652,
+      0.4546999931335449,
+      -0.0071000000461936
+    ],
+    [
+      -3.4542999267578125,
+      0.320499986410141,
+      -0.0024999999441206455
+    ],
+    [
+      -2.786799907684326,
+      0.20880000293254852,
+      -9.999999747378752e-05
+    ],
+    [
+      -2.1073999404907227,
+      0.1216999962925911,
+      0.002099999925121665
+    ],
+    [
+      -1.416599988937378,
+      0.05779999867081642,
+      0.0032999999821186066
+    ],
+    [
+      -0.7139999866485596,
+      0.01679999940097332,
+      0.0024999999441206455
+    ],
+    [
+      0.0,
+      0.0,
+      0.0
+    ]
+  ],
+  "ego_history_yaw_deg": [
+    -30.621000289916992,
+    -28.697999954223633,
+    -26.72100067138672,
+    -24.697999954223633,
+    -22.684999465942383,
+    -20.670000076293945,
+    -18.621000289916992,
+    -16.525999069213867,
+    -14.404000282287598,
+    -12.3100004196167,
+    -10.194999694824219,
+    -8.067000389099121,
+    -5.991000175476074,
+    -3.9730000495910645,
+    -1.9789999723434448,
+    -0.0
+  ],
+  "ego_path_m": 9.729284286499023,
+  "cameras": [
+    "cross_left_120",
+    "front_wide_120",
+    "cross_right_120",
+    "front_tele_30"
+  ],
+  "top5_coc": [
+    {
+      "rank": 1,
+      "first_token": "Stop",
+      "first_token_id": 10674,
+      "first_p": 0.4461762011051178,
+      "pred_coc": "Stop to yield to the construction flagger ahead.",
+      "pred_coc_raw": "Stop to yield to the construction flagger ahead.<|cot_end|><|traj_future_start|><|im_end|>",
+      "readable": true,
+      "jaccard": 0.1111111111111111,
+      "gt_coverage": 0.15384615384615385
+    },
+    {
+      "rank": 2,
+      "first_token": "Slow",
+      "first_token_id": 58289,
+      "first_p": 0.27061954140663147,
+      "pred_coc": "Slow down to yield to the construction flagger.",
+      "pred_coc_raw": "Slow down to yield to the construction flagger.<|cot_end|><|traj_future_start|><|im_end|>",
+      "readable": true,
+      "jaccard": 0.1111111111111111,
+      "gt_coverage": 0.15384615384615385
+    },
+    {
+      "rank": 3,
+      "first_token": "Keep",
+      "first_token_id": 19434,
+      "first_p": 0.0603833869099617,
+      "pred_coc": "Keep 9 due to the road worker ahead.",
+      "pred_coc_raw": "Keep<|im_end|><|im_end|><|im_end|><|im_end|><|im_end|><|im_end|><|im_end|><|im_end|>9 due to the road worker ahead.<|cot_end|><|traj_future_start|><|traj_future_start|>",
+      "readable": true,
+      "jaccard": 0.05,
+      "gt_coverage": 0.07692307692307693
+    },
+    {
+      "rank": 4,
+      "first_token": "N",
+      "first_token_id": 45,
+      "first_p": 0.0603833869099617,
+      "pred_coc": "NTurn on the right due to the construction worker and cones\u5c4e ahead.",
+      "pred_coc_raw": "NTurn on the right due to the construction worker and cones\u5c4e ahead.<|cot_end|><|traj_future_start|><|traj_future_start|>",
+      "readable": true,
+      "jaccard": 0.2631578947368421,
+      "gt_coverage": 0.38461538461538464
+    },
+    {
+      "rank": 5,
+      "first_token": "Turn",
+      "first_token_id": 19389,
+      "first_p": 0.0603833869099617,
+      "pred_coc": "Turn 9 due to the road worker directing traffic to the right.",
+      "pred_coc_raw": "Turn<|im_end|><|im_end|><|im_end|><|im_end|><|im_end|><|im_end|><|im_end|><|im_end|>9 due to the road worker directing traffic to the right.<|cot_end|><|traj_future_start|><|traj_future_start|>",
+      "readable": true,
+      "jaccard": 0.15,
+      "gt_coverage": 0.23076923076923078
+    }
+  ]
+}

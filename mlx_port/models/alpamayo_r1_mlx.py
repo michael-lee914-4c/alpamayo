@@ -504,8 +504,24 @@ class AlpamayoR1MLX(nn.Module):
         from mlx_port.vlm_loader import LOCAL_QWEN_PROCESSOR_PATH
 
         vlm_path = vlm_model_path or LOCAL_QWEN_PROCESSOR_PATH
+
+        alpamayo_cfg_path = os.path.join(alpamayo_path, "config.json")
+        if not os.path.isfile(alpamayo_cfg_path):
+            raise FileNotFoundError(
+                f"Alpamayo checkpoint config.json not found at {alpamayo_cfg_path}."
+            )
+        with open(alpamayo_cfg_path) as f:
+            alpamayo_cfg = json.load(f)
+
+        # NVIDIA _build_processor adds all traj_vocab_size <iN> tokens first,
+        # then SPECIAL_TOKENS. Doing this in two phases (768, then specials,
+        # then the rest) maps <|prompt_start|> onto checkpoint row <i768>.
+        declared_traj_vocab_size = alpamayo_cfg.get("traj_vocab_size", 4000)
+
         # 1. Load VLM + Alpamayo tokens from the base Qwen checkpoint
-        vlm, processor = load_vlm_with_alpamayo_tokens(vlm_path)
+        vlm, processor = load_vlm_with_alpamayo_tokens(
+            vlm_path, traj_vocab_size=declared_traj_vocab_size
+        )
 
         # 1.5 Load the fine-tuned VLM weights from the Alpamayo checkpoint safetensors.
         # This replaces the base-Qwen weights with Alpamayo's learned CoC / driving weights
@@ -528,33 +544,15 @@ class AlpamayoR1MLX(nn.Module):
         )
 
         # ------------------------------------------------------------------
-        # Surgical method-level patches.
-        # 1. Bind corrected get_input_embeddings (prevents clearing cached
-        #    _position_ids / _rope_deltas on decode steps).
-        # 2. Replace get_rope_index on the language_model with the version
-        #    that correctly detects all 16 vision-start tokens.
+        # Replace base instances with Alpamayo subclass instances via the
+        # explicit from_existing API (proper instantiation entry point).
         # ------------------------------------------------------------------
         from mlx_port.models.alpamayo_qwen3vl import AlpamayoModel, AlpamayoLanguageModel
 
-        vlm.get_input_embeddings = AlpamayoModel.get_input_embeddings.__get__(
-            vlm, type(vlm)
-        )
+        vlm.language_model = AlpamayoLanguageModel.from_existing(vlm.language_model)
+        vlm = AlpamayoModel.from_existing(vlm)
 
-        vlm.language_model.get_rope_index = AlpamayoLanguageModel.get_rope_index.__get__(
-            vlm.language_model, type(vlm.language_model)
-        )
-
-        # Also patch __call__ so that the Alpamayo continuation guard (which
-        # forces use of the cached multimodal _position_ids / _rope_deltas on
-        # decode steps) is active. This guarantees the prefill-computed
-        # vision-aware layout is never overwritten by the base recalc logic.
-        vlm.language_model.__call__ = AlpamayoLanguageModel.__call__.__get__(
-            vlm.language_model, type(vlm.language_model)
-        )
-
-        # Temporary debug print to verify __call__ binding (will be removed once confirmed)
-        print("[PATCH_DEBUG] AlpamayoLanguageModel.__call__ bound to vlm.language_model.__call__")
-        print(f"[PATCH_DEBUG]   bound __call__ qualname: {getattr(vlm.language_model.__call__, '__qualname__', 'N/A')}")
+        print("[AlpamayoR1MLX] Instantiated AlpamayoLanguageModel and AlpamayoModel via from_existing")
 
         # Note: mlx-vlm Model objects do not expose .astype(); we rely on the
         # checkpoint being in the correct dtype (bfloat16). The final model.astype(dtype)
@@ -574,16 +572,6 @@ class AlpamayoR1MLX(nn.Module):
 
             # Start from the VLM text_config (the expert is the language-model portion of Qwen3-VL)
             base_text_cfg = vlm.config.text_config.to_dict() if hasattr(vlm.config.text_config, "to_dict") else dict(vlm.config.text_config)
-
-            # Read expert_cfg overrides from the Alpamayo checkpoint config.json
-            alpamayo_cfg_path = os.path.join(alpamayo_path, "config.json")
-            if not os.path.isfile(alpamayo_cfg_path):
-                raise FileNotFoundError(
-                    f"Alpamayo checkpoint config.json not found at {alpamayo_cfg_path}. "
-                    "Cannot load expert configuration."
-                )
-            with open(alpamayo_cfg_path) as f:
-                alpamayo_cfg = json.load(f)
 
             expert_overrides = alpamayo_cfg.get("expert_cfg", {})
             if not expert_overrides:
@@ -613,15 +601,6 @@ class AlpamayoR1MLX(nn.Module):
 
         # 3. Create action projections using dimensions from the Alpamayo checkpoint config
         # (expert_cfg.hidden_size is the authoritative source, matching the expert we just built)
-        alpamayo_cfg_path = os.path.join(alpamayo_path, "config.json")
-        if not os.path.isfile(alpamayo_cfg_path):
-            raise FileNotFoundError(
-                f"Alpamayo checkpoint config.json not found at {alpamayo_cfg_path}. "
-                "Cannot determine action projection dimensions."
-            )
-        with open(alpamayo_cfg_path) as f:
-            alpamayo_cfg = json.load(f)
-
         expert_cfg = alpamayo_cfg.get("expert_cfg", {})
         expert_hidden_size = expert_cfg.get("hidden_size", 2048)
 
@@ -633,10 +612,14 @@ class AlpamayoR1MLX(nn.Module):
         x_dims = action_space.get_action_space_dims()
         diffusion = FlowMatching(x_dims=x_dims, num_inference_steps=10)
 
-        # 4.5 Real trajectory tokenizer (required for strict parity in Row 6/7)
-        from mlx_port.models.trajectory_tokenizer_mlx import DiscreteTrajectoryTokenizerMLX
+        # 4.5 History tokenizer (Row 6). NVIDIA hist_traj_tokenizer_cfg is
+        # DeltaTrajectoryTokenizer: 16 steps × xyz = 48 tokens. Discrete action
+        # bins are the *future* tokenizer, not history fusion.
+        from mlx_port.models.trajectory_tokenizer_mlx import DeltaTrajectoryTokenizerMLX
 
-        hist_traj_tokenizer = DiscreteTrajectoryTokenizerMLX(action_space=action_space)
+        hist_cfg = alpamayo_cfg.get("hist_traj_tokenizer_cfg") or {}
+        hist_kwargs = {k: v for k, v in hist_cfg.items() if k != "_target_"}
+        hist_traj_tokenizer = DeltaTrajectoryTokenizerMLX(**hist_kwargs)
 
         model = cls(
             vlm=vlm,
@@ -656,58 +639,49 @@ class AlpamayoR1MLX(nn.Module):
 
         # 6. Attach token fusion attributes from the processor (Row 6)
         tokenizer = processor.tokenizer
-
-        # NVIDIA parity: ensure the full declared trajectory vocabulary exists in the tokenizer.
-        # The checkpoint config may declare traj_vocab_size=4000, but the serialized tokenizer.json
-        # may contain fewer <iN> tokens. We mirror src/alpamayo_r1/processor/qwen_processor.py
-        # by calling add_tokens if needed, then reading the actual indices back.
-        declared_traj_vocab_size = alpamayo_cfg.get("traj_vocab_size", 4000)
         declared_traj_start = alpamayo_cfg.get("traj_token_start_idx", 151669)
 
-        # Compute how many <iN> tokens are already present
-        existing_traj_tokens = 0
-        for i in range(declared_traj_vocab_size):
-            tok = f"<i{i}>"
-            if tokenizer.convert_tokens_to_ids(tok) != tokenizer.unk_token_id:
-                existing_traj_tokens = i + 1
-            else:
-                break
+        if tokenizer.traj_token_start_idx != declared_traj_start:
+            raise RuntimeError(
+                f"Tokenizer <i0> id is {tokenizer.traj_token_start_idx}, "
+                f"but Alpamayo config traj_token_start_idx is {declared_traj_start}. "
+                "Token add-order does not match the checkpoint embedding layout."
+            )
+        cfg_traj_ids = alpamayo_cfg.get("traj_token_ids", {})
+        for name, expected_id in cfg_traj_ids.items():
+            actual_id = tokenizer.traj_token_ids.get(name)
+            if actual_id != expected_id:
+                raise RuntimeError(
+                    f"Tokenizer traj_token_ids[{name!r}] is {actual_id}, "
+                    f"but Alpamayo config has {expected_id}."
+                )
 
-        if existing_traj_tokens < declared_traj_vocab_size:
-            missing = [f"<i{v}>" for v in range(existing_traj_tokens, declared_traj_vocab_size)]
-            num_added = tokenizer.add_tokens(missing)
-            print(f"[AlpamayoR1MLX] Added {num_added} missing trajectory tokens "
-                  f"(<i{existing_traj_tokens}> … <i{declared_traj_vocab_size-1}>) to tokenizer")
-
-        # Now the tokenizer is guaranteed to contain the full range; read the real indices
-        tokenizer.traj_token_start_idx = tokenizer.convert_tokens_to_ids("<i0>")
-        tokenizer.traj_token_end_idx = tokenizer.convert_tokens_to_ids(
-            f"<i{declared_traj_vocab_size - 1}>"
-        )
-
-        # Attach the real MLX trajectory tokenizer (strict parity requirement)
         tokenizer.hist_traj_tokenizer = hist_traj_tokenizer
-        tokenizer.hist_token_start_idx = 0
-        tokenizer.traj_token_ids = {"history": 0, "future": 1}
+        tokenizer.hist_token_start_idx = tokenizer.traj_token_start_idx
 
         model.hist_traj_tokenizer = hist_traj_tokenizer
-        model.hist_token_start_idx = 0
-        model.traj_token_ids = {"history": 0, "future": 1}
-
-        # Attach Alpamayo-specific token indices and lengths from the (now-complete) tokenizer
+        model.hist_token_start_idx = tokenizer.traj_token_start_idx
+        model.traj_token_ids = dict(tokenizer.traj_token_ids)
         model.traj_token_start_idx = tokenizer.traj_token_start_idx
         model.traj_vocab_size = declared_traj_vocab_size
         model.tokens_per_future_traj = alpamayo_cfg.get("tokens_per_future_traj", 32)
+        model.tokens_per_history_traj = alpamayo_cfg.get("tokens_per_history_traj", 48)
 
-        # Build exact list of trajectory token IDs for robust masking
-        # (handles non-contiguous IDs after add_tokens appends missing <iN> at vocab end)
-        traj_token_id_list = []
-        for i in range(declared_traj_vocab_size):
-            tok = f"<i{i}>"
-            tid = tokenizer.convert_tokens_to_ids(tok)
-            if tid != tokenizer.unk_token_id:
-                traj_token_id_list.append(tid)
+        # Contiguous after the NVIDIA add order: <i0> .. <i{N-1}> then specials.
+        traj_token_id_list = [
+            tokenizer.convert_tokens_to_ids(f"<i{i}>")
+            for i in range(declared_traj_vocab_size)
+        ]
         model.traj_token_id_list = traj_token_id_list
+
+        print(
+            f"[AlpamayoR1MLX] tokenizer layout: vocab={len(tokenizer)} "
+            f"i0={tokenizer.traj_token_start_idx} "
+            f"i{declared_traj_vocab_size - 1}={tokenizer.traj_token_end_idx} "
+            f"cot_start={tokenizer.convert_tokens_to_ids('<|cot_start|>')} "
+            f"traj_future_start={tokenizer.traj_token_ids.get('future_start')} "
+            f"hist_tok={type(hist_traj_tokenizer).__name__}"
+        )
 
         # Final dtype enforcement for the whole model (Row 10)
         # Note: mlx.nn.Module.astype is not available on custom top-level modules
