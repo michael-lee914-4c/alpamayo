@@ -158,6 +158,27 @@ def min_ade_xy(pred_xy: np.ndarray, gt_xy: np.ndarray) -> float:
     return float(diff.min())
 
 
+def _pred_xy_for_ade(pred: np.ndarray) -> np.ndarray:
+    """Normalize pred_xyz to (num_samples, T, 2) for min_ade_xy.
+
+    Accepted layouts:
+      (B, num_traj_sets, num_samples, T, 3)  NVIDIA rollout
+      (B or sets, num_samples, T, 3)
+      (num_samples, T, 3) or (num_samples, T, 2)
+      (T, 3) or (T, 2)
+    """
+    pred = np.asarray(pred)
+    if pred.ndim == 5:
+        return np.asarray(pred[0, 0, :, :, :2])
+    if pred.ndim == 4:
+        return np.asarray(pred[0, :, :, :2])
+    if pred.ndim == 3:
+        return np.asarray(pred[:, :, :2])
+    if pred.ndim == 2:
+        return np.asarray(pred[None, :, :2])
+    return pred
+
+
 def format_gt_report(
     gt: dict[str, Any],
     pred_coc: str | None = None,
@@ -191,13 +212,7 @@ def format_gt_report(
             gt_xy = gt_xyz[0, :, :2].T
         else:
             gt_xy = gt_xyz[:, :2].T if gt_xyz.shape[-1] >= 2 else gt_xyz
-        # pred_xyz NVIDIA: [B, num_traj_sets, num_samples, T, 3]
-        if pred.ndim == 5:
-            pred_xy = pred[0, 0, :, :, :2].transpose(0, 2, 1)
-        elif pred.ndim == 3:
-            pred_xy = pred[None, :, :2].transpose(0, 2, 1)
-        else:
-            pred_xy = pred
+        pred_xy = _pred_xy_for_ade(pred)
         ade = min_ade_xy(pred_xy, gt_xy)
         lines.append(f"minADE={ade:.3f} m  (pred shape={pred.shape})")
     elif pred_xyz is None:

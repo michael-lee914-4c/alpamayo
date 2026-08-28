@@ -181,6 +181,49 @@ class ExpertLogitsProcessor:
         return scores
 
 
+# Qwen3-VL-8B-Instruct generation_config.json. NVIDIA passes
+# self.vlm.generation_config into HF generate and does not overwrite eos_token_id,
+# so these IDs still finish a sequence immediately.
+QWEN_HF_EOS_TOKENS = ("<|im_end|>", "<|endoftext|>")
+
+
+def _as_token_id_list(value: Any) -> list[int]:
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple, set)):
+        return [int(v) for v in value]
+    return [int(value)]
+
+
+def hf_eos_token_ids(tokenizer: Any) -> list[int]:
+    """EOS ids HuggingFace ``generate`` uses for the Qwen3-VL VLM.
+
+    Qwen3-VL ``generation_config.eos_token_id`` is ``[<|im_end|>, <|endoftext|>]``.
+    """
+    ids: list[int] = []
+    seen: set[int] = set()
+    unk = getattr(tokenizer, "unk_token_id", None)
+    candidates: list[int] = []
+    for name in QWEN_HF_EOS_TOKENS:
+        tid = tokenizer.convert_tokens_to_ids(name)
+        if tid is not None:
+            candidates.append(int(tid))
+    candidates.extend(_as_token_id_list(getattr(tokenizer, "eos_token_id", None)))
+    for tid in candidates:
+        if tid < 0 or tid == unk or tid in seen:
+            continue
+        seen.add(tid)
+        ids.append(tid)
+    return ids
+
+
+def _last_token_id(input_ids: Any) -> int:
+    if isinstance(input_ids, (int, np.integer)):
+        return int(input_ids)
+    arr = np.asarray(input_ids)
+    return int(arr.reshape(-1)[-1])
+
+
 class StopAfterEOS:
     """MLX port of StopAfterEOS.
 
@@ -190,6 +233,10 @@ class StopAfterEOS:
 
     def __init__(self, eos_token_id: int):
         self.eos_token_id = eos_token_id
+        self.eos_found = None
+
+    def reset(self) -> None:
+        """Clear latch so a later sample can generate a full sequence."""
         self.eos_found = None
 
     def __call__(self, input_ids: mx.array, scores: mx.array = None, **kwargs) -> bool:
@@ -209,6 +256,38 @@ class StopAfterEOS:
         current_has_eos = last_tokens == self.eos_token_id
         self.eos_found = self.eos_found | current_has_eos
         return False
+
+
+class AlpamayoGenerateStop:
+    """NVIDIA ``vlm.generate`` stopping, matching HuggingFace + StopAfterEOS.
+
+    1. Immediate stop on the VLM ``generation_config`` EOS ids
+       (Qwen3-VL: ``<|im_end|>``, ``<|endoftext|>``).
+    2. Stop one token after ``<|traj_future_start|>`` so the KV cache is
+       updated the way NVIDIA's ``StopAfterEOS`` requires.
+    """
+
+    def __init__(self, delayed_eos_id: int, immediate_eos_ids: list[int] | None = None):
+        delayed = int(delayed_eos_id)
+        immediate = [int(i) for i in (immediate_eos_ids or []) if int(i) != delayed]
+        self.immediate_eos_ids = set(immediate)
+        self.delayed = StopAfterEOS(delayed)
+
+    def reset(self) -> None:
+        self.delayed.reset()
+
+    def __call__(self, input_ids: mx.array, scores: mx.array = None, **kwargs) -> bool:
+        if _last_token_id(input_ids) in self.immediate_eos_ids:
+            return True
+        return self.delayed(input_ids, scores, **kwargs)
+
+
+def make_vlm_generate_stop(tokenizer: Any, delayed_eos_id: int) -> AlpamayoGenerateStop:
+    """Build the stopper used by NVIDIA ``AlpamayoR1.vlm.generate``."""
+    return AlpamayoGenerateStop(
+        delayed_eos_id=int(delayed_eos_id),
+        immediate_eos_ids=hf_eos_token_ids(tokenizer),
+    )
 
 
 def replace_padding_after_eos(

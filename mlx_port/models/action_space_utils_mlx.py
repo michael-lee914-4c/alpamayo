@@ -281,15 +281,102 @@ def dxy_theta_to_v(
     return v
 
 
+def _chol_solve(lhs: mx.array, rhs: mx.array) -> mx.array:
+    """Batched Cholesky solve via SciPy (same path as dxy_theta_to_v)."""
+    *lead, n = rhs.shape
+    lhs_np = np.array(lhs, dtype=np.float64)
+    rhs_np = np.array(rhs[..., None], dtype=np.float64)
+    lead_tuple = tuple(lead)
+    if lead_tuple:
+        x_list = []
+        for idx in np.ndindex(lead_tuple):
+            c, lower = cho_factor(lhs_np[idx], lower=True)
+            xi = cho_solve((c, lower), rhs_np[idx]).squeeze(-1)
+            x_list.append(xi)
+        x_np = np.stack(x_list, axis=0).reshape(*lead_tuple, n)
+    else:
+        c, lower = cho_factor(lhs_np, lower=True)
+        x_np = cho_solve((c, lower), rhs_np).squeeze(-1)
+    return mx.array(x_np, dtype=rhs.dtype)
+
+
+def solve_single_constraint(
+    x_init: mx.array,
+    x_target: mx.array,
+    w_data: mx.array | None = None,
+    w_smooth1=None,
+    w_smooth2=None,
+    w_smooth3=None,
+    lam: float = 1e-3,
+    ridge: float = 0.0,
+    dt: float = 1.0,
+) -> mx.array:
+    """MLX port of NVIDIA ``solve_single_constraint``.
+
+    Pins ``x_0 = x_init`` and solves for ``x_1..x_N`` against ``x_target``
+    plus optional 1st/2nd/3rd-order smoothing. Returns ``(..., N+1)``.
+    """
+    *lead, n = x_target.shape
+    if n <= 0:
+        raise ValueError("x_target must have a positive last-dimension length N.")
+    if w_data is None:
+        w_data = mx.ones_like(x_target)
+    x_init = mx.array(x_init, dtype=x_target.dtype)
+
+    eye = mx.eye(n, dtype=x_target.dtype)
+    a_data = mx.broadcast_to(eye, (*lead, n, n)) if lead else eye
+    aw_data = a_data * w_data[..., None]
+    ata = mx.einsum("...ij,...ik->...jk", aw_data, a_data)
+    rhs = mx.einsum("...ij,...i->...j", aw_data, x_target)
+
+    dtd = construct_DTD(
+        n + 1,
+        tuple(lead),
+        w_smooth1=w_smooth1,
+        w_smooth2=w_smooth2,
+        w_smooth3=w_smooth3,
+        lam=lam,
+        dt=dt,
+        dtype=x_target.dtype,
+    )
+    rhs = rhs - dtd[..., 1:, 0] * x_init[..., None]
+
+    ridge_term = ridge * eye
+    if lead:
+        ridge_term = mx.broadcast_to(ridge_term, (*lead, n, n))
+    lhs = ata + dtd[..., 1:, 1:] + ridge_term
+    x = _chol_solve(lhs, rhs)
+    return mx.concatenate([x_init[..., None], x], axis=-1)
+
+
+def unwrap_angle(phi: mx.array) -> mx.array:
+    """Unwrap the last dim so successive diffs lie in (-pi, pi]."""
+    d = phi[..., 1:] - phi[..., :-1]
+    d = mx.arctan2(mx.sin(d), mx.cos(d))
+    return mx.concatenate([phi[..., :1], phi[..., :1] + mx.cumsum(d, axis=-1)], axis=-1)
+
+
 def theta_smooth(
     traj_future_rot: mx.array,
     dt: float = 0.1,
     theta_lambda: float = 1e-6,
     theta_ridge: float = 1e-8,
 ) -> mx.array:
-    """Extract yaw and apply light smoothing."""
+    """Extract yaw, unwrap, then 3rd-order-smooth (NVIDIA theta_smooth).
+
+    Returns ``(..., T+1)`` with the first sample pinned to 0, matching
+    ``alpamayo_r1.action_space.utils.theta_smooth``.
+    """
     yaw = mx.arctan2(traj_future_rot[..., 1, 0], traj_future_rot[..., 0, 0])
-    d = yaw[..., 1:] - yaw[..., :-1]
-    d = (d + mx.pi) % (2 * mx.pi) - mx.pi
-    yaw = mx.concatenate([yaw[..., :1], yaw[..., :1] + mx.cumsum(d, axis=-1)], axis=-1)
-    return yaw
+    yaw = unwrap_angle(yaw)
+    theta_init = mx.zeros_like(yaw[..., 0])
+    return solve_single_constraint(
+        x_init=theta_init,
+        x_target=yaw,
+        w_smooth1=None,
+        w_smooth2=None,
+        w_smooth3=1.0,
+        dt=dt,
+        lam=theta_lambda,
+        ridge=theta_ridge,
+    )

@@ -27,9 +27,9 @@ from mlx_port.profiling import (
 from mlx_lm.models.cache import KVCache
 from mlx_port.models.token_utils_mlx import (
     ExpertLogitsProcessor,
-    StopAfterEOS,
-    replace_padding_after_eos,
     extract_text_tokens,
+    make_vlm_generate_stop,
+    replace_padding_after_eos,
 )
 from mlx_port.models.alpamayo_qwen3vl import AlpamayoModel, AlpamayoLanguageModel
 
@@ -240,11 +240,10 @@ def _greedy_continue_from_first(
     cache,
     first_token_id: int,
     logits_processor: ExpertLogitsProcessor,
-    eos_token_id: int,
+    stopper,
     max_new_tokens: int,
 ) -> list[int]:
     generated = [int(first_token_id)]
-    stopper = StopAfterEOS(eos_token_id=eos_token_id)
     if stopper(mx.array([generated])):
         return generated
     outputs = vlm(input_ids=mx.array([[first_token_id]]), cache=cache)
@@ -325,7 +324,7 @@ def generate_top_k_coc(
             cache,
             tid,
             logits_processor,
-            int(eos_token_id),
+            make_vlm_generate_stop(model.tokenizer, int(eos_token_id)),
             max_generation_length,
         )
         extra = extract_text_tokens(model.tokenizer, mx.array([tokens]))
@@ -404,7 +403,9 @@ def sample_trajectories_from_data_with_vlm_rollout(
         traj_token_ids=getattr(model, "traj_token_id_list", None),
     )
 
-    stopping_criteria = StopAfterEOS(eos_token_id=eos_token_id)
+    # HF generate still honors vlm.generation_config.eos_token_id (<|im_end|>,
+    # <|endoftext|>). NVIDIA only adds StopAfterEOS on <|traj_future_start|>.
+    delayed_eos_id = int(eos_token_id)
     max_new_tokens = kwargs.get("max_generation_length") or model.tokens_per_future_traj
 
     vlm_profiler = StepProfiler(
@@ -415,10 +416,16 @@ def sample_trajectories_from_data_with_vlm_rollout(
     n_vlm_samples = n_samples_total
 
     def _run_single_vlm_generation(alpamayo_model, input_ids, image_kwargs, logits_processor,
-                                    stopping_criteria, max_new_tokens, temperature, top_p):
+                                    max_new_tokens, temperature, top_p):
         """Single-trajectory manual generation (now relies on fixed subclasses)."""
         generated_tokens = []
         vlm = alpamayo_model.vlm
+        # Fresh stopper per sample. StopAfterEOS latches eos_found; reusing one
+        # instance would halt the next sample after a single decode step.
+        stopping_criteria = make_vlm_generate_stop(
+            alpamayo_model.tokenizer, delayed_eos_id
+        )
+        stopping_criteria.reset()
 
         # Create KV cache list once before the first forward pass
         n_layers = len(vlm.language_model.model.layers)
@@ -500,7 +507,7 @@ def sample_trajectories_from_data_with_vlm_rollout(
     if n_vlm_samples <= 1:
         generated, cache = _run_single_vlm_generation(
             model, input_ids, image_kwargs, logits_processor,
-            stopping_criteria, max_new_tokens, temperature, top_p
+            max_new_tokens, temperature, top_p
         )
         rope_deltas = 0
     else:
@@ -509,7 +516,7 @@ def sample_trajectories_from_data_with_vlm_rollout(
         for _ in range(n_vlm_samples):
             gen, c = _run_single_vlm_generation(
                 model, input_ids, image_kwargs, logits_processor,
-                stopping_criteria, max_new_tokens, temperature, top_p
+                max_new_tokens, temperature, top_p
             )
             seq_list.append(gen)
             cache_list.append(c)
@@ -529,11 +536,8 @@ def sample_trajectories_from_data_with_vlm_rollout(
         generated, eos_token_id=eos_token_id, pad_token_id=model.tokenizer.pad_token_id
     )
 
-    if vlm_only:
-        extra = extract_text_tokens(model.tokenizer, vlm_outputs.sequences)
-        return None, None, extra
-
-    if kwargs.get("return_extra", False):
+    want_extra = bool(return_extra) or bool(kwargs.get("return_extra", False))
+    if vlm_only or want_extra:
         extra = extract_text_tokens(model.tokenizer, vlm_outputs.sequences)
         return None, None, extra
 

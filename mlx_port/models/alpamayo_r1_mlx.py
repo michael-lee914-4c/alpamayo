@@ -253,13 +253,31 @@ class ActionSpace:
     Full implementation will be added when we need real trajectory conversion.
     """
 
-    def __init__(self):
-        self.accel_mean = 0.0
-        self.accel_std = 1.0
-        self.curvature_mean = 0.0
-        self.curvature_std = 1.0
-        self.dt = 0.1
-        self.n_waypoints = 8
+    def __init__(
+        self,
+        accel_mean: float = 0.0,
+        accel_std: float = 1.0,
+        curvature_mean: float = 0.0,
+        curvature_std: float = 1.0,
+        dt: float = 0.1,
+        n_waypoints: int = 8,
+        theta_lambda: float = 1e-6,
+        theta_ridge: float = 1e-8,
+        v_lambda: float = 1e-6,
+        v_ridge: float = 1e-4,
+        **_unused,
+    ):
+        self.accel_mean = accel_mean
+        self.accel_std = accel_std
+        self.curvature_mean = curvature_mean
+        self.curvature_std = curvature_std
+        self.dt = dt
+        self.n_waypoints = n_waypoints
+        # Same defaults as UnicycleAccelCurvatureActionSpace / config.json.
+        self.theta_lambda = theta_lambda
+        self.theta_ridge = theta_ridge
+        self.v_lambda = v_lambda
+        self.v_ridge = v_ridge
 
     def get_action_space_dims(self) -> tuple[int, ...]:
         """Return the shape expected by the diffusion expert.
@@ -397,17 +415,25 @@ class ActionSpace:
         )
         dxy = full_xy[..., 1:, :] - full_xy[..., :-1, :]
 
-        # 2. Heading smoothing (returns yaw of length = n_future)
-        theta_future = theta_smooth(traj_future_rot, dt=self.dt)
-
-        # Prepend initial heading (assume 0 for simplicity, or from history)
-        # theta has length n_future + 1 to match v (which includes v0)
-        theta0 = mx.zeros_like(theta_future[..., :1])
-        theta = mx.concatenate([theta0, theta_future], axis=-1)
+        # 2. Heading smoothing. NVIDIA theta_smooth returns (..., T+1) with
+        # theta[..., 0] pinned to 0 via solve_single_constraint.
+        theta = theta_smooth(
+            traj_future_rot,
+            dt=self.dt,
+            theta_lambda=self.theta_lambda,
+            theta_ridge=self.theta_ridge,
+        )
 
         # 3. Velocity recovery (v has length n_future + 1)
         # Pass the full theta (length N+1) so dxy_theta_to_v can use mid-point headings
-        v = dxy_theta_to_v(dxy, theta, v0, dt=self.dt)
+        v = dxy_theta_to_v(
+            dxy,
+            theta,
+            v0,
+            dt=self.dt,
+            v_lambda=self.v_lambda,
+            v_ridge=self.v_ridge,
+        )
 
         # 4. Acceleration via real regularized solver (solve_xs_eq_y)
         # y must be acceleration (dv/dt), not velocity difference, so the data term
@@ -607,8 +633,13 @@ class AlpamayoR1MLX(nn.Module):
         action_in_proj = ActionInProj(in_dims=5, out_dim=expert_hidden_size)
         action_out_proj = ActionOutProj(in_features=expert_hidden_size, out_features=5)
 
-        # 4. Diffusion and action space (Row 7)
-        action_space = ActionSpace()
+        # 4. Diffusion and action space (Row 7). Regularizers / stats come from
+        # action_space_cfg; n_waypoints stays at the MLX default until the
+        # expert rollout uses the checkpoint horizon (64).
+        as_cfg = dict(alpamayo_cfg.get("action_space_cfg") or {})
+        as_cfg.pop("_target_", None)
+        as_cfg.pop("n_waypoints", None)
+        action_space = ActionSpace(**as_cfg)
         x_dims = action_space.get_action_space_dims()
         diffusion = FlowMatching(x_dims=x_dims, num_inference_steps=10)
 
