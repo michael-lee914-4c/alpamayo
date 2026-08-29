@@ -13,6 +13,7 @@ from mlx_port.models.expert_mlx import (
     text_config_from_vlm_and_overrides,
     traj_future_start_offsets,
     trim_cache,
+    sync_cache_idx,
 )
 from mlx_vlm.models.qwen3_vl.config import TextConfig
 
@@ -112,5 +113,9 @@ def test_trim_cache_restores_prefix_len():
     extra = mx.random.normal((1, 2, 4, 4))
     cache[0].update_and_fetch(extra, extra)
     assert cache_seq_len(cache) == 10
+    cache[0]._idx = 9
+    sync_cache_idx(cache)
+    assert cache[0]._idx == 10
     trim_cache(cache, 4)
     assert cache_seq_len(cache) == 6
+    assert cache[0]._idx == 6
