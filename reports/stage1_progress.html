@@ -20,18 +20,18 @@
     <div class="max-w-5xl mx-auto px-6 py-10">
         <div class="flex items-center justify-between mb-8">
             <div class="flex items-center gap-x-4">
-                <div class="w-12 h-12 bg-amber-600 rounded-2xl flex items-center justify-center">
-                    <i class="fa-solid fa-tools text-white text-3xl"></i>
+                <div class="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center">
+                    <i class="fa-solid fa-check text-white text-3xl"></i>
                 </div>
                 <div>
                     <div class="font-display text-4xl font-semibold tracking-tight">Stage <span class="stage-number">1</span></div>
-                    <div class="text-amber-400 text-sm font-medium">CoC readable · GT match not closed · expert not scored</div>
+                    <div class="text-emerald-400 text-sm font-medium">VLM / CoC inference closed · trajectory moved to Stage 1b</div>
                 </div>
             </div>
             <div class="flex items-center gap-x-3">
-                <div class="px-4 py-1.5 bg-amber-900/40 border border-amber-700 rounded-3xl text-amber-400 text-sm flex items-center gap-x-2">
-                    <i class="fa-solid fa-clock"></i>
-                    <span class="font-semibold">IN PROGRESS</span>
+                <div class="px-4 py-1.5 bg-emerald-900/40 border border-emerald-700 rounded-3xl text-emerald-400 text-sm flex items-center gap-x-2">
+                    <i class="fa-solid fa-check"></i>
+                    <span class="font-semibold">COMPLETE</span>
                 </div>
                 <div class="text-xs text-slate-500">Aug 28, 2026 • M4 Pro Max 128 GiB</div>
             </div>
@@ -41,7 +41,7 @@
             <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Stage Status</div>
-                    <div class="text-3xl font-semibold text-white">In Progress</div>
+                    <div class="text-3xl font-semibold text-emerald-400">Complete</div>
                 </div>
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Key Focus</div>
@@ -49,7 +49,7 @@
                 </div>
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Unit Tests</div>
-                    <div class="text-3xl font-semibold text-emerald-400">59 / 59</div>
+                    <div class="text-3xl font-semibold text-emerald-400">64 / 64</div>
                     <div class="text-xs text-slate-500 mt-1">non-slow · 4 slow deselected</div>
                 </div>
                 <div>
@@ -65,15 +65,16 @@
         <!-- Stage 1 gate -->
         <div class="mb-8">
             <div class="section-header">
-                <i class="fa-solid fa-flag-checkered text-amber-400"></i>
-                <div class="font-semibold text-xl">Stage 1 Gate (locked)</div>
+                <i class="fa-solid fa-flag-checkered text-emerald-400"></i>
+                <div class="font-semibold text-xl">Stage 1 Gate (closed — CoC only)</div>
             </div>
-            <div class="bg-slate-900 border border-amber-800/60 rounded-3xl p-6 text-sm space-y-4">
+            <div class="bg-slate-900 border border-emerald-800/60 rounded-3xl p-6 text-sm space-y-4">
                 <p class="text-slate-300">
-                    Stay on Stage 1 until both pass on the local PAI-CoC subset
-                    (<code>/Volumes/MicronSSD/pai_coc</code>, 370 labeled clips in chunks 0–249).
-                    Stages 2–3 SFT stay blocked. Jaccard is cheap word overlap — read the sentence.
-                    Grok (<code>grok-4.6</code>) is the semantic judge.
+                    2026-08-28 decision: split the old Stage 1. This page is VLM / CoC inference.
+                    Trajectory / minADE is <a class="text-cyan-400 hover:underline" href="stage1b_progress.html">Stage 1b</a>.
+                    Readable CoC under NVIDIA sampling is accepted; default-clip greedy ≠ GT pedestrian is not a Stage 1 blocker.
+                    Stages 2–3 SFT stay blocked until 1b decides the inference gate.
+                    Jaccard is cheap word overlap — read the sentence. Grok (<code>grok-4.6</code>) is the semantic judge.
                 </p>
                 <div class="text-slate-200 mb-2">Default clip <code class="text-cyan-300">0abe118e-aa79-41f6-a719-f2df8abaf1ea</code> · event <code>t0_us=8757247</code> · cluster <code>PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY</code>.</div>
                 <div class="text-xs text-slate-400 mb-1">GT CoC</div>
@@ -91,9 +92,9 @@
                         <div class="text-xs text-slate-500 mt-2">Test: <code>test_end_to_end_inference_temperature_coc_and_traj</code> · 103.8 s · RSS 59.28 GB · Metal 43.95 GB</div>
                     </div>
                     <div class="bg-slate-950 border border-slate-700 rounded-2xl p-4 md:col-span-2">
-                        <div class="text-xs uppercase tracking-wider text-slate-400 mb-2">2. Action expert minADE</div>
-                        <div class="text-slate-300">Not scored. <code>pred_xyz=None</code>. GT future is present: <code>ego_future_xyz</code> shape <code>(1, 1, 64, 3)</code> (64 waypoints @ 0.1 s).</div>
-                        <div class="mt-2 text-xs text-slate-500">Temperature e2e calls the same NVIDIA entry point (<code>vlm_only=False</code>, <code>num_traj_samples=1</code>). Expert <code>step_fn</code> (VLM KV prefix → action_in_proj → diffusion → <code>action_to_traj</code>) is not wired. Action-space solvers are ported; <code>ActionInProj</code> is still a stub vs <code>PerWaypointActionInProjV2</code>.</div>
+                        <div class="text-xs uppercase tracking-wider text-slate-400 mb-2">Action expert minADE — moved to Stage 1b</div>
+                        <div class="text-slate-300"><code>pred_xyz=None</code> on this stage’s eval path. GT future is present: <code>ego_future_xyz</code> shape <code>(1, 1, 64, 3)</code>.</div>
+                        <div class="mt-2 text-xs text-slate-500">See <a class="text-cyan-400 hover:underline" href="stage1b_progress.html">reports/stage1b_progress.html</a>.</div>
                     </div>
                 </div>
             </div>
@@ -177,8 +178,8 @@
                             <td class="px-4 py-3 font-mono text-xs text-slate-500">8</td>
                             <td class="px-4 py-3">extract_text_tokens + minADE</td>
                             <td class="px-4 py-3 font-mono text-xs">gt_eval.py · eval_coc_grok.py</td>
-                            <td class="px-4 py-3 text-center"><span class="px-2 py-0.5 bg-amber-900 text-amber-400 text-xs rounded-full">CoC only</span></td>
-                            <td class="px-4 py-3 text-xs">CoC extract + Grok judge live. minADE helpers exist; no expert XY yet.</td>
+                            <td class="px-4 py-3 text-center"><span class="px-2 py-0.5 bg-emerald-900 text-emerald-400 text-xs rounded-full">CoC done</span></td>
+                            <td class="px-4 py-3 text-xs">CoC extract + Grok judge live. minADE is Stage 1b.</td>
                         </tr>
                         <tr>
                             <td class="px-4 py-3 font-mono text-xs text-slate-500">9</td>
@@ -192,7 +193,7 @@
                             <td class="px-4 py-3">bfloat16 · expert decoder · action space</td>
                             <td class="px-4 py-3 font-mono text-xs">alpamayo_r1_mlx.py · action_space_utils_mlx.py</td>
                             <td class="px-4 py-3 text-center"><span class="px-2 py-0.5 bg-emerald-900 text-emerald-400 text-xs rounded-full">Done (struct)</span></td>
-                            <td class="px-4 py-3 text-xs">Qwen3-VL expert + FlowMatching + Unicycle. <code>theta</code> via <code>solve_single_constraint</code> (T+1, x0=0). Lambdas match NVIDIA defaults. <code>from_pretrained</code> does <em>not</em> override <code>n_waypoints=64</code> (keeps diffusion dims (8, 2)).</td>
+                            <td class="px-4 py-3 text-xs">Solvers ported. Stage 1b now uses checkpoint <code>n_waypoints=64</code> and real <code>PerWaypointActionInProjV2</code>. Expert <code>step_fn</code> still unwired.</td>
                         </tr>
                         <tr>
                             <td class="px-4 py-3 font-mono text-xs text-slate-500">12</td>
@@ -364,7 +365,7 @@
             <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 text-sm space-y-3">
                 <div class="flex flex-wrap gap-3">
                     <div class="px-4 py-2 bg-slate-950 border border-emerald-800 rounded-2xl">
-                        <span class="text-emerald-400">Non-slow:</span> <span class="font-semibold text-white">59 / 59</span>
+                        <span class="text-emerald-400">Non-slow:</span> <span class="font-semibold text-white">64 / 64</span>
                     </div>
                     <div class="px-4 py-2 bg-slate-950 border border-emerald-800 rounded-2xl">
                         <span class="text-emerald-400">E2E greedy:</span> <span class="font-semibold text-white">pinned</span>
@@ -423,25 +424,17 @@ PYTHONPATH=src:. .venv/bin/python mlx_port/scripts/eval_coc_grok.py \
             </div>
             <ol class="list-decimal list-inside space-y-2 text-sm text-slate-300">
                 <li>
-                    <span class="text-amber-400 font-semibold">Decide the CoC quality bar.</span>
-                    Default-clip greedy is readable but names a stop sign, not the GT pedestrian.
-                    T=0.6 on 5 clips is 3/5 Grok match on sample 1. Options: require greedy = GT, or accept “related + samples contain GT,” or treat NVIDIA sampling as the policy and score a sample set.
-                </li>
-                <li>
-                    <span class="text-amber-400 font-semibold">Wire expert <code>step_fn</code></span>
-                    so the temperature e2e can return <code>pred_xyz</code> / minADE.
-                    Needed: real <code>PerWaypointActionInProjV2</code>, <code>n_waypoints=64</code>, VLM KV prefix into the 2048-d expert, then <code>action_to_traj</code>.
-                    Default-clip GT future is already loaded: <code>(1, 1, 64, 3)</code>.
-                </li>
-                <li>
-                    Optional Thor dump: one <code>vlm(…)</code> prefill, raw top-15 at last token <code>&lt;|cot_start|&gt;</code>, before <code>ExpertLogitsProcessor</code>, vs MLX.
+                    Stage 1 is closed. Continue on
+                    <a class="text-cyan-400 hover:underline" href="stage1b_progress.html">reports/stage1b_progress.html</a>
+                    (action expert → trajectory / minADE).
                 </li>
                 <li class="text-slate-500">
                     Stages 2–3 remain blocked. Do not re-enable temporal grouping on greedy e2e. Do not mask <code>&lt;|im_end|&gt;</code>.
                 </li>
             </ol>
             <div class="mt-4 text-xs font-mono text-indigo-400">
-                reports/stage1_progress.html · updated 2026-08-28 ·
+                reports/stage1_progress.html · closed 2026-08-28 ·
+                <a class="text-cyan-400 hover:underline" href="stage1b_progress.html">stage 1b</a> ·
                 <a class="text-cyan-400 hover:underline" href="stage1_debug_notes.html">historical debug</a>
             </div>
         </div>

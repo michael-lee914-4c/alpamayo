@@ -38,9 +38,12 @@ def test_load_expert_weights_successfully():
     assert hasattr(model.expert, "language_model")
     assert len(model.expert.layers) == 36, f"Expected 36 layers, got {len(model.expert.layers)}"
 
-    # Check that action projections exist and have reasonable shapes
+    # Check that action projections exist and have checkpoint shapes
     assert hasattr(model, "action_in_proj")
     assert hasattr(model, "action_out_proj")
+    assert model.action_space.get_action_space_dims() == (64, 2)
+    assert model.action_out_proj.weight.shape == (2, 2048)
+    assert model.action_in_proj.norm.weight.shape == (2048,)
 
     # Spot-check one weight to ensure it is not all zeros (loaded from checkpoint)
     sample_weight = model.expert.language_model.model.layers[0].self_attn.q_proj.weight

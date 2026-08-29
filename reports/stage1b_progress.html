@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stage 1b Progress • Alpamayo MLX Port</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&amp;family=Space+Grotesk:wght@500;600&amp;display=swap');
+        body { font-family: 'Inter', system-ui, sans-serif; }
+        .font-display { font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif; font-weight: 600; }
+        .metric-card { transition: all 0.2s cubic-bezier(0.4, 0.0, 0.2, 1); }
+        .metric-card:hover { transform: translateY(-1px); }
+        pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+        .section-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200">
+    <div class="max-w-5xl mx-auto px-6 py-10">
+        <div class="flex items-center justify-between mb-8">
+            <div class="flex items-center gap-x-4">
+                <div class="w-12 h-12 bg-amber-600 rounded-2xl flex items-center justify-center">
+                    <i class="fa-solid fa-route text-white text-3xl"></i>
+                </div>
+                <div>
+                    <div class="font-display text-4xl font-semibold tracking-tight">Stage <span class="stage-number">1b</span></div>
+                    <div class="text-amber-400 text-sm font-medium">Action expert · trajectory · minADE</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-x-3">
+                <div class="px-4 py-1.5 bg-amber-900/40 border border-amber-700 rounded-3xl text-amber-400 text-sm flex items-center gap-x-2">
+                    <i class="fa-solid fa-clock"></i>
+                    <span class="font-semibold">IN PROGRESS</span>
+                </div>
+                <div class="text-xs text-slate-500">Aug 28, 2026 • M4 Pro Max 128 GiB</div>
+            </div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl p-8 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div>
+                    <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Stage Status</div>
+                    <div class="text-3xl font-semibold text-white">In Progress</div>
+                </div>
+                <div>
+                    <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Key Focus</div>
+                    <div class="font-semibold text-xl text-cyan-400">Expert step_fn → XY</div>
+                </div>
+                <div>
+                    <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Gate</div>
+                    <div class="font-semibold text-xl text-amber-400">minADE vs GT</div>
+                </div>
+                <div>
+                    <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">MLX Device</div>
+                    <div class="inline-flex items-center gap-x-2 px-3 py-1 bg-emerald-950 border border-emerald-800 rounded-2xl">
+                        <i class="fa-solid fa-microchip text-emerald-400"></i>
+                        <span class="font-semibold text-emerald-400">GPU (Apple Silicon)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-8">
+            <div class="section-header">
+                <i class="fa-solid fa-flag-checkered text-amber-400"></i>
+                <div class="font-semibold text-xl">Stage 1b Gate</div>
+            </div>
+            <div class="bg-slate-900 border border-amber-800/60 rounded-3xl p-6 text-sm space-y-4">
+                <p class="text-slate-300">
+                    Wire NVIDIA <code>step_fn</code> so temperature e2e returns <code>pred_xyz</code> and minADE
+                    vs <code>ego_future_xyz</code> on the local PAI-CoC subset.
+                    Default clip <code class="text-cyan-300">0abe118e-aa79-41f6-a719-f2df8abaf1ea</code>
+                    already has GT future <code>(1, 1, 64, 3)</code>.
+                    Do not invent a trajectory from the old stub <code>ActionInProj</code> or a no-cache expert.
+                    Stages 2–3 SFT stay blocked until this gate is decided.
+                </p>
+                <p class="text-xs text-slate-500">
+                    VLM / CoC is closed on
+                    <a class="text-cyan-400 hover:underline" href="stage1_progress.html">reports/stage1_progress.html</a>.
+                </p>
+            </div>
+        </div>
+
+        <div class="mb-8">
+            <div class="section-header">
+                <i class="fa-solid fa-lightbulb text-amber-400"></i>
+                <div class="font-semibold text-xl">NVIDIA Contract</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 text-sm space-y-3 text-slate-300">
+                <p>
+                    After VLM generate (T=0.6, top_p=0.98, StopAfterEOS on
+                    <code>&lt;|traj_future_start|&gt;</code> plus one token),
+                    <code>src/alpamayo_r1/models/alpamayo_r1.py</code> does:
+                </p>
+                <ol class="list-decimal list-inside space-y-2">
+                    <li><code>action_in_proj(x, t)</code> — <code>PerWaypointActionInProjV2</code>, Fourier + MLP, LayerNorm → <code>(B, 64, 2048)</code>.</li>
+                    <li>Expert forward on those 64 tokens with VLM <code>past_key_values</code>, 3-row <code>position_ids = arange(64) + rope_deltas + (traj_future_start + 1)</code>, and a mask that hides pad / the extra EOS token between that offset and the diffusion tokens.</li>
+                    <li><code>expert_non_causal_attention=true</code> — diffusion tokens attend to each other fully.</li>
+                    <li>Crop cache back to prefill length after each Euler step.</li>
+                    <li><code>action_out_proj</code> is <code>Linear(2048, 2)</code> → accel / curvature.</li>
+                    <li><code>FlowMatching.sample</code> (Euler, 10 steps) then <code>action_to_traj</code>. Reshape <code>(B, num_traj_sets, num_traj_samples, 64, 3)</code>.</li>
+                </ol>
+                <p class="text-xs text-slate-400">
+                    Checkpoint: <code>n_waypoints=64</code>, expert hidden 2048 / 16 heads / head_dim 128 / intermediate 8256,
+                    <code>action_in_proj_cfg</code> hidden 512, 2 enc layers, 20 Fourier feats.
+                </p>
+            </div>
+        </div>
+
+        <div class="mb-8">
+            <div class="section-header">
+                <i class="fa-solid fa-key text-cyan-400"></i>
+                <div class="font-semibold text-xl">VLM KV prefix (4096 → 2048)</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 text-sm space-y-3 text-slate-300">
+                <p>
+                    This is not a naive cache share of hidden states. VLM hidden is 4096; expert hidden is 2048.
+                    Shapes still match because <code>expert_cfg</code> does <em>not</em> override
+                    <code>num_key_value_heads</code> or layer count. Both sides store K/V as
+                    <code>[B, 8, S, 128]</code> (GQA). Expert queries (16 heads) attend to VLM-produced keys/values,
+                    then append their own 64-token K/V, then crop.
+                </p>
+                <p>
+                    Stock <code>mlx_lm</code> Qwen3 (the current expert wrapper) cannot take NVIDIA’s
+                    explicit 3-row <code>position_ids</code> or the 4D pad mask. It RoPEs at
+                    <code>cache.offset</code> (full prompt + generated, including the extra EOS token).
+                    NVIDIA positions start at <code>traj_future_start + 1</code>, which is one token earlier.
+                    Stage 1b must run the expert through <code>mlx_vlm</code> Qwen3-VL attention (same path as the VLM)
+                    so we can pass position ids, the pad mask, and non-causal attention.
+                </p>
+            </div>
+        </div>
+
+        <div class="mb-8">
+            <div class="section-header">
+                <i class="fa-solid fa-list-check text-emerald-400"></i>
+                <div class="font-semibold text-xl">Landed this split</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 text-sm">
+                <ul class="space-y-2 text-slate-300">
+                    <li><span class="text-emerald-400 font-semibold">PerWaypointActionInProjV2</span> — <code>mlx_port/models/action_in_proj_mlx.py</code>. Checkpoint key names match. Numerical test vs NVIDIA PyTorch module.</li>
+                    <li><span class="text-emerald-400 font-semibold">ActionOutProj</span> — bare <code>nn.Linear</code> so keys are <code>action_out_proj.weight</code> / <code>.bias</code> (not <code>.linear.weight</code>).</li>
+                    <li><span class="text-emerald-400 font-semibold">n_waypoints=64</span> — <code>ActionSpace.get_action_space_dims()</code> uses <code>self.n_waypoints</code>. <code>from_pretrained</code> no longer pops 64, so diffusion <code>x_dims</code> is <code>(64, 2)</code>.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="mb-8">
+            <div class="section-header">
+                <i class="fa-solid fa-triangle-exclamation text-amber-400"></i>
+                <div class="font-semibold text-xl">Still open</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 text-sm">
+                <ol class="list-decimal list-inside space-y-2 text-slate-300">
+                    <li>Swap the expert from <code>mlx_lm.qwen3</code> to an <code>mlx_vlm</code> language-model wrapper (keep weight remap <code>expert.* → expert.language_model.model.*</code>).</li>
+                    <li>Keep VLM <code>rope_deltas</code> after generate (today the rollout hardcodes <code>0</code>). Build full sequences as prompt + generated so <code>traj_future_start</code> offset matches NVIDIA.</li>
+                    <li>Implement <code>step_fn</code> + cache crop / trim + non-causal mask in <code>sample_trajectories_from_data_with_vlm_rollout</code>.</li>
+                    <li>Temperature e2e: <code>load_expert=True</code>, print minADE. Do not claim parity until the KV prefix is actually used.</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="mb-8">
+            <div class="section-header">
+                <i class="fa-solid fa-vial text-emerald-400"></i>
+                <div class="font-semibold text-xl">Tests</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 text-sm space-y-3">
+                <pre class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-xs text-cyan-300 overflow-auto">PYTHONPATH=src:. .venv/bin/python -m pytest mlx_port/tests/test_action_in_proj_mlx.py -q --tb=short
+PYTHONPATH=src:. .venv/bin/python -m pytest mlx_port/tests -q -m "not slow"
+PYTHONPATH=src:. .venv/bin/python -m pytest mlx_port/tests/test_end_to_end_inference.py::test_end_to_end_inference_temperature_coc_and_traj -s --tb=short</pre>
+                <p class="text-xs text-slate-400">
+                    Temperature e2e still expects readable CoC and <code>pred_xyz=None</code> until <code>step_fn</code> is wired.
+                    After wiring, record minADE here — do not pin a fake XY.
+                </p>
+            </div>
+        </div>
+
+        <div class="bg-indigo-950/50 border border-indigo-800 rounded-3xl p-8">
+            <div class="font-semibold text-indigo-400 mb-3 flex items-center gap-x-2">
+                <i class="fa-solid fa-arrow-right"></i>
+                <span>Next</span>
+            </div>
+            <p class="text-sm text-slate-300">
+                Expert wrapper with mlx_vlm attention, then <code>step_fn</code>. Do not mask
+                <code>&lt;|im_end|&gt;</code>. Do not re-enable temporal grouping on greedy e2e.
+            </p>
+            <div class="mt-4 text-xs font-mono text-indigo-400">
+                reports/stage1b_progress.html · started 2026-08-28 ·
+                <a class="text-cyan-400 hover:underline" href="stage1_progress.html">stage 1 (closed)</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

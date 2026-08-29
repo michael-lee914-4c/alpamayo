@@ -661,7 +661,8 @@ def sample_trajectories_from_data_with_vlm_rollout(
     if vlm_only:
         return None, None, extra
 
-    # Expert diffusion (NVIDIA step_fn + VLM KV prefix) is not wired yet.
+    # Stage 1b: NVIDIA step_fn (action_in_proj → expert + VLM KV prefix →
+    # action_out_proj → diffusion.sample → action_to_traj) is not wired yet.
     return None, None, extra
 
 

@@ -34,12 +34,17 @@ def test_expert_decoder_instantiation():
 
 
 def test_action_projection_modules():
-    """Verify action projection modules can be created."""
-    action_in = ActionInProj(in_dims=5, out_dim=2048)
-    action_out = ActionOutProj(in_features=2048, out_features=5)
+    """Verify checkpoint-shaped action projections can be created."""
+    action_in = ActionInProj(
+        in_dims=(64, 2),
+        out_dim=2048,
+        num_enc_layers=2,
+        hidden_size=512,
+    )
+    action_out = ActionOutProj(2048, 2)
 
-    assert action_in is not None
-    assert action_out is not None
+    assert action_in.out_dim == 2048
+    assert action_out.weight.shape == (2, 2048)
     print("ActionInProj and ActionOutProj instantiated successfully")
 
 

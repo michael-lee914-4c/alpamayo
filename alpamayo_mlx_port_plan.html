@@ -95,22 +95,26 @@
                 For <strong>every stage</strong>, the agent must generate a dedicated, self-contained HTML report file saved in <span class="font-mono text-indigo-300">reports/</span> folder:
             </div>
             
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4 text-xs">
                 <div class="bg-slate-900 border border-indigo-800 rounded-2xl p-4">
                     <div class="font-semibold text-indigo-400 mb-1">reports/stage0_progress.html</div>
                     <div class="text-slate-400">Venv setup, package versions, verification output, environment footprint</div>
                 </div>
                 <div class="bg-slate-900 border border-indigo-800 rounded-2xl p-4">
                     <div class="font-semibold text-indigo-400 mb-1">reports/stage1_progress.html</div>
-                    <div class="text-slate-400">Code changes, inference metrics (minADE), loss curves, memory/time footprint, visualizations</div>
+                    <div class="text-slate-400">VLM / CoC inference (closed 2026-08-28)</div>
+                </div>
+                <div class="bg-slate-900 border border-indigo-800 rounded-2xl p-4">
+                    <div class="font-semibold text-indigo-400 mb-1">reports/stage1b_progress.html</div>
+                    <div class="text-slate-400">Action expert step_fn, trajectory, minADE vs ego_future_xyz</div>
                 </div>
                 <div class="bg-slate-900 border border-indigo-800 rounded-2xl p-4">
                     <div class="font-semibold text-indigo-400 mb-1">reports/stage2_progress.html</div>
-                    <div class="text-slate-400">Training loss curves, discrete token accuracy, compute footprint (peak memory, epoch time)</div>
+                    <div class="text-slate-400">Training loss curves, discrete token accuracy, compute footprint</div>
                 </div>
                 <div class="bg-slate-900 border border-indigo-800 rounded-2xl p-4">
                     <div class="font-semibold text-indigo-400 mb-1">reports/stage3_progress.html</div>
-                    <div class="text-slate-400">Flow-matching loss, final minADE, full model footprint, comparison table vs original</div>
+                    <div class="text-slate-400">Flow-matching loss, final minADE, full model footprint</div>
                 </div>
             </div>
             
@@ -186,27 +190,56 @@
         </div>
 
         <!-- Stage 1 -->
-        <div class="section-card bg-slate-900 border border-cyan-700/50 rounded-3xl overflow-hidden">
+        <div class="section-card bg-slate-900 border border-emerald-700/50 rounded-3xl overflow-hidden">
             <div class="stage-header px-8 py-5 flex items-center justify-between">
                 <div class="flex items-center gap-x-4">
-                    <div class="w-9 h-9 bg-cyan-600 text-white rounded-2xl flex items-center justify-center font-mono font-bold">1</div>
+                    <div class="w-9 h-9 bg-emerald-600 text-white rounded-2xl flex items-center justify-center font-mono font-bold">1</div>
                     <div>
-                        <div class="font-semibold text-xl">Port Pre-trained Model + Inference Validation</div>
-                        <div class="text-sm text-cyan-400">4–6 days • Foundation</div>
+                        <div class="font-semibold text-xl">Stage 1: VLM / CoC Inference</div>
+                        <div class="text-sm text-emerald-400">Closed 2026-08-28</div>
                     </div>
                 </div>
-                <div class="metric-badge">FOUNDATION</div>
+                <div class="metric-badge bg-emerald-900 text-emerald-300">COMPLETE</div>
             </div>
             
             <div class="p-8">
                 <div class="uppercase text-xs tracking-widest text-slate-500 mb-2">Success Criteria</div>
                 <div class="text-sm text-slate-300 mb-4">
-                    Port Alpamayo 10B to MLX • Load VLM + Diffusion Transformer + Qwen tokenizer • Run inference on PAI dataset • Quantitative (minADE) + Qualitative (trajectory + CoC visualization)
+                    Load Alpamayo VLM on MLX • NVIDIA CoC sampling (T=0.6, top_p=0.98) • readable CoC on local PAI-CoC • Grok semantic judge.
+                    Trajectory / minADE is not part of this stage (see 1b). Default-clip greedy ≠ GT pedestrian is accepted as closed.
                 </div>
             </div>
             
             <div class="px-8 py-4 border-t border-slate-700 bg-slate-950 flex items-center justify-between text-xs">
-                <div><span class="font-semibold">Report:</span> <span class="font-mono text-indigo-300">reports/stage1_progress.html</span> (code changes, metrics, footprint, visualizations)</div>
+                <div><span class="font-semibold">Report:</span> <span class="font-mono text-indigo-300">reports/stage1_progress.html</span></div>
+                <div class="report-badge">MANDATORY</div>
+            </div>
+        </div>
+
+        <!-- Stage 1b -->
+        <div class="section-card bg-slate-900 border border-cyan-700/50 rounded-3xl overflow-hidden">
+            <div class="stage-header px-8 py-5 flex items-center justify-between">
+                <div class="flex items-center gap-x-4">
+                    <div class="w-9 h-9 bg-cyan-600 text-white rounded-2xl flex items-center justify-center font-mono font-bold">1b</div>
+                    <div>
+                        <div class="font-semibold text-xl">Stage 1b: Action Expert + Trajectory</div>
+                        <div class="text-sm text-cyan-400">2–4 days • Foundation</div>
+                    </div>
+                </div>
+                <div class="metric-badge">IN PROGRESS</div>
+            </div>
+            
+            <div class="p-8">
+                <div class="uppercase text-xs tracking-widest text-slate-500 mb-2">Success Criteria</div>
+                <div class="text-sm text-slate-300 mb-4">
+                    Real <code class="text-cyan-300">PerWaypointActionInProjV2</code> • <code class="text-cyan-300">n_waypoints=64</code> •
+                    expert <code class="text-cyan-300">step_fn</code> with VLM KV prefix • <code class="text-cyan-300">action_to_traj</code> •
+                    minADE vs <code class="text-cyan-300">ego_future_xyz</code> on local PAI-CoC. Do not produce a fake XY.
+                </div>
+            </div>
+            
+            <div class="px-8 py-4 border-t border-slate-700 bg-slate-950 flex items-center justify-between text-xs">
+                <div><span class="font-semibold">Report:</span> <span class="font-mono text-indigo-300">reports/stage1b_progress.html</span></div>
                 <div class="report-badge">MANDATORY</div>
             </div>
         </div>
@@ -264,7 +297,7 @@
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-y-6">
                 <div>
                     <div class="font-display text-3xl font-semibold tracking-tight">Total Timeline</div>
-                    <div class="text-5xl font-semibold text-cyan-400 mt-1">15–23 days</div>
+                    <div class="text-5xl font-semibold text-cyan-400 mt-1">17–27 days</div>
                     <div class="text-sm text-slate-400 mt-2">Includes mandatory per-stage HTML progress reports</div>
                 </div>
                 

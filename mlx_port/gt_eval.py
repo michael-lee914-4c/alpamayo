@@ -1,15 +1,11 @@
-"""Stage 1 ground-truth comparison for the local PAI-CoC subset.
+"""Ground-truth comparison for the local PAI-CoC subset.
 
-Stay on Stage 1 until both of these pass on a local clip:
+Stage 1 (VLM / CoC) is closed. Stage 1b scores the action expert:
+predicted XY vs ``ego_future_xyz`` minADE (NVIDIA reports meters).
 
-1. CoC — generated reasoning is readable English and aligns with the
-   human label in ``reasoning/ood_reasoning.parquet``.
-2. Action expert — predicted XY vs ``ego_future_xyz`` minADE is in a
-   physical range (NVIDIA reports meters, not hundreds of m/s²).
-
-NVIDIA's ``test_inference.py`` only scores trajectory (minADE) and prints
-CoC. This module also scores CoC against the human labels that shipped
-with the CoC subset.
+This module still scores CoC against the human labels in
+``reasoning/ood_reasoning.parquet``. Jaccard is cheap word overlap —
+read the sentence. Grok is the semantic judge.
 """
 
 from __future__ import annotations
