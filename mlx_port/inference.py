@@ -702,10 +702,8 @@ def _sample_trajectories_from_data_with_vlm_rollout_impl(
         n_layers = len(vlm.language_model.model.layers)
         cache = [KVCache() for _ in range(n_layers)]
 
-        # --- Prefill (memory peaks captured by MemoryMonitor) ---
+        # Prefill is timed inside AlpamayoModel.__call__ on language_model.
         clock = current_clock()
-        t_prefill = time.perf_counter()
-        encode_before = clock.encode_ms if clock is not None else 0.0
         with MemoryMonitor(poll_interval=0.05, label="vlm_prefill"):
             outputs = vlm(
                 input_ids=input_ids,
@@ -713,10 +711,6 @@ def _sample_trajectories_from_data_with_vlm_rollout_impl(
                 cache=cache,
             )
         mx.eval(outputs.logits)
-        if clock is not None:
-            elapsed_ms = (time.perf_counter() - t_prefill) * 1000.0
-            encode_delta = clock.encode_ms - encode_before
-            clock.add_ms("prefill", elapsed_ms - encode_delta)
         record_memory_sample("after_vlm_prefill")
 
         raw_last = outputs.logits[:, -1, :].astype(mx.float32)
@@ -732,7 +726,6 @@ def _sample_trajectories_from_data_with_vlm_rollout_impl(
             )
 
         decode_profiler = StepProfiler(enabled=is_profiling_enabled(), name="Decode")
-        t_decode = time.perf_counter()
         for step in range(max_new_tokens):
             decode_profiler.step_start(step)
 
@@ -779,8 +772,8 @@ def _sample_trajectories_from_data_with_vlm_rollout_impl(
 
         decode_profiler.summary()
         if clock is not None:
-            clock.add_seconds("decode", time.perf_counter() - t_decode)
-            clock.decode_tok += len(generated_tokens)
+            # Token 1 came from the prefill LM step. Decode_tok is tokens after that.
+            clock.decode_tok += max(0, len(generated_tokens) - 1)
 
         generated = mx.array([generated_tokens])
         record_memory_sample("after_vlm_generation_complete")

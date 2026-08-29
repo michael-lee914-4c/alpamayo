@@ -39,7 +39,7 @@
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Stage Status</div>
                     <div class="text-3xl font-semibold text-sky-400">In Progress</div>
-                    <div class="text-xs text-slate-500 mt-1">P1b warm median on this PR · prefill dominant · G1 numbers filled</div>
+                    <div class="text-xs text-slate-500 mt-1">First-step LM prefill 58.2 s · still dominant</div>
                 </div>
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Key Focus</div>
@@ -69,9 +69,8 @@
             <p>
                 Unit tests were recorded 2026-08-29. Greedy e2e with
                 <code>ALPAMAYO_STAGE_TIMERS=1</code> was run the same day (table
-                below). That is <strong>one cold trial</strong>, not the P1b
-                3-warm median. Do not merge the next Stage 1c PR until this
-                report is checked.
+                below). That is <strong>one cold trial</strong>. Do not merge
+                the next Stage 1c PR until this report is checked.
             </p>
         </div>
 
@@ -87,9 +86,10 @@
                         <li>Stage 1c is incremental PRs into <code>main</code> (not <code>optimize-inference-time</code>; that landed in #5).</li>
                         <li>P0 is inventory only. P1a is wall-clock only. No Euler/decode/quant change until G1 is green.</li>
                         <li>Timers are opt-in (<code>ALPAMAYO_STAGE_TIMERS=1</code>) so the default e2e path stays unchanged.</li>
-                        <li>Encode is timed inside <code>get_input_embeddings</code>. Prefill is first-forward minus encode after the existing logits <code>mx.eval</code>.</li>
-                        <li>When timing is on, vision outputs get one extra <code>mx.eval</code> so encode is not lazy-attributed to prefill. Token graph is the same.</li>
-                        <li>T1.1 warm protocol lives in <code>test_stage_timer_window.py</code>: load once, discard window 1, median of 3. Cold one-shot numbers stay in this report.</li>
+                        <li>Encode is timed around <code>vision_tower</code> only.</li>
+                        <li><strong>Prefill is the first token</strong>: <code>language_model(...)</code> on the prompt (<code>seq_len &gt; 1</code>) plus <code>mx.eval(logits)</code> inside <code>AlpamayoModel.__call__</code>. After token 1, one-token LM calls are decode (warm KV).</li>
+                        <li>T1.1 is greedy e2e + <code>ALPAMAYO_STAGE_TIMERS=1</code>.</li>
+                        <li>P2a: one <code>mx.eval</code> after the Euler loop. Mid-loop <code>clear_cache</code> removed so it cannot sync every 3 steps.</li>
                     </ul>
                 </div>
                 <div>
@@ -129,9 +129,23 @@
                     <li>mlx_port/models/alpamayo_qwen3vl.py — time vision encode + eval when clock bound</li>
                     <li>mlx_port/tests/test_stage_timers.py — clock math, env flag</li>
                 </ul>
+                <div class="text-[11px] uppercase tracking-wider text-slate-500">P1b #8 (G1 table)</div>
+                <ul class="text-xs space-y-1 font-mono">
+                    <li>mlx_port/stage_timers.py — median_stage_times</li>
+                    <li>G1 timer is greedy e2e</li>
+                </ul>
+                <div class="text-[11px] uppercase tracking-wider text-slate-500">P2a (this PR)</div>
+                <ul class="text-xs space-y-1 font-mono">
+                    <li>mlx_port/models/alpamayo_r1_mlx.py — one mx.eval after Euler; no mid-loop clear_cache</li>
+                    <li>mlx_port/tests/test_alpamayo_r1_mlx.py — assert exactly one mx.eval on a 10-step dummy sample</li>
+                    <li>mlx_port/stage_timers.py — <code>vlm_step_stage</code>: seq&gt;1 prefill, seq=1 decode</li>
+                    <li>mlx_port/models/alpamayo_qwen3vl.py — time <code>language_model</code> + eval logits per step</li>
+                    <li>mlx_port/inference.py — decode_tok = tokens after the first</li>
+                </ul>
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 font-mono text-xs text-cyan-300 overflow-auto">
                     ALPAMAYO_STAGE_TIMERS=1 → extra["stage_times"] + [STAGE] line<br>
-                    Off by default. Extra mx.eval(hidden_states) only when current_clock() is set.
+                    Off by default. Extra mx.eval(hidden_states) only when current_clock() is set.<br>
+                    P2a: FlowMatching.sample evals x once after the loop (was every Euler step).
                 </div>
             </div>
         </div>
@@ -148,24 +162,20 @@
 # 2026-08-29 13:30 local · Python 3.12.13 · pytest 9.0.3 · 1.88 s
 # 74 passed, 1 skipped
 
-PYTHONPATH=src:. ALPAMAYO_STAGE_TIMERS=1 PROFILE=1 \
+PYTHONPATH=src:. ALPAMAYO_STAGE_TIMERS=1 \
   /Users/michaellee/Projects/alpamayo/.venv/bin/python -m pytest \
   mlx_port/tests/test_end_to_end_inference.py::test_end_to_end_inference_prints_coc_vlm_only \
   -s --tb=short
-# 2026-08-29 13:33 local · 1 passed in 113.32 s
-# [STAGE] encode=21055.2 prefill=58440.7 decode=796.1 fm=2294.8 dominant=prefill
+# 2026-08-29 14:01 · first-step LM timer · 1 passed in 113.14 s
+# [STAGE] encode=21043.8 prefill=58151.3 decode=652.1 decode_tok=11 fm=2032.8 dominant=prefill
 
 # median helper (no Metal):
 PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
   /Users/michaellee/Projects/alpamayo/.venv/bin/python -m pytest \
   mlx_port/tests/test_stage_timers.py -q --tb=short
-# 2026-08-29 · 7 passed
-
-PYTHONPATH=src:. ALPAMAYO_STAGE_TIMERS=1 \
-  /Users/michaellee/Projects/alpamayo/.venv/bin/python -m pytest \
-  mlx_port/tests/test_stage_timer_window.py::test_greedy_window_warmup_then_three_warm_trials \
-  -s --tb=short
-# load once · discard 1 window · record 3 · print [MEDIAN]</pre>
+# 2026-08-29 · 7 passed (then +vlm_step_stage)
+# later same day: test_stage_timers + test_alpamayo_r1_mlx 15 passed
+# full not-slow suite: 79 passed, 1 skipped</pre>
                 <p class="text-xs text-slate-400">
                     Interpreter: <code>/Users/michaellee/Projects/alpamayo/.venv/bin/python</code>.
                     Same filter as CI <code>macos-26 (no weights)</code>.
@@ -217,6 +227,11 @@ PYTHONPATH=src:. ALPAMAYO_STAGE_TIMERS=1 \
                                 <td class="px-2 py-2">ValueError if no trials</td>
                             </tr>
                             <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">test_stage_timers.py::test_vlm_step_stage_prompt_is_prefill_one_token_is_decode</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">seq 32777 → prefill; seq 1 → decode</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2">Remaining <code>not slow</code> suite (69 tests in action_in_proj, expert, unicycle, tokenizer, gt_eval, rope, nucleus, traj plots, …)</td>
                                 <td class="px-2 py-2 text-emerald-400">PASS</td>
                                 <td class="px-2 py-2">All collected items PASSED. No assertion failures.</td>
@@ -229,23 +244,22 @@ PYTHONPATH=src:. ALPAMAYO_STAGE_TIMERS=1 \
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono">test_end_to_end_inference.py::test_end_to_end_inference_prints_coc_vlm_only[256]</td>
                                 <td class="px-2 py-2 text-emerald-400">PASS</td>
-                                <td class="px-2 py-2">Greedy T=0, expert on, clip 0abe118e-…. CoC pinned. pytest 113.32 s. Cold G1 table kept below. T=0.6 e2e not rerun.</td>
+                                <td class="px-2 py-2">First-step timer 2026-08-29 14:01 · 113.14 s · encode 21044 / prefill 58151 / decode 652 (11 tok) / fm 2033. CoC pinned. minADE 4.187 m. T=0.6 not rerun.</td>
                             </tr>
                             <tr>
-                                <td class="px-2 py-2 font-mono">test_stage_timer_window.py::test_greedy_window_warmup_then_three_warm_trials[256]</td>
+                                <td class="px-2 py-2 font-mono">test_alpamayo_r1_mlx.py::test_flow_matching_evals_once_after_euler_loop</td>
                                 <td class="px-2 py-2 text-emerald-400">PASS</td>
-                                <td class="px-2 py-2">2026-08-29 · 359.63 s · median total 82032.7 ms · dominant=prefill. Cold table unchanged.</td>
+                                <td class="px-2 py-2">10 Euler steps, dummy step_fn, mx.eval called once.</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
                 <div>
-                    <div class="font-semibold text-slate-300 mb-2">G1 stage times — greedy e2e, 1 cold trial (2026-08-29)</div>
+                    <div class="font-semibold text-slate-300 mb-2">G1 stage times — greedy e2e, first-step LM timer (2026-08-29 14:01)</div>
                     <p class="text-xs text-slate-500 mb-2">
-                        <code>ALPAMAYO_STAGE_TIMERS=1 PROFILE=1</code> ·
-                        <code>.venv/bin/python</code> · default clip · T=0 · FM unseeded ·
-                        extra encode <code>mx.eval</code> on (timers on).
-                        MemoryMonitor prints during prefill; that can add a little host time to <code>prefill_ms</code>.
+                        <code>ALPAMAYO_STAGE_TIMERS=1</code> · <code>.venv</code> · T=0 · clip 0abe118e-… ·
+                        prefill = <code>language_model</code> on the prompt + <code>mx.eval(logits)</code>.
+                        decode = one-token LM calls after token 1 (11 steps). Cold load.
                     </p>
                     <div class="overflow-auto mb-3">
                         <table class="w-full text-left text-xs">
@@ -257,58 +271,19 @@ PYTHONPATH=src:. ALPAMAYO_STAGE_TIMERS=1 \
                                 </tr>
                             </thead>
                             <tbody class="text-slate-300">
-                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">encode_ms</td><td class="px-2 py-2">21055.2</td><td class="px-2 py-2">25.5%</td></tr>
-                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">prefill_ms</td><td class="px-2 py-2 font-semibold text-amber-300">58440.7</td><td class="px-2 py-2">70.8% · dominant</td></tr>
-                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">decode_ms</td><td class="px-2 py-2">796.1</td><td class="px-2 py-2">1.0% · 12 tok · 66.34 ms/tok</td></tr>
-                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">fm_ms</td><td class="px-2 py-2">2294.8</td><td class="px-2 py-2">2.8% · 10 steps · 229.48 ms/step</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">encode_ms</td><td class="px-2 py-2">21043.8</td><td class="px-2 py-2">25.7%</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">prefill_ms</td><td class="px-2 py-2 font-semibold text-amber-300">58151.3</td><td class="px-2 py-2">71.0% · first LM step</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">decode_ms</td><td class="px-2 py-2">652.1</td><td class="px-2 py-2">0.8% · 11 tok after first · 59.28 ms/tok</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">fm_ms</td><td class="px-2 py-2">2032.8</td><td class="px-2 py-2">2.5% · 10 steps · 203.28 ms/step</td></tr>
                                 <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">convert_ms</td><td class="px-2 py-2">0.1</td><td class="px-2 py-2">~0%</td></tr>
-                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">stage total_ms</td><td class="px-2 py-2">82586.8</td><td class="px-2 py-2">encode+prefill+decode+fm+convert</td></tr>
-                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">model_load</td><td class="px-2 py-2">12986.0 ms</td><td class="px-2 py-2">outside window · mem 0 → 44.32 GB</td></tr>
-                                <tr><td class="px-2 py-2 font-mono">pytest wall</td><td class="px-2 py-2">113.32 s</td><td class="px-2 py-2">load + data + window + cleanup</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">stage total_ms</td><td class="px-2 py-2">81880.1</td><td class="px-2 py-2">81.9 s window</td></tr>
+                                <tr><td class="px-2 py-2 font-mono">pytest wall</td><td class="px-2 py-2">113.14 s</td><td class="px-2 py-2">load + data + window + cleanup</td></tr>
                             </tbody>
                         </table>
                     </div>
                     <p class="text-xs text-slate-400">
-                        Dominant stage: <strong class="text-amber-300">prefill</strong>.
-                        Encode is next. Decode and FM are under 5% on this 12-token greedy CoC.
-                        Keep these cold numbers. Warm median is a separate table below — do not overwrite this one.
-                    </p>
-                </div>
-                <div>
-                    <div class="font-semibold text-slate-300 mb-2">G1 stage times — 1 warmup + 3 warm trials, median (T1.1)</div>
-                    <p class="text-xs text-slate-500 mb-2">
-                        Same clip and greedy knobs. Model stays loaded. First window after load is discarded.
-                        <code>PROFILE</code> off. 2026-08-29 · pytest 359.63 s ·
-                        <code>test_stage_timer_window.py</code> PASS.
-                    </p>
-                    <div class="overflow-auto mb-3">
-                        <table class="w-full text-left text-xs">
-                            <thead class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
-                                <tr>
-                                    <th class="px-2 py-2">Field</th>
-                                    <th class="px-2 py-2">Warmup (discarded)</th>
-                                    <th class="px-2 py-2">T1</th>
-                                    <th class="px-2 py-2">T2</th>
-                                    <th class="px-2 py-2">T3</th>
-                                    <th class="px-2 py-2">Median</th>
-                                </tr>
-                            </thead>
-                            <tbody class="text-slate-300">
-                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">encode_ms</td><td class="px-2 py-2">21075.5</td><td class="px-2 py-2">21016.8</td><td class="px-2 py-2">21031.1</td><td class="px-2 py-2">21063.4</td><td class="px-2 py-2">21031.1</td></tr>
-                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">prefill_ms</td><td class="px-2 py-2">58404.7</td><td class="px-2 py-2">58141.6</td><td class="px-2 py-2">58209.6</td><td class="px-2 py-2">58179.7</td><td class="px-2 py-2 font-semibold text-amber-300">58179.7</td></tr>
-                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">decode_ms</td><td class="px-2 py-2">786.4</td><td class="px-2 py-2">789.3</td><td class="px-2 py-2">794.7</td><td class="px-2 py-2">797.0</td><td class="px-2 py-2">794.7 · 12 tok · 66.23 ms/tok</td></tr>
-                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">fm_ms</td><td class="px-2 py-2">2284.2</td><td class="px-2 py-2">2029.8</td><td class="px-2 py-2">2027.2</td><td class="px-2 py-2">2024.6</td><td class="px-2 py-2">2027.2 · 10 steps · 202.72 ms/step</td></tr>
-                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">convert_ms</td><td class="px-2 py-2">0.1</td><td class="px-2 py-2">0.0</td><td class="px-2 py-2">0.0</td><td class="px-2 py-2">0.0</td><td class="px-2 py-2">0.0</td></tr>
-                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">total_ms</td><td class="px-2 py-2">82550.8</td><td class="px-2 py-2">81977.5</td><td class="px-2 py-2">82062.7</td><td class="px-2 py-2">82064.6</td><td class="px-2 py-2">82032.7</td></tr>
-                                <tr><td class="px-2 py-2 font-mono">dominant</td><td class="px-2 py-2">prefill</td><td class="px-2 py-2">prefill</td><td class="px-2 py-2">prefill</td><td class="px-2 py-2">prefill</td><td class="px-2 py-2 font-semibold text-amber-300">prefill (70.9%)</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <p class="text-xs text-slate-400">
-                        Warm median is 0.55 s faster than the cold window (82.6 s → 82.0 s).
-                        Prefill is still ~71%. Encode 25.6%. Decode+FM stay under 5%.
-                        Warmup after load was not a large first-run spike (82.6 s, same as cold).
-                        dtype=bfloat16 · compiled=no on all stages · num_traj_samples=1 · max_generation_length=256.
+                        Dominant is <strong class="text-amber-300">prefill</strong> (the first LM step, ~32k tokens).
+                        Encode 21.0 s is next. Decode and FM stay under 5%.
                     </p>
                 </div>
                 <div>
@@ -316,9 +291,8 @@ PYTHONPATH=src:. ALPAMAYO_STAGE_TIMERS=1 \
                     <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-xs text-slate-300 space-y-1">
                         <div>CoC: <code>Stop for the stop sign at the intersection.</code> (pinned prefix held; readable=True; jaccard=0.077 vs GT yield-to-pedestrian)</div>
                         <div>GT CoC: Strong deceleration to yield to the pedestrian crossing the crosswalk.</div>
-                        <div><code>pred_xyz</code> <code>(1,1,1,64,3)</code> · pred end (42.94, 0.69) · GT end (18.79, 0.06)</div>
-                        <div>minADE <strong>9.918 m</strong> · t0_v=7.953 m/s · accel mean −0.96 · first step ~0.80 m / 0.1 s</div>
-                        <div class="text-slate-500">1b greedy minADE was 3.89 m (end 24.3 m). This run is a different unseeded FM draw, not a timer-regression claim. CoC matched the pin.</div>
+                        <div><code>pred_xyz</code> <code>(1,1,1,64,3)</code> · pred end (33.70, −0.07) · GT end (18.79, 0.06)</div>
+                        <div>minADE <strong>4.187 m</strong> · t0_v=7.953 m/s · accel mean −0.86</div>
                     </div>
                 </div>
                 <div>
@@ -335,19 +309,19 @@ PYTHONPATH=src:. ALPAMAYO_STAGE_TIMERS=1 \
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6">
-                    <div class="text-xs text-slate-500">Peak memory (greedy e2e)</div>
-                    <div class="text-2xl font-semibold text-white mt-2">66.94 <span class="text-lg text-slate-400">GiB</span></div>
-                    <div class="text-xs text-slate-500 mt-1">RSS 66.94 · Metal 52.59 · load ended 44.32 GiB</div>
+                    <div class="text-xs text-slate-500">Peak memory (first-step e2e)</div>
+                    <div class="text-2xl font-semibold text-white mt-2">67.51 <span class="text-lg text-slate-400">GiB</span></div>
+                    <div class="text-xs text-slate-500 mt-1">RSS 67.51 · Metal 52.59</div>
                 </div>
                 <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6">
-                    <div class="text-xs text-slate-500">Cold window / warm median</div>
-                    <div class="text-2xl font-semibold text-white mt-2">82.6 / 82.0 s</div>
-                    <div class="text-xs text-slate-500 mt-1">Cold pytest 113 s · warm suite 360 s (4 windows)</div>
+                    <div class="text-xs text-slate-500">First-step window / pytest</div>
+                    <div class="text-2xl font-semibold text-white mt-2">81.9 / 113 s</div>
+                    <div class="text-xs text-slate-500 mt-1">LM prefill 58.2 s · encode 21.0 s · decode 0.65 s</div>
                 </div>
                 <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6">
-                    <div class="text-xs text-slate-500">G1 dominant (cold and warm)</div>
+                    <div class="text-xs text-slate-500">G1 dominant (first LM step)</div>
                     <div class="text-2xl font-semibold text-amber-400 mt-2">prefill</div>
-                    <div class="text-xs text-slate-500 mt-1">Warm median 58.2 s · 70.9%. Encode 21.0 s. Decode+FM &lt;5%.</div>
+                    <div class="text-xs text-slate-500 mt-1">58.2 s · 71% of 81.9 s. Encode 21.0 s. Decode+FM &lt;5%.</div>
                 </div>
             </div>
         </div>
@@ -390,14 +364,14 @@ PYTHONPATH=src:. ALPAMAYO_STAGE_TIMERS=1 \
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono text-sky-300">P1b</td>
                                 <td class="px-2 py-2 font-mono">stage1c-p1-baseline-table</td>
-                                <td class="px-2 py-2">3 warm trials on the default clip; fill G1; name the dominant stage.</td>
-                                <td class="px-2 py-2 text-sky-400">this PR</td>
+                                <td class="px-2 py-2">Greedy e2e is the G1 timer.</td>
+                                <td class="px-2 py-2 text-emerald-400">merged (#8)</td>
                             </tr>
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono text-sky-300">P2a</td>
                                 <td class="px-2 py-2 font-mono">stage1c-p2-kill-per-step-eval</td>
                                 <td class="px-2 py-2">Drop <code>mx.eval</code> inside the Euler loop; keep one barrier after FM. Re-time.</td>
-                                <td class="px-2 py-2 text-slate-500">after G1</td>
+                                <td class="px-2 py-2 text-sky-400">this PR</td>
                             </tr>
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono text-sky-300">P2b</td>
@@ -484,10 +458,10 @@ PYTHONPATH=src:. ALPAMAYO_STAGE_TIMERS=1 \
             </div>
             <p class="text-sm text-slate-300">
                 Wait for user verification. Do not merge another PR until then.
-                G1 fields are filled (warm median). Dominant is prefill on both
-                cold and warm. Do not spend a week on decode or FM. Do not start
-                Phase 3 quant until you sign off. First cut after sign-off is
-                prefill work, not Euler eval.
+                G1 fields are filled from greedy e2e (first-step LM timer).
+                Dominant is prefill. Do not spend a week on decode or FM. Do not
+                start Phase 3 quant until you sign off. First cut after sign-off
+                is prefill work, not Euler eval.
             </p>
             <div class="mt-4 text-xs font-mono text-indigo-400">
                 reports/stage1c_progress.html · started 2026-08-29 ·

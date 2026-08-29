@@ -11,6 +11,7 @@ from mlx_port.stage_timers import (
     median_stage_times,
     print_stage_table,
     time_stage,
+    vlm_step_stage,
 )
 
 
@@ -104,6 +105,29 @@ def test_median_stage_times_is_middle_trial_not_mean():
     assert mid["ms_per_tok"] == 20.83
     assert mid["dominant_stage"] == "prefill"
     assert mid["dominant_stage"] in G1_DOMINANT
+
+
+def test_vlm_step_stage_prompt_is_prefill_one_token_is_decode():
+    prompt = type("Ids", (), {"shape": (1, 32777)})()
+    first_decode = type("Ids", (), {"shape": (1, 1)})()
+    assert vlm_step_stage(prompt) == "prefill"
+    assert vlm_step_stage(first_decode) == "decode"
+
+
+def test_vlm_step_stage_rejects_empty_ids():
+    try:
+        vlm_step_stage(None)
+    except ValueError as exc:
+        assert "input_ids" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for missing input_ids")
+    empty = type("Ids", (), {"shape": (1, 0)})()
+    try:
+        vlm_step_stage(empty)
+    except ValueError as exc:
+        assert "seq_len=0" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for seq_len=0")
 
 
 def test_median_stage_times_rejects_empty():

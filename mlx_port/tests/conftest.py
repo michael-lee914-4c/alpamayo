@@ -17,7 +17,6 @@ try:
 except ImportError:
     collect_ignore += [
         "test_end_to_end_inference.py",
-        "test_stage_timer_window.py",
         "test_single_image_coc.py",
         "test_data_loading.py",
     ]
@@ -25,7 +24,6 @@ except ImportError:
 if os.environ.get("ALPAMAYO_CI_NO_WEIGHTS"):
     for name in (
         "test_end_to_end_inference.py",
-        "test_stage_timer_window.py",
         "test_single_image_coc.py",
         "test_data_loading.py",
         "test_vlm_weight_loading.py",

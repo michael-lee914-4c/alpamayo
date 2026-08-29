@@ -28,7 +28,7 @@ def _dbg(msg: str) -> None:
 
 from mlx_vlm.models.qwen3_vl.language import Attention, LanguageModel
 from mlx_vlm.models.qwen3_vl.qwen3_vl import Model, InputEmbeddingsFeatures
-from mlx_port.stage_timers import current_clock, time_stage
+from mlx_port.stage_timers import current_clock, time_stage, vlm_step_stage
 from mlx_lm.models.base import create_causal_mask
 
 from mlx_port.models.rope_index_mlx import compute_hf_rope_index_mx
@@ -451,4 +451,12 @@ class AlpamayoModel(Model):
             f"_position_ids={'set' if getattr(lm, '_position_ids', None) is not None else 'None'} "
             f"_rope_deltas={getattr(lm, '_rope_deltas', None)}"
         )
-        return lm(input_ids, mask=mask, cache=cache, **kwargs)
+        # Prefill = first VLM step (prompt seq). After token 1, one-token
+        # calls are decode on a warm KV. Barrier only when T1.1 is on.
+        stage = vlm_step_stage(input_ids)
+        with time_stage(stage):
+            out = lm(input_ids, mask=mask, cache=cache, **kwargs)
+            if current_clock() is not None:
+                logits = getattr(out, "logits", out)
+                mx.eval(logits)
+        return out
