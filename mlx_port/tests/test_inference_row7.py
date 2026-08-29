@@ -1,6 +1,9 @@
 """Structural tests for Row 7 inference components."""
 
+from pathlib import Path
+
 import mlx.core as mx
+import pytest
 
 from mlx_port.models.token_utils_mlx import (
     AlpamayoGenerateStop,
@@ -93,6 +96,9 @@ def test_qwen_hf_eos_ids_match_generation_config():
     from transformers import AutoTokenizer
 
     from mlx_port.processor import LOCAL_QWEN_PROCESSOR_PATH
+
+    if not Path(LOCAL_QWEN_PROCESSOR_PATH).exists():
+        pytest.skip("local Qwen3-VL processor not present")
 
     tokenizer = AutoTokenizer.from_pretrained(
         LOCAL_QWEN_PROCESSOR_PATH, trust_remote_code=True

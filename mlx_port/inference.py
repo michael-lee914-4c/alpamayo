@@ -36,6 +36,7 @@ from mlx_port.models.expert_mlx import (
     cache_seq_len,
     expert_attention_mask,
     expert_position_ids,
+    sync_cache_idx,
     traj_future_start_offsets,
     trim_cache,
 )
@@ -508,11 +509,14 @@ def _sample_one_trajectory(
 ) -> tuple[mx.array, mx.array]:
     """NVIDIA ``step_fn`` + ``diffusion.sample`` + ``action_to_traj`` for one cache."""
     n_diffusion = int(model.action_space.get_action_space_dims()[0])
+    sync_cache_idx(cache)
     prefix_len = cache_seq_len(cache)
     offsets = traj_future_start_offsets(full_sequence, traj_future_start_id)
     position_ids = expert_position_ids(n_diffusion, 1, rope_deltas, offsets)
-    attn_mask = expert_attention_mask(1, n_diffusion, prefix_len, offsets)
     weight_dtype = model.expert.language_model.model.layers[0].self_attn.q_proj.weight.dtype
+    attn_mask = expert_attention_mask(1, n_diffusion, prefix_len, offsets).astype(
+        weight_dtype
+    )
 
     def step_fn(x: mx.array, t: mx.array) -> mx.array:
         embeds = model.action_in_proj(x, t)

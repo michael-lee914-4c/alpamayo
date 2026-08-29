@@ -119,8 +119,15 @@ def _print_traj(pred_xyz, pred_rot, data):
     print("\nFuture Trajectory (from action expert):")
     if pred_xyz is not None:
         xyz_np = np.asarray(pred_xyz)
+        flat = xyz_np.reshape(-1, xyz_np.shape[-1])
         print("  pred_xyz shape:", xyz_np.shape)
-        print("  pred_xyz[0, :5]:\n", xyz_np.reshape(-1, xyz_np.shape[-1])[:5])
+        print("  pred_xyz first 5:\n", flat[:5])
+        print("  pred_xyz last 5:\n", flat[-5:])
+        print(
+            f"  pred xy start=({flat[0, 0]:.3f}, {flat[0, 1]:.3f}) "
+            f"end=({flat[-1, 0]:.3f}, {flat[-1, 1]:.3f}) "
+            f"max|xy|={np.max(np.abs(flat[:, :2])):.3f}"
+        )
     else:
         print("  pred_xyz=None  (expert step_fn not run)")
     if pred_rot is not None:
@@ -129,7 +136,14 @@ def _print_traj(pred_xyz, pred_rot, data):
     gt_fut = data.get("ego_future_xyz")
     if gt_fut is not None:
         fut = np.asarray(gt_fut)
+        gt_flat = fut.reshape(-1, fut.shape[-1])
         print(f"  gt ego_future_xyz shape={fut.shape}")
+        print("  gt first 5:\n", gt_flat[:5])
+        print("  gt last 5:\n", gt_flat[-5:])
+        print(
+            f"  gt xy start=({gt_flat[0, 0]:.3f}, {gt_flat[0, 1]:.3f}) "
+            f"end=({gt_flat[-1, 0]:.3f}, {gt_flat[-1, 1]:.3f})"
+        )
 
 
 def _cleanup(*objs):
@@ -143,18 +157,18 @@ def _cleanup(*objs):
 @pytest.mark.slow
 @pytest.mark.parametrize("max_gen_len", [256])
 def test_end_to_end_inference_prints_coc_vlm_only(max_gen_len):
-    """Greedy CoC (T=0). Pins the last confirmed sentence on CLIP_ID."""
+    """Greedy CoC (T=0) plus action-expert trajectory on CLIP_ID."""
     gt, data = _load_clip()
     print("[End-to-End Test] Loading AlpamayoR1MLX (this may take a while)...")
     with profile_section("model_load", enabled=is_profiling_enabled()):
         model = AlpamayoR1MLX.from_pretrained(
             CHECKPOINT,
-            load_expert=False,
+            load_expert=True,
             dtype=mx.bfloat16,
         )
     model_inputs = _prepare_inputs(model, data)
 
-    print("[End-to-End Test] Running greedy VLM rollout (temperature=0, no grouping)...")
+    print("[End-to-End Test] Running greedy rollout (temperature=0, expert on)...")
     pred_xyz, pred_rot, extra = sample_trajectories_from_data_with_vlm_rollout(
         model=model,
         data=model_inputs,
@@ -163,7 +177,7 @@ def test_end_to_end_inference_prints_coc_vlm_only(max_gen_len):
         num_traj_samples=1,
         max_generation_length=max_gen_len,
         return_extra=True,
-        vlm_only=True,
+        vlm_only=False,
     )
     _report_memory()
 
@@ -198,7 +212,7 @@ def test_end_to_end_inference_prints_coc_vlm_only(max_gen_len):
         )
     )
     _print_traj(pred_xyz, pred_rot, data)
-    assert pred_xyz is None and pred_rot is None
+    assert pred_xyz is not None and pred_rot is not None, "greedy rollout returned no trajectory"
     print("[End-to-End Test] Inference completed successfully.")
     _cleanup(model, data, model_inputs, extra)
 

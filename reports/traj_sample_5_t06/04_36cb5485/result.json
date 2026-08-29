@@ -1,0 +1,180 @@
+{
+  "clip_id": "36cb5485-5c56-48c5-8219-90095851d627",
+  "chunk": 57,
+  "split": "train",
+  "event_cluster": "ANIMALS_BIRDS_ROADKILL",
+  "t0_us": 9746740,
+  "n_events": 1,
+  "gt_coc_texts": [
+    "Stop for the stop sign while waiting for pedestrians to cross the street."
+  ],
+  "pred_coc_raw": "Stop to yield to the pedestrian in the crosswalk.<|cot_end|><|traj_future_start|><|endoftext|>",
+  "pred_coc": "Stop to yield to the pedestrian in the crosswalk.",
+  "readable": true,
+  "jaccard": 0.21428571428571427,
+  "gt_coverage": 0.3,
+  "min_ade_m": 9.57186522161667,
+  "pred_xyz_shape": [
+    1,
+    1,
+    1,
+    64,
+    3
+  ],
+  "gt_xy": {
+    "start": [
+      0.9574,
+      -0.0002
+    ],
+    "end": [
+      21.0074,
+      -0.1321
+    ],
+    "path_m": 21.0078,
+    "first5": [
+      [
+        0.9574,
+        -0.0002
+      ],
+      [
+        1.8929,
+        0.0004
+      ],
+      [
+        2.805,
+        -0.0004
+      ],
+      [
+        3.6933,
+        -0.0014
+      ],
+      [
+        4.556,
+        -0.0022
+      ]
+    ],
+    "last5": [
+      [
+        20.7905,
+        -0.1285
+      ],
+      [
+        20.842,
+        -0.1293
+      ],
+      [
+        20.8951,
+        -0.1302
+      ],
+      [
+        20.9501,
+        -0.1312
+      ],
+      [
+        21.0074,
+        -0.1321
+      ]
+    ]
+  },
+  "pred_xy": {
+    "start": [
+      0.9682,
+      -0.0023
+    ],
+    "end": [
+      37.416,
+      18.234
+    ],
+    "path_m": 41.6225,
+    "first5": [
+      [
+        0.9682,
+        -0.0023
+      ],
+      [
+        1.9326,
+        -0.0091
+      ],
+      [
+        2.8919,
+        -0.0201
+      ],
+      [
+        3.8444,
+        -0.0352
+      ],
+      [
+        4.7884,
+        -0.0541
+      ]
+    ],
+    "last5": [
+      [
+        36.0974,
+        15.7954
+      ],
+      [
+        36.3951,
+        16.3971
+      ],
+      [
+        36.7125,
+        17.0054
+      ],
+      [
+        37.0518,
+        17.6185
+      ],
+      [
+        37.416,
+        18.234
+      ]
+    ]
+  },
+  "gt_speed_start_end": [
+    9.574,
+    0.573
+  ],
+  "pred_speed_start_end": [
+    9.682,
+    7.152
+  ],
+  "image_grid": [
+    [
+      "04_36cb5485/00_cross_left_120_t-0.3s.jpg",
+      "04_36cb5485/00_cross_left_120_t-0.2s.jpg",
+      "04_36cb5485/00_cross_left_120_t-0.1s.jpg",
+      "04_36cb5485/00_cross_left_120_tp0.0s.jpg"
+    ],
+    [
+      "04_36cb5485/01_front_wide_120_t-0.3s.jpg",
+      "04_36cb5485/01_front_wide_120_t-0.2s.jpg",
+      "04_36cb5485/01_front_wide_120_t-0.1s.jpg",
+      "04_36cb5485/01_front_wide_120_tp0.0s.jpg"
+    ],
+    [
+      "04_36cb5485/02_cross_right_120_t-0.3s.jpg",
+      "04_36cb5485/02_cross_right_120_t-0.2s.jpg",
+      "04_36cb5485/02_cross_right_120_t-0.1s.jpg",
+      "04_36cb5485/02_cross_right_120_tp0.0s.jpg"
+    ],
+    [
+      "04_36cb5485/03_front_tele_30_t-0.3s.jpg",
+      "04_36cb5485/03_front_tele_30_t-0.2s.jpg",
+      "04_36cb5485/03_front_tele_30_t-0.1s.jpg",
+      "04_36cb5485/03_front_tele_30_tp0.0s.jpg"
+    ]
+  ],
+  "contact_sheet": "04_36cb5485/grid.jpg",
+  "traj_xy": "04_36cb5485/traj_xy.png",
+  "traj_speed": "04_36cb5485/traj_speed.png",
+  "cameras": [
+    "cross_left_120",
+    "front_wide_120",
+    "cross_right_120",
+    "front_tele_30"
+  ],
+  "seed": 46,
+  "temperature": 0.6,
+  "top_p": 0.98
+}

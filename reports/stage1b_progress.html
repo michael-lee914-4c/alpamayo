@@ -42,10 +42,11 @@
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Stage Status</div>
                     <div class="text-3xl font-semibold text-white">In Progress</div>
+                    <div class="text-xs text-slate-500 mt-1">5-clip mean minADE 7.84 m</div>
                 </div>
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Key Focus</div>
-                    <div class="font-semibold text-xl text-cyan-400">Expert step_fn → XY</div>
+                    <div class="font-semibold text-xl text-cyan-400">Yield/stop + laterals</div>
                 </div>
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Gate</div>
@@ -122,12 +123,11 @@
                     then append their own 64-token K/V, then crop.
                 </p>
                 <p>
-                    Stock <code>mlx_lm</code> Qwen3 (the current expert wrapper) cannot take NVIDIA’s
-                    explicit 3-row <code>position_ids</code> or the 4D pad mask. It RoPEs at
-                    <code>cache.offset</code> (full prompt + generated, including the extra EOS token).
-                    NVIDIA positions start at <code>traj_future_start + 1</code>, which is one token earlier.
-                    Stage 1b must run the expert through <code>mlx_vlm</code> Qwen3-VL attention (same path as the VLM)
-                    so we can pass position ids, the pad mask, and non-causal attention.
+                    The expert is now an <code>mlx_vlm</code> Qwen3-VL attention wrapper
+                    (not stock <code>mlx_lm</code> Qwen3). After VLM generate, sync
+                    <code>cache._idx = offset</code> — <code>_idx</code> is set at the
+                    <em>start</em> of a VLM call and is one token behind. The pad mask
+                    must be the expert dtype (bfloat16).
                 </p>
             </div>
         </div>
@@ -155,11 +155,160 @@
             </div>
             <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 text-sm">
                 <ol class="list-decimal list-inside space-y-2 text-slate-300">
-                    <li>Run temperature e2e with <code>load_expert=True</code> and record minADE vs <code>ego_future_xyz</code>. Do not pin a number until a real clip run exists.</li>
-                    <li>Confirm expert weights actually land on the mlx_vlm modules (slow <code>test_load_expert_weights_successfully</code>).</li>
-                    <li>If minADE is huge, debug RoPE offset / mask / v0 before changing sampling.</li>
-                    <li>Optional: NVIDIA <code>dxy_theta_to_v_without_v0</code> instead of the current t0 estimate that reuses <code>dxy_theta_to_v</code> with v0=0.</li>
+                    <li>First-step speed matches GT on all 5 clips. Pred rarely decelerates on yield/stop (clips 1–4) and missed the left on clip 0; clip 4 added a spurious left.</li>
+                    <li>RoPE / pad mask / v0 vs an unconditioned “keep rolling” prior. Optional: NVIDIA <code>dxy_theta_to_v_without_v0</code>.</li>
+                    <li>Do not close Stage 1b. Physical XY, not a stub — not a yield/stop match.</li>
                 </ol>
+            </div>
+        </div>
+
+        <div class="mb-8">
+            <div class="section-header">
+                <i class="fa-solid fa-chart-line text-cyan-400"></i>
+                <div class="font-semibold text-xl">Greedy e2e (T=0, expert on)</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 text-sm space-y-4">
+                <p class="text-slate-300">
+                    Default clip <code class="text-cyan-300">0abe118e-…</code> · 2026-08-28 · 110 s · RSS 67.8 GB · Metal 53.1 GB.
+                    CoC pin held. Expert returned <code>pred_xyz</code> <code>(1, 1, 1, 64, 3)</code>.
+                </p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+                        <div class="text-xs text-slate-500 mb-1">minADE</div>
+                        <div class="text-3xl font-semibold text-amber-300">6.96 m</div>
+                    </div>
+                    <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+                        <div class="text-xs text-slate-500 mb-1">Pred XY start → end</div>
+                        <div class="font-mono text-cyan-200">(0.80, −0.00) → (33.37, −0.23)</div>
+                    </div>
+                    <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+                        <div class="text-xs text-slate-500 mb-1">GT XY start → end</div>
+                        <div class="font-mono text-emerald-300">(0.79, −0.00) → (18.79, +0.06)</div>
+                    </div>
+                </div>
+                <p class="text-slate-400 text-xs">
+                    First steps match GT speed (~0.80 m / 0.1 s, almost straight).
+                    GT decelerates and nearly stops at 18.8 m (pedestrian yield).
+                    Pred keeps rolling to 33.4 m. Physical units, not a stub. Not a yield/stop match.
+                    CoC: “Stop for the stop sign at the intersection.” vs GT pedestrian yield.
+                </p>
+            </div>
+        </div>
+
+        <div class="mb-8">
+            <div class="section-header">
+                <i class="fa-solid fa-layer-group text-cyan-400"></i>
+                <div class="font-semibold text-xl">5-clip T=0.6 × 1 trajectory</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 text-sm space-y-4">
+                <p class="text-slate-300">
+                    Same clips as
+                    <a class="text-cyan-400 hover:underline" href="coc_sample_5_t06/index.html">coc_sample_5_t06</a>
+                    (seed 42, skip t0 &lt; 1.6 s). NVIDIA sampling: T=0.6, top_p=0.98, 1 CoC + 1 expert traj.
+                    8.2 min after model load. Full plots:
+                    <a class="text-cyan-400 hover:underline" href="traj_sample_5_t06/index.html">reports/traj_sample_5_t06/index.html</a>.
+                    Jaccard is cheap — read the sentences.
+                </p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+                        <div class="text-xs text-slate-500 mb-1">Mean minADE</div>
+                        <div class="text-3xl font-semibold text-amber-300">7.84 m</div>
+                        <div class="text-xs text-slate-500 mt-1">range 6.04–9.57</div>
+                    </div>
+                    <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+                        <div class="text-xs text-slate-500 mb-1">First-step speed</div>
+                        <div class="text-xl font-semibold text-emerald-300">matches GT</div>
+                        <div class="text-xs text-slate-500 mt-1">all 5 clips, ~0.1 s</div>
+                    </div>
+                    <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+                        <div class="text-xs text-slate-500 mb-1">Yield / stop</div>
+                        <div class="text-xl font-semibold text-rose-300">overshoots</div>
+                        <div class="text-xs text-slate-500 mt-1">clips 1–4 keep rolling</div>
+                    </div>
+                </div>
+                <div class="overflow-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
+                            <tr>
+                                <th class="px-2 py-2">#</th>
+                                <th class="px-2 py-2">Cluster</th>
+                                <th class="px-2 py-2">minADE</th>
+                                <th class="px-2 py-2">GT → pred end XY</th>
+                                <th class="px-2 py-2">GT CoC</th>
+                                <th class="px-2 py-2">Pred CoC</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-slate-300">
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 text-slate-500">0</td>
+                                <td class="px-2 py-2">work zone</td>
+                                <td class="px-2 py-2 tabular-nums text-amber-300">9.19</td>
+                                <td class="px-2 py-2 font-mono text-[11px]">(68.1, 31.8) → (68.1, 9.8)</td>
+                                <td class="px-2 py-2">Turn left, stay clear of cones.</td>
+                                <td class="px-2 py-2 text-amber-100">Slow down due to a road worker directing traffic.</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 text-slate-500">1</td>
+                                <td class="px-2 py-2">night peds</td>
+                                <td class="px-2 py-2 tabular-nums text-amber-300">6.04</td>
+                                <td class="px-2 py-2 font-mono text-[11px]">(28.2, −0.4) → (43.2, −3.7)</td>
+                                <td class="px-2 py-2">Decelerate for pedestrians crossing.</td>
+                                <td class="px-2 py-2 text-amber-100">Stop to yield to the pedestrian in the crosswalk ahead.</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 text-slate-500">2</td>
+                                <td class="px-2 py-2">snow</td>
+                                <td class="px-2 py-2 tabular-nums text-amber-300">6.46</td>
+                                <td class="px-2 py-2 font-mono text-[11px]">(9.1, 0.0) → (24.8, −1.1)</td>
+                                <td class="px-2 py-2">Yield to the pedestrian crossing.</td>
+                                <td class="px-2 py-2 text-amber-100">Stop to yield to the cross-traffic vehicle ahead.</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 text-slate-500">3</td>
+                                <td class="px-2 py-2">residential</td>
+                                <td class="px-2 py-2 tabular-nums text-amber-300">7.95</td>
+                                <td class="px-2 py-2 font-mono text-[11px]">(13.7, −0.2) → (28.1, −1.1)</td>
+                                <td class="px-2 py-2">Yield to pedestrians crossing.</td>
+                                <td class="px-2 py-2 text-amber-100">Stop to yield to the pedestrian crossing ahead.</td>
+                            </tr>
+                            <tr>
+                                <td class="px-2 py-2 text-slate-500">4</td>
+                                <td class="px-2 py-2">fog + STOP</td>
+                                <td class="px-2 py-2 tabular-nums text-amber-300">9.57</td>
+                                <td class="px-2 py-2 font-mono text-[11px]">(21.0, −0.1) → (37.4, 18.2)</td>
+                                <td class="px-2 py-2">Stop for the stop sign; wait for pedestrians.</td>
+                                <td class="px-2 py-2 text-amber-100">Stop to yield to the pedestrian in the crosswalk.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-slate-400 text-xs">
+                    Clip 0 CoC is the same mismatch as the earlier T=0.6 sample (worker vs left/cones); XY matches GT range (~68 m) but stays almost straight.
+                    Clips 1 and 3 name the pedestrian correctly; 2 names far cross-traffic (wrong priority, same as the CoC-only eval); 4 drops the stop sign.
+                    Trajectories: first step ~GT speed on every clip. Yield clips (1–4) GT ends near 0–2 m/s; pred stays at cruise. Clip 4 also swings left (+18 m y).
+                </p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                    <a href="traj_sample_5_t06/index.html#clip-0" class="block">
+                        <img src="traj_sample_5_t06/00_faff17c7/traj_xy.png" alt="clip 0 XY" class="w-full rounded-xl border border-slate-700 bg-slate-950">
+                        <div class="mt-1 text-[11px] text-slate-500">0 · missed left</div>
+                    </a>
+                    <a href="traj_sample_5_t06/index.html#clip-1" class="block">
+                        <img src="traj_sample_5_t06/01_8e83f069/traj_xy.png" alt="clip 1 XY" class="w-full rounded-xl border border-slate-700 bg-slate-950">
+                        <div class="mt-1 text-[11px] text-slate-500">1 · overshoot</div>
+                    </a>
+                    <a href="traj_sample_5_t06/index.html#clip-2" class="block">
+                        <img src="traj_sample_5_t06/02_1946f1c3/traj_xy.png" alt="clip 2 XY" class="w-full rounded-xl border border-slate-700 bg-slate-950">
+                        <div class="mt-1 text-[11px] text-slate-500">2 · overshoot</div>
+                    </a>
+                    <a href="traj_sample_5_t06/index.html#clip-3" class="block">
+                        <img src="traj_sample_5_t06/03_8e06f83c/traj_xy.png" alt="clip 3 XY" class="w-full rounded-xl border border-slate-700 bg-slate-950">
+                        <div class="mt-1 text-[11px] text-slate-500">3 · overshoot</div>
+                    </a>
+                    <a href="traj_sample_5_t06/index.html#clip-4" class="block">
+                        <img src="traj_sample_5_t06/04_36cb5485/traj_xy.png" alt="clip 4 XY" class="w-full rounded-xl border border-slate-700 bg-slate-950">
+                        <div class="mt-1 text-[11px] text-slate-500">4 · overshoot + left</div>
+                    </a>
+                </div>
             </div>
         </div>
 
@@ -171,9 +320,15 @@
             <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 text-sm space-y-3">
                 <pre class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-xs text-cyan-300 overflow-auto">PYTHONPATH=src:. .venv/bin/python -m pytest mlx_port/tests/test_action_in_proj_mlx.py -q --tb=short
 PYTHONPATH=src:. .venv/bin/python -m pytest mlx_port/tests -q -m "not slow"
-PYTHONPATH=src:. .venv/bin/python -m pytest mlx_port/tests/test_end_to_end_inference.py::test_end_to_end_inference_temperature_coc_and_traj -s --tb=short</pre>
+PYTHONPATH=src:. .venv/bin/python -m pytest mlx_port/tests/test_end_to_end_inference.py::test_end_to_end_inference_temperature_coc_and_traj -s --tb=short
+PYTHONPATH=src:. .venv/bin/python mlx_port/scripts/run_local_traj_sample.py --report-dir reports/traj_sample_5_t06</pre>
                 <p class="text-xs text-slate-400">
-                    Temperature e2e now loads the expert. Record minADE on this page after the first real clip run — do not pin a fake XY.
+                    Greedy e2e (T=0, expert on, 2026-08-28): CoC still
+                    “Stop for the stop sign at the intersection.”
+                    <code>pred_xyz</code> shape <code>(1, 1, 1, 64, 3)</code>, minADE <strong>6.96 m</strong>
+                    vs GT future that stops near 18.8 m. Pred starts at the right speed
+                    (~0.80 m / 0.1 s) and stays almost straight, but keeps rolling to 33.4 m.
+                    Physical units, not a stub. Not a yield/stop match. 110 s, RSS 67.8 GB, Metal 53.1 GB.
                 </p>
             </div>
         </div>
@@ -184,11 +339,11 @@ PYTHONPATH=src:. .venv/bin/python -m pytest mlx_port/tests/test_end_to_end_infer
                 <span>Next</span>
             </div>
             <p class="text-sm text-slate-300">
-                Expert wrapper with mlx_vlm attention, then <code>step_fn</code>. Do not mask
-                <code>&lt;|im_end|&gt;</code>. Do not re-enable temporal grouping on greedy e2e.
+                Diagnose the keep-rolling prior on yield/stop (and the missed / extra laterals).
+                Do not mask <code>&lt;|im_end|&gt;</code>. Do not close Stage 1b on a 7.8 m mean ADE.
             </p>
             <div class="mt-4 text-xs font-mono text-indigo-400">
-                reports/stage1b_progress.html · started 2026-08-28 ·
+                reports/stage1b_progress.html · updated 2026-08-28 ·
                 <a class="text-cyan-400 hover:underline" href="stage1_progress.html">stage 1 (closed)</a>
             </div>
         </div>

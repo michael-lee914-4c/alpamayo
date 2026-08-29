@@ -1,0 +1,180 @@
+{
+  "clip_id": "faff17c7-4572-472a-be28-0f035bb88a37",
+  "chunk": 4,
+  "split": "train",
+  "event_cluster": "WORK_ZONES_TEMP_TRAFFIC_CONTROL",
+  "t0_us": 5627325,
+  "n_events": 1,
+  "gt_coc_texts": [
+    "Turn left while keeping a safe distance from the construction cones on the right."
+  ],
+  "pred_coc_raw": "Slow down due to a road worker directing traffic.<|cot_end|><|traj_future_start|><|endoftext|>",
+  "pred_coc": "Slow down due to a road worker directing traffic.",
+  "readable": true,
+  "jaccard": 0.047619047619047616,
+  "gt_coverage": 0.07692307692307693,
+  "min_ade_m": 9.186520839721824,
+  "pred_xyz_shape": [
+    1,
+    1,
+    1,
+    64,
+    3
+  ],
+  "gt_xy": {
+    "start": [
+      0.7258,
+      0.0085
+    ],
+    "end": [
+      68.1481,
+      31.8174
+    ],
+    "path_m": 75.2098,
+    "first5": [
+      [
+        0.7258,
+        0.0085
+      ],
+      [
+        1.4634,
+        0.0413
+      ],
+      [
+        2.212,
+        0.1007
+      ],
+      [
+        2.9723,
+        0.1865
+      ],
+      [
+        3.7436,
+        0.2996
+      ]
+    ],
+    "last5": [
+      [
+        62.6298,
+        28.9802
+      ],
+      [
+        63.9984,
+        29.6847
+      ],
+      [
+        65.3742,
+        30.392
+      ],
+      [
+        66.7567,
+        31.103
+      ],
+      [
+        68.1481,
+        31.8174
+      ]
+    ]
+  },
+  "pred_xy": {
+    "start": [
+      0.7199,
+      0.0021
+    ],
+    "end": [
+      68.1305,
+      9.7953
+    ],
+    "path_m": 68.831,
+    "first5": [
+      [
+        0.7199,
+        0.0021
+      ],
+      [
+        1.4399,
+        0.0088
+      ],
+      [
+        2.1589,
+        0.0203
+      ],
+      [
+        2.8776,
+        0.0363
+      ],
+      [
+        3.5985,
+        0.0569
+      ]
+    ],
+    "last5": [
+      [
+        62.5173,
+        8.9015
+      ],
+      [
+        63.9077,
+        9.1249
+      ],
+      [
+        65.3071,
+        9.3484
+      ],
+      [
+        66.715,
+        9.5719
+      ],
+      [
+        68.1305,
+        9.7953
+      ]
+    ]
+  },
+  "gt_speed_start_end": [
+    7.258,
+    15.641
+  ],
+  "pred_speed_start_end": [
+    7.199,
+    14.33
+  ],
+  "image_grid": [
+    [
+      "00_faff17c7/00_cross_left_120_t-0.3s.jpg",
+      "00_faff17c7/00_cross_left_120_t-0.2s.jpg",
+      "00_faff17c7/00_cross_left_120_t-0.1s.jpg",
+      "00_faff17c7/00_cross_left_120_tp0.0s.jpg"
+    ],
+    [
+      "00_faff17c7/01_front_wide_120_t-0.3s.jpg",
+      "00_faff17c7/01_front_wide_120_t-0.2s.jpg",
+      "00_faff17c7/01_front_wide_120_t-0.1s.jpg",
+      "00_faff17c7/01_front_wide_120_tp0.0s.jpg"
+    ],
+    [
+      "00_faff17c7/02_cross_right_120_t-0.3s.jpg",
+      "00_faff17c7/02_cross_right_120_t-0.2s.jpg",
+      "00_faff17c7/02_cross_right_120_t-0.1s.jpg",
+      "00_faff17c7/02_cross_right_120_tp0.0s.jpg"
+    ],
+    [
+      "00_faff17c7/03_front_tele_30_t-0.3s.jpg",
+      "00_faff17c7/03_front_tele_30_t-0.2s.jpg",
+      "00_faff17c7/03_front_tele_30_t-0.1s.jpg",
+      "00_faff17c7/03_front_tele_30_tp0.0s.jpg"
+    ]
+  ],
+  "contact_sheet": "00_faff17c7/grid.jpg",
+  "traj_xy": "00_faff17c7/traj_xy.png",
+  "traj_speed": "00_faff17c7/traj_speed.png",
+  "cameras": [
+    "cross_left_120",
+    "front_wide_120",
+    "cross_right_120",
+    "front_tele_30"
+  ],
+  "seed": 42,
+  "temperature": 0.6,
+  "top_p": 0.98
+}

@@ -44,16 +44,25 @@ def text_config_from_vlm_and_overrides(
 
 
 def cache_seq_len(cache: list[Any]) -> int:
-    """Prefix length stored in the VLM KV cache (mlx_lm KVCache uses offset)."""
+    """True KV length. mlx_lm ``KVCache.offset`` is updated in ``update_and_fetch``.
+
+    Do not use ``_idx``: AlpamayoLanguageModel sets it at the *start* of a VLM
+    call, so after generate it is one token behind ``offset``. mlx_vlm
+    attention slices the mask with ``_idx`` and concatenates with ``offset``.
+    """
     if not cache or cache[0] is None:
         return 0
-    c0 = cache[0]
-    if hasattr(c0, "_idx") and getattr(c0, "_idx") is not None:
-        try:
-            return int(c0._idx)
-        except (TypeError, ValueError):
-            pass
-    return int(c0.offset)
+    return int(cache[0].offset)
+
+
+def sync_cache_idx(cache: list[Any]) -> None:
+    """Set ``_idx = offset`` so mlx_vlm mask length matches the real KV prefix."""
+    if not cache:
+        return
+    for layer_cache in cache:
+        if layer_cache is None:
+            continue
+        layer_cache._idx = int(layer_cache.offset)
 
 
 def trim_cache(cache: list[Any], n_tokens: int) -> None:
@@ -63,6 +72,7 @@ def trim_cache(cache: list[Any], n_tokens: int) -> None:
     if n_tokens <= 0 or not cache:
         return
     trim_prompt_cache(cache, int(n_tokens))
+    sync_cache_idx(cache)
 
 
 def traj_future_start_offsets(
@@ -108,7 +118,7 @@ def expert_attention_mask(
     kv = prefix_len + n_diffusion
     mask = np.zeros((batch, 1, n_diffusion, kv), dtype=np.float32)
     off = np.asarray(offsets).reshape(-1)
-    hide = float(np.finfo(np.float32).min)
+    hide = -1e4
     for i in range(batch):
         start = int(off[i])
         if 0 <= start < prefix_len:

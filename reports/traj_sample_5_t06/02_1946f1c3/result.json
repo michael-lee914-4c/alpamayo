@@ -1,0 +1,180 @@
+{
+  "clip_id": "1946f1c3-8638-4648-8944-506e6bffc4df",
+  "chunk": 177,
+  "split": "train",
+  "event_cluster": "PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY",
+  "t0_us": 5699907,
+  "n_events": 1,
+  "gt_coc_texts": [
+    "Yield to the pedestrian crossing the road."
+  ],
+  "pred_coc_raw": "Stop to yield to the cross-traffic vehicle ahead.<|cot_end|><|traj_future_start|><|endoftext|>",
+  "pred_coc": "Stop to yield to the cross-traffic vehicle ahead.",
+  "readable": true,
+  "jaccard": 0.2727272727272727,
+  "gt_coverage": 0.5,
+  "min_ade_m": 6.461116157514131,
+  "pred_xyz_shape": [
+    1,
+    1,
+    1,
+    64,
+    3
+  ],
+  "gt_xy": {
+    "start": [
+      0.3984,
+      -0.0003
+    ],
+    "end": [
+      9.1462,
+      0.0052
+    ],
+    "path_m": 9.1462,
+    "first5": [
+      [
+        0.3984,
+        -0.0003
+      ],
+      [
+        0.7863,
+        -0.0005
+      ],
+      [
+        1.1638,
+        -0.0016
+      ],
+      [
+        1.5315,
+        -0.0014
+      ],
+      [
+        1.8874,
+        -0.002
+      ]
+    ],
+    "last5": [
+      [
+        9.0777,
+        0.0051
+      ],
+      [
+        9.0966,
+        0.0051
+      ],
+      [
+        9.1139,
+        0.0052
+      ],
+      [
+        9.1302,
+        0.0052
+      ],
+      [
+        9.1462,
+        0.0052
+      ]
+    ]
+  },
+  "pred_xy": {
+    "start": [
+      0.4056,
+      0.0002
+    ],
+    "end": [
+      24.8355,
+      -1.0954
+    ],
+    "path_m": 24.8596,
+    "first5": [
+      [
+        0.4056,
+        0.0002
+      ],
+      [
+        0.813,
+        0.0009
+      ],
+      [
+        1.2224,
+        0.0019
+      ],
+      [
+        1.6337,
+        0.0033
+      ],
+      [
+        2.0467,
+        0.0048
+      ]
+    ],
+    "last5": [
+      [
+        23.3089,
+        -0.964
+      ],
+      [
+        23.6822,
+        -0.9962
+      ],
+      [
+        24.0608,
+        -1.0288
+      ],
+      [
+        24.4452,
+        -1.0619
+      ],
+      [
+        24.8355,
+        -1.0954
+      ]
+    ]
+  },
+  "gt_speed_start_end": [
+    3.984,
+    0.16
+  ],
+  "pred_speed_start_end": [
+    4.056,
+    3.917
+  ],
+  "image_grid": [
+    [
+      "02_1946f1c3/00_cross_left_120_t-0.3s.jpg",
+      "02_1946f1c3/00_cross_left_120_t-0.2s.jpg",
+      "02_1946f1c3/00_cross_left_120_t-0.1s.jpg",
+      "02_1946f1c3/00_cross_left_120_tp0.0s.jpg"
+    ],
+    [
+      "02_1946f1c3/01_front_wide_120_t-0.3s.jpg",
+      "02_1946f1c3/01_front_wide_120_t-0.2s.jpg",
+      "02_1946f1c3/01_front_wide_120_t-0.1s.jpg",
+      "02_1946f1c3/01_front_wide_120_tp0.0s.jpg"
+    ],
+    [
+      "02_1946f1c3/02_cross_right_120_t-0.3s.jpg",
+      "02_1946f1c3/02_cross_right_120_t-0.2s.jpg",
+      "02_1946f1c3/02_cross_right_120_t-0.1s.jpg",
+      "02_1946f1c3/02_cross_right_120_tp0.0s.jpg"
+    ],
+    [
+      "02_1946f1c3/03_front_tele_30_t-0.3s.jpg",
+      "02_1946f1c3/03_front_tele_30_t-0.2s.jpg",
+      "02_1946f1c3/03_front_tele_30_t-0.1s.jpg",
+      "02_1946f1c3/03_front_tele_30_tp0.0s.jpg"
+    ]
+  ],
+  "contact_sheet": "02_1946f1c3/grid.jpg",
+  "traj_xy": "02_1946f1c3/traj_xy.png",
+  "traj_speed": "02_1946f1c3/traj_speed.png",
+  "cameras": [
+    "cross_left_120",
+    "front_wide_120",
+    "cross_right_120",
+    "front_tele_30"
+  ],
+  "seed": 44,
+  "temperature": 0.6,
+  "top_p": 0.98
+}
