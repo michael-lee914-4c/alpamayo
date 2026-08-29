@@ -8,6 +8,7 @@ Token outputs are unchanged; this is a host barrier only.
 from __future__ import annotations
 
 import os
+import statistics
 import time
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -15,6 +16,14 @@ from dataclasses import dataclass, field
 from typing import Iterator
 
 STAGE_TIMER_ENV = "ALPAMAYO_STAGE_TIMERS"
+G1_MS_KEYS = (
+    "encode_ms",
+    "prefill_ms",
+    "decode_ms",
+    "fm_ms",
+    "convert_ms",
+)
+G1_DOMINANT = ("encode", "prefill", "decode", "action", "python-overhead")
 
 
 def is_stage_timers_enabled() -> bool:
@@ -109,6 +118,36 @@ def time_stage(name: str) -> Iterator[None]:
         yield
     finally:
         clock.add_seconds(name, time.perf_counter() - t0)
+
+
+def median_stage_times(trials: list[dict]) -> dict:
+    """Median of T1.1 warm trials. Recomputes rates and dominant from medians."""
+    if not trials:
+        raise ValueError("median_stage_times requires at least one trial")
+    out = dict(trials[0])
+    for key in G1_MS_KEYS:
+        out[key] = round(float(statistics.median(t[key] for t in trials)), 1)
+    out["decode_tok"] = int(statistics.median(t["decode_tok"] for t in trials))
+    out["fm_steps"] = int(statistics.median(t["fm_steps"] for t in trials))
+    out["ms_per_tok"] = (
+        round(out["decode_ms"] / out["decode_tok"], 2) if out["decode_tok"] else 0.0
+    )
+    out["ms_per_fm_step"] = (
+        round(out["fm_ms"] / out["fm_steps"], 2) if out["fm_steps"] else 0.0
+    )
+    stages = {
+        "encode": out["encode_ms"],
+        "prefill": out["prefill_ms"],
+        "decode": out["decode_ms"],
+        "action": out["fm_ms"],
+        "python-overhead": out["convert_ms"],
+    }
+    out["total_ms"] = round(sum(stages.values()), 1)
+    dominant = max(stages, key=stages.get)
+    if stages[dominant] <= 0.0:
+        dominant = "python-overhead"
+    out["dominant_stage"] = dominant
+    return out
 
 
 def print_stage_table(times: dict) -> None:
