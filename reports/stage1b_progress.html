@@ -142,6 +142,8 @@
                     <li><span class="text-emerald-400 font-semibold">PerWaypointActionInProjV2</span> — <code>mlx_port/models/action_in_proj_mlx.py</code>. Checkpoint key names match. Numerical test vs NVIDIA PyTorch module.</li>
                     <li><span class="text-emerald-400 font-semibold">ActionOutProj</span> — bare <code>nn.Linear</code> so keys are <code>action_out_proj.weight</code> / <code>.bias</code> (not <code>.linear.weight</code>).</li>
                     <li><span class="text-emerald-400 font-semibold">n_waypoints=64</span> — <code>ActionSpace.get_action_space_dims()</code> uses <code>self.n_waypoints</code>. <code>from_pretrained</code> no longer pops 64, so diffusion <code>x_dims</code> is <code>(64, 2)</code>.</li>
+                    <li><span class="text-emerald-400 font-semibold">AlpamayoExpert</span> — mlx_vlm Qwen3-VL attention wrapper. Keeps VLM GQA (8 KV heads) and 36 layers; width is 2048 / 16 Q heads. Weight remap unchanged.</li>
+                    <li><span class="text-emerald-400 font-semibold">step_fn</span> — <code>sample_trajectories_from_data_with_vlm_rollout</code> now runs action_in_proj → expert + VLM KV prefix → action_out_proj → Euler sample → <code>action_to_traj</code>. Uses VLM <code>_rope_deltas</code>, prompt+generated offset, pad mask, cache trim. Temperature e2e loads the expert.</li>
                 </ul>
             </div>
         </div>
@@ -153,10 +155,10 @@
             </div>
             <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 text-sm">
                 <ol class="list-decimal list-inside space-y-2 text-slate-300">
-                    <li>Swap the expert from <code>mlx_lm.qwen3</code> to an <code>mlx_vlm</code> language-model wrapper (keep weight remap <code>expert.* → expert.language_model.model.*</code>).</li>
-                    <li>Keep VLM <code>rope_deltas</code> after generate (today the rollout hardcodes <code>0</code>). Build full sequences as prompt + generated so <code>traj_future_start</code> offset matches NVIDIA.</li>
-                    <li>Implement <code>step_fn</code> + cache crop / trim + non-causal mask in <code>sample_trajectories_from_data_with_vlm_rollout</code>.</li>
-                    <li>Temperature e2e: <code>load_expert=True</code>, print minADE. Do not claim parity until the KV prefix is actually used.</li>
+                    <li>Run temperature e2e with <code>load_expert=True</code> and record minADE vs <code>ego_future_xyz</code>. Do not pin a number until a real clip run exists.</li>
+                    <li>Confirm expert weights actually land on the mlx_vlm modules (slow <code>test_load_expert_weights_successfully</code>).</li>
+                    <li>If minADE is huge, debug RoPE offset / mask / v0 before changing sampling.</li>
+                    <li>Optional: NVIDIA <code>dxy_theta_to_v_without_v0</code> instead of the current t0 estimate that reuses <code>dxy_theta_to_v</code> with v0=0.</li>
                 </ol>
             </div>
         </div>
@@ -171,8 +173,7 @@
 PYTHONPATH=src:. .venv/bin/python -m pytest mlx_port/tests -q -m "not slow"
 PYTHONPATH=src:. .venv/bin/python -m pytest mlx_port/tests/test_end_to_end_inference.py::test_end_to_end_inference_temperature_coc_and_traj -s --tb=short</pre>
                 <p class="text-xs text-slate-400">
-                    Temperature e2e still expects readable CoC and <code>pred_xyz=None</code> until <code>step_fn</code> is wired.
-                    After wiring, record minADE here — do not pin a fake XY.
+                    Temperature e2e now loads the expert. Record minADE on this page after the first real clip run — do not pin a fake XY.
                 </p>
             </div>
         </div>

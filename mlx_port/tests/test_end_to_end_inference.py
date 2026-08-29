@@ -208,15 +208,15 @@ def test_end_to_end_inference_prints_coc_vlm_only(max_gen_len):
 def test_end_to_end_inference_temperature_coc_and_traj(max_gen_len):
     """NVIDIA test_inference.py draw: T=0.6, top_p=0.98, seed 42, one sample.
 
-    CoC is sampled (not greedy). Stage 1b wires expert step_fn so this
-    test can print pred_xyz / minADE; until then pred_xyz stays None.
+    CoC is sampled (not greedy). Loads the action expert and runs step_fn
+    so pred_xyz / minADE can be printed when diffusion succeeds.
     """
     gt, data = _load_clip()
     print("[End-to-End Test] Loading AlpamayoR1MLX (this may take a while)...")
     with profile_section("model_load", enabled=is_profiling_enabled()):
         model = AlpamayoR1MLX.from_pretrained(
             CHECKPOINT,
-            load_expert=False,
+            load_expert=True,
             dtype=mx.bfloat16,
         )
     model_inputs = _prepare_inputs(model, data)

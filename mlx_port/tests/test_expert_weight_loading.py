@@ -18,7 +18,7 @@ def test_load_expert_weights_successfully():
     """Load the full AlpamayoR1MLX model with the real Qwen3-VL expert.
 
     This exercises:
-    - Correct expert architecture (qwen3_vl.Model with 36 layers)
+    - mlx_vlm Qwen3-VL expert (36 layers, mRoPE, explicit position_ids)
     - Proper key remapping from checkpoint (expert.* -> expert.language_model.model.*)
     - Safe bfloat16 loading via torch intermediate + astype
     - Action projection weight loading
