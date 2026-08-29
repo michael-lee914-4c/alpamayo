@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from mlx_port.scripts.run_local_traj_sample import (
+from mlx_port.traj_sample_plot_utils import (
     N_WAYPOINTS,
     _require_full_xy,
     _speed_mps,

@@ -37,6 +37,13 @@ from mlx_port.scripts.run_local_coc_sample import (
     _save_contact_sheet,
     _save_frames,
 )
+from mlx_port.traj_sample_plot_utils import (
+    DT_S,
+    _as_xy,
+    _require_full_xy,
+    _speed_mps,
+    _xy_for_redraw as _xy_from_cached_record,
+)
 
 # Same five clips as reports/coc_sample_5_t06 (seed 42, skip t0 < 1.6s).
 CLIP_IDS = [
@@ -48,8 +55,6 @@ CLIP_IDS = [
 ]
 REPORT_DIR = Path("/Users/michaellee/Projects/alpamayo/reports/traj_sample_5_t06")
 SEED = 42
-DT_S = 0.1
-N_WAYPOINTS = 64
 NVIDIA_TEMPERATURE = 0.6
 NVIDIA_TOP_P = 0.98
 
@@ -63,28 +68,6 @@ def _font(size: int) -> ImageFont.ImageFont:
         if Path(path).exists():
             return ImageFont.truetype(path, size)
     return ImageFont.load_default()
-
-
-def _as_xy(arr: np.ndarray) -> np.ndarray:
-    a = np.asarray(arr, dtype=np.float64)
-    if a.ndim == 4:
-        a = a[0, 0]
-    elif a.ndim == 3:
-        a = a[0]
-    return a[:, :2]
-
-
-def _speed_mps(xy: np.ndarray) -> np.ndarray:
-    xy = np.asarray(xy, dtype=np.float64)
-    prev = np.concatenate([np.zeros((1, 2), dtype=np.float64), xy[:-1]], axis=0)
-    return np.linalg.norm(xy - prev, axis=-1) / DT_S
-
-
-def _require_full_xy(xy: np.ndarray, name: str) -> np.ndarray:
-    xy = np.asarray(xy, dtype=np.float64)
-    if xy.ndim != 2 or xy.shape[0] != N_WAYPOINTS or xy.shape[1] < 2:
-        raise ValueError(f"{name} must be ({N_WAYPOINTS}, 2+), got {getattr(xy, 'shape', None)}")
-    return xy
 
 
 def _save_traj_plots(
@@ -304,27 +287,23 @@ def run_one_clip(model, processor, clip_id: str, clip_dir: Path, seed: int) -> d
 
 def _xy_for_redraw(rec: dict, clip_id: str) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:
     """Hist/GT/pred XY for a plot redraw. Pred is the saved 64-pt path only — no interpolation."""
-    pred_full = rec.get("pred_xy_full")
-    hist = rec.get("hist_xy_full")
-    gt = rec.get("gt_xy_full")
-    if hist is None or gt is None:
-        gt_meta = load_clip_gt(clip_id)
-        t0_us = int(gt_meta["events"][0]["event_start_timestamp"])
-        data = load_physical_aiavdataset(
-            clip_id,
-            t0_us=t0_us,
-            local_dir=str(LOCAL_DIR),
-            maybe_stream=True,
-            num_frames=DEFAULT_NUM_FRAMES,
-        )
-        hist_xy = _as_xy(data["ego_history_xyz"])
-        gt_xy = _as_xy(data["ego_future_xyz"])
-    else:
-        hist_xy, gt_xy = np.asarray(hist), np.asarray(gt)
-
-    if pred_full is None:
-        return hist_xy, gt_xy, None
-    return hist_xy, gt_xy, _require_full_xy(pred_full, "pred_xy_full")
+    if rec.get("hist_xy_full") is not None and rec.get("gt_xy_full") is not None:
+        return _xy_from_cached_record(rec, clip_id)
+    gt_meta = load_clip_gt(clip_id)
+    t0_us = int(gt_meta["events"][0]["event_start_timestamp"])
+    data = load_physical_aiavdataset(
+        clip_id,
+        t0_us=t0_us,
+        local_dir=str(LOCAL_DIR),
+        maybe_stream=True,
+        num_frames=DEFAULT_NUM_FRAMES,
+    )
+    filled = {
+        **rec,
+        "hist_xy_full": _as_xy(data["ego_history_xyz"]).tolist(),
+        "gt_xy_full": _as_xy(data["ego_future_xyz"]).tolist(),
+    }
+    return _xy_from_cached_record(filled, clip_id)
 
 
 def _html_report(results: list[dict], generated_at: str) -> str:
