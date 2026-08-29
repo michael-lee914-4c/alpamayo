@@ -3,10 +3,12 @@
 import time
 
 from mlx_port.stage_timers import (
+    G1_DOMINANT,
     StageClock,
     bind_clock,
     current_clock,
     is_stage_timers_enabled,
+    median_stage_times,
     print_stage_table,
     time_stage,
 )
@@ -82,3 +84,32 @@ def test_env_flag_defaults_off(monkeypatch):
     assert is_stage_timers_enabled() is False
     monkeypatch.setenv("ALPAMAYO_STAGE_TIMERS", "1")
     assert is_stage_timers_enabled() is True
+
+
+def test_median_stage_times_is_middle_trial_not_mean():
+    base = StageClock(
+        encode_ms=100.0,
+        prefill_ms=800.0,
+        decode_ms=250.0,
+        fm_ms=400.0,
+        convert_ms=20.0,
+        decode_tok=12,
+        fm_steps=10,
+    ).as_dict()
+    low = dict(base, encode_ms=90.0, prefill_ms=500.0, total_ms=1260.0)
+    high = dict(base, encode_ms=300.0, prefill_ms=9000.0, total_ms=9970.0)
+    mid = median_stage_times([low, base, high])
+    assert mid["encode_ms"] == 100.0
+    assert mid["prefill_ms"] == 800.0
+    assert mid["ms_per_tok"] == 20.83
+    assert mid["dominant_stage"] == "prefill"
+    assert mid["dominant_stage"] in G1_DOMINANT
+
+
+def test_median_stage_times_rejects_empty():
+    try:
+        median_stage_times([])
+    except ValueError as exc:
+        assert "at least one" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for an empty trial list")

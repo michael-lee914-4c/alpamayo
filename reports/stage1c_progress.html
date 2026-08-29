@@ -39,7 +39,7 @@
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Stage Status</div>
                     <div class="text-3xl font-semibold text-sky-400">In Progress</div>
-                    <div class="text-xs text-slate-500 mt-1">P0 inventory · P1a timers · G1 not green</div>
+                    <div class="text-xs text-slate-500 mt-1">P1b warm median on this PR · prefill dominant · G1 numbers filled</div>
                 </div>
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Key Focus</div>
@@ -56,6 +56,302 @@
             </div>
         </div>
 
+        <div class="bg-amber-950/40 border border-amber-700 rounded-3xl p-6 mb-8 text-sm text-slate-200 space-y-2">
+            <div class="font-semibold text-amber-400">Verification gap (protocol)</div>
+            <p>
+                PR <a class="text-cyan-400 hover:underline" href="https://github.com/michael-lee914-4c/alpamayo/pull/7">#7</a>
+                (P1a timers) was merged to <code>main</code> before a
+                <code>.venv</code> pass/fail table was written here. That violates
+                the stage-progress rule: tests must use
+                <code>/Users/michaellee/Projects/alpamayo/.venv</code> and be
+                documented before treating the change as verified.
+            </p>
+            <p>
+                Unit tests were recorded 2026-08-29. Greedy e2e with
+                <code>ALPAMAYO_STAGE_TIMERS=1</code> was run the same day (table
+                below). That is <strong>one cold trial</strong>, not the P1b
+                3-warm median. Do not merge the next Stage 1c PR until this
+                report is checked.
+            </p>
+        </div>
+
+        <div class="mb-8">
+            <div class="section-header">
+                <i class="fa-solid fa-lightbulb text-amber-400"></i>
+                <div class="font-semibold text-xl">Design &amp; Decisions</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 text-sm space-y-4 text-slate-300">
+                <div>
+                    <div class="font-semibold text-slate-200 mb-1">Key design choices</div>
+                    <ul class="list-disc pl-5 space-y-1 text-xs">
+                        <li>Stage 1c is incremental PRs into <code>main</code> (not <code>optimize-inference-time</code>; that landed in #5).</li>
+                        <li>P0 is inventory only. P1a is wall-clock only. No Euler/decode/quant change until G1 is green.</li>
+                        <li>Timers are opt-in (<code>ALPAMAYO_STAGE_TIMERS=1</code>) so the default e2e path stays unchanged.</li>
+                        <li>Encode is timed inside <code>get_input_embeddings</code>. Prefill is first-forward minus encode after the existing logits <code>mx.eval</code>.</li>
+                        <li>When timing is on, vision outputs get one extra <code>mx.eval</code> so encode is not lazy-attributed to prefill. Token graph is the same.</li>
+                        <li>T1.1 warm protocol lives in <code>test_stage_timer_window.py</code>: load once, discard window 1, median of 3. Cold one-shot numbers stay in this report.</li>
+                    </ul>
+                </div>
+                <div>
+                    <div class="font-semibold text-slate-200 mb-1">Why</div>
+                    <p class="text-xs">
+                        The speedup plan forbids Phase 3 quant until G1 fields exist.
+                        A clock that dumps encode into prefill would pick the wrong first cut.
+                    </p>
+                </div>
+                <div>
+                    <div class="font-semibold text-slate-200 mb-1">Rejected</div>
+                    <ul class="list-disc pl-5 space-y-1 text-xs">
+                        <li>Always-on timers / extra eval on the default path — would change sync vs 1b e2e.</li>
+                        <li>4-bit expert or vision first — plan forbids it before G1.</li>
+                        <li>Merging P1a without a documented <code>.venv</code> table — already happened; do not repeat.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-8">
+            <div class="section-header">
+                <i class="fa-solid fa-code text-cyan-400"></i>
+                <div class="font-semibold text-xl">Code Changes</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 text-sm text-slate-300 space-y-3">
+                <div class="text-[11px] uppercase tracking-wider text-slate-500">P0 #6 (docs)</div>
+                <ul class="text-xs space-y-1 font-mono">
+                    <li>mlx_port/PORT.md</li>
+                    <li>mlx_port/alpamayo_mlx_port_plan.html · mlx_port/alpamayo1-mlx-speedup-plan.html</li>
+                    <li>reports/stage1c_progress.html</li>
+                </ul>
+                <div class="text-[11px] uppercase tracking-wider text-slate-500">P1a #7 (timers)</div>
+                <ul class="text-xs space-y-1 font-mono">
+                    <li>mlx_port/stage_timers.py — StageClock, bind_clock, G1 as_dict</li>
+                    <li>mlx_port/inference.py — wrap rollout; time prefill/decode/FM/convert</li>
+                    <li>mlx_port/models/alpamayo_qwen3vl.py — time vision encode + eval when clock bound</li>
+                    <li>mlx_port/tests/test_stage_timers.py — clock math, env flag</li>
+                </ul>
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 font-mono text-xs text-cyan-300 overflow-auto">
+                    ALPAMAYO_STAGE_TIMERS=1 → extra["stage_times"] + [STAGE] line<br>
+                    Off by default. Extra mx.eval(hidden_states) only when current_clock() is set.
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-8">
+            <div class="section-header">
+                <i class="fa-solid fa-vial text-emerald-400"></i>
+                <div class="font-semibold text-xl">Test Results</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 text-sm space-y-4">
+                <pre class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-xs text-cyan-300 overflow-auto">PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
+  /Users/michaellee/Projects/alpamayo/.venv/bin/python -m pytest \
+  mlx_port/tests -m "not slow" -v --tb=short
+# 2026-08-29 13:30 local · Python 3.12.13 · pytest 9.0.3 · 1.88 s
+# 74 passed, 1 skipped
+
+PYTHONPATH=src:. ALPAMAYO_STAGE_TIMERS=1 PROFILE=1 \
+  /Users/michaellee/Projects/alpamayo/.venv/bin/python -m pytest \
+  mlx_port/tests/test_end_to_end_inference.py::test_end_to_end_inference_prints_coc_vlm_only \
+  -s --tb=short
+# 2026-08-29 13:33 local · 1 passed in 113.32 s
+# [STAGE] encode=21055.2 prefill=58440.7 decode=796.1 fm=2294.8 dominant=prefill
+
+# median helper (no Metal):
+PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
+  /Users/michaellee/Projects/alpamayo/.venv/bin/python -m pytest \
+  mlx_port/tests/test_stage_timers.py -q --tb=short
+# 2026-08-29 · 7 passed
+
+PYTHONPATH=src:. ALPAMAYO_STAGE_TIMERS=1 \
+  /Users/michaellee/Projects/alpamayo/.venv/bin/python -m pytest \
+  mlx_port/tests/test_stage_timer_window.py::test_greedy_window_warmup_then_three_warm_trials \
+  -s --tb=short
+# load once · discard 1 window · record 3 · print [MEDIAN]</pre>
+                <p class="text-xs text-slate-400">
+                    Interpreter: <code>/Users/michaellee/Projects/alpamayo/.venv/bin/python</code>.
+                    Same filter as CI <code>macos-26 (no weights)</code>.
+                    User has not signed off on this table yet.
+                </p>
+                <div class="overflow-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
+                            <tr>
+                                <th class="px-2 py-2">Test</th>
+                                <th class="px-2 py-2">Result</th>
+                                <th class="px-2 py-2">Important output</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-slate-300">
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">test_stage_timers.py::test_as_dict_fills_g1_fields_and_names_dominant</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">G1 keys present. ms_per_tok=5.0, ms_per_fm_step=40.0, dominant=prefill, compiled all false, dtype=bfloat16</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">test_stage_timers.py::test_zero_clock_does_not_divide_by_zero</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">ms_per_tok=0, ms_per_fm_step=0, dominant=python-overhead</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">test_stage_timers.py::test_time_stage_is_noop_without_bound_clock</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">current_clock() stays None</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">test_stage_timers.py::test_time_stage_records_when_bound</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">10 ms sleep → decode_ms≥8, decode_tok=2, clock unbound after</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">test_stage_timers.py::test_env_flag_defaults_off</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">ALPAMAYO_STAGE_TIMERS unset → False; =1 → True</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">test_stage_timers.py::test_median_stage_times_is_middle_trial_not_mean</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">median encode=100 / prefill=800, not the mean of 90/300 and 500/9000</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">test_stage_timers.py::test_median_stage_times_rejects_empty</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">ValueError if no trials</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2">Remaining <code>not slow</code> suite (69 tests in action_in_proj, expert, unicycle, tokenizer, gt_eval, rope, nucleus, traj plots, …)</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">All collected items PASSED. No assertion failures.</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">test_traj_to_action_numerical.py::test_without_v0_matches_nvidia_torch</td>
+                                <td class="px-2 py-2 text-amber-400">SKIP</td>
+                                <td class="px-2 py-2">NVIDIA <code>alpamayo_r1.action_space.utils</code> not importable in this venv</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">test_end_to_end_inference.py::test_end_to_end_inference_prints_coc_vlm_only[256]</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">Greedy T=0, expert on, clip 0abe118e-…. CoC pinned. pytest 113.32 s. Cold G1 table kept below. T=0.6 e2e not rerun.</td>
+                            </tr>
+                            <tr>
+                                <td class="px-2 py-2 font-mono">test_stage_timer_window.py::test_greedy_window_warmup_then_three_warm_trials[256]</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">2026-08-29 · 359.63 s · median total 82032.7 ms · dominant=prefill. Cold table unchanged.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div>
+                    <div class="font-semibold text-slate-300 mb-2">G1 stage times — greedy e2e, 1 cold trial (2026-08-29)</div>
+                    <p class="text-xs text-slate-500 mb-2">
+                        <code>ALPAMAYO_STAGE_TIMERS=1 PROFILE=1</code> ·
+                        <code>.venv/bin/python</code> · default clip · T=0 · FM unseeded ·
+                        extra encode <code>mx.eval</code> on (timers on).
+                        MemoryMonitor prints during prefill; that can add a little host time to <code>prefill_ms</code>.
+                    </p>
+                    <div class="overflow-auto mb-3">
+                        <table class="w-full text-left text-xs">
+                            <thead class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
+                                <tr>
+                                    <th class="px-2 py-2">Field</th>
+                                    <th class="px-2 py-2">Value</th>
+                                    <th class="px-2 py-2">Share of stage total</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-300">
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">encode_ms</td><td class="px-2 py-2">21055.2</td><td class="px-2 py-2">25.5%</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">prefill_ms</td><td class="px-2 py-2 font-semibold text-amber-300">58440.7</td><td class="px-2 py-2">70.8% · dominant</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">decode_ms</td><td class="px-2 py-2">796.1</td><td class="px-2 py-2">1.0% · 12 tok · 66.34 ms/tok</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">fm_ms</td><td class="px-2 py-2">2294.8</td><td class="px-2 py-2">2.8% · 10 steps · 229.48 ms/step</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">convert_ms</td><td class="px-2 py-2">0.1</td><td class="px-2 py-2">~0%</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">stage total_ms</td><td class="px-2 py-2">82586.8</td><td class="px-2 py-2">encode+prefill+decode+fm+convert</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">model_load</td><td class="px-2 py-2">12986.0 ms</td><td class="px-2 py-2">outside window · mem 0 → 44.32 GB</td></tr>
+                                <tr><td class="px-2 py-2 font-mono">pytest wall</td><td class="px-2 py-2">113.32 s</td><td class="px-2 py-2">load + data + window + cleanup</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-xs text-slate-400">
+                        Dominant stage: <strong class="text-amber-300">prefill</strong>.
+                        Encode is next. Decode and FM are under 5% on this 12-token greedy CoC.
+                        Keep these cold numbers. Warm median is a separate table below — do not overwrite this one.
+                    </p>
+                </div>
+                <div>
+                    <div class="font-semibold text-slate-300 mb-2">G1 stage times — 1 warmup + 3 warm trials, median (T1.1)</div>
+                    <p class="text-xs text-slate-500 mb-2">
+                        Same clip and greedy knobs. Model stays loaded. First window after load is discarded.
+                        <code>PROFILE</code> off. 2026-08-29 · pytest 359.63 s ·
+                        <code>test_stage_timer_window.py</code> PASS.
+                    </p>
+                    <div class="overflow-auto mb-3">
+                        <table class="w-full text-left text-xs">
+                            <thead class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
+                                <tr>
+                                    <th class="px-2 py-2">Field</th>
+                                    <th class="px-2 py-2">Warmup (discarded)</th>
+                                    <th class="px-2 py-2">T1</th>
+                                    <th class="px-2 py-2">T2</th>
+                                    <th class="px-2 py-2">T3</th>
+                                    <th class="px-2 py-2">Median</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-300">
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">encode_ms</td><td class="px-2 py-2">21075.5</td><td class="px-2 py-2">21016.8</td><td class="px-2 py-2">21031.1</td><td class="px-2 py-2">21063.4</td><td class="px-2 py-2">21031.1</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">prefill_ms</td><td class="px-2 py-2">58404.7</td><td class="px-2 py-2">58141.6</td><td class="px-2 py-2">58209.6</td><td class="px-2 py-2">58179.7</td><td class="px-2 py-2 font-semibold text-amber-300">58179.7</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">decode_ms</td><td class="px-2 py-2">786.4</td><td class="px-2 py-2">789.3</td><td class="px-2 py-2">794.7</td><td class="px-2 py-2">797.0</td><td class="px-2 py-2">794.7 · 12 tok · 66.23 ms/tok</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">fm_ms</td><td class="px-2 py-2">2284.2</td><td class="px-2 py-2">2029.8</td><td class="px-2 py-2">2027.2</td><td class="px-2 py-2">2024.6</td><td class="px-2 py-2">2027.2 · 10 steps · 202.72 ms/step</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">convert_ms</td><td class="px-2 py-2">0.1</td><td class="px-2 py-2">0.0</td><td class="px-2 py-2">0.0</td><td class="px-2 py-2">0.0</td><td class="px-2 py-2">0.0</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">total_ms</td><td class="px-2 py-2">82550.8</td><td class="px-2 py-2">81977.5</td><td class="px-2 py-2">82062.7</td><td class="px-2 py-2">82064.6</td><td class="px-2 py-2">82032.7</td></tr>
+                                <tr><td class="px-2 py-2 font-mono">dominant</td><td class="px-2 py-2">prefill</td><td class="px-2 py-2">prefill</td><td class="px-2 py-2">prefill</td><td class="px-2 py-2">prefill</td><td class="px-2 py-2 font-semibold text-amber-300">prefill (70.9%)</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-xs text-slate-400">
+                        Warm median is 0.55 s faster than the cold window (82.6 s → 82.0 s).
+                        Prefill is still ~71%. Encode 25.6%. Decode+FM stay under 5%.
+                        Warmup after load was not a large first-run spike (82.6 s, same as cold).
+                        dtype=bfloat16 · compiled=no on all stages · num_traj_samples=1 · max_generation_length=256.
+                    </p>
+                </div>
+                <div>
+                    <div class="font-semibold text-slate-300 mb-1">Critical Alpamayo outputs</div>
+                    <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-xs text-slate-300 space-y-1">
+                        <div>CoC: <code>Stop for the stop sign at the intersection.</code> (pinned prefix held; readable=True; jaccard=0.077 vs GT yield-to-pedestrian)</div>
+                        <div>GT CoC: Strong deceleration to yield to the pedestrian crossing the crosswalk.</div>
+                        <div><code>pred_xyz</code> <code>(1,1,1,64,3)</code> · pred end (42.94, 0.69) · GT end (18.79, 0.06)</div>
+                        <div>minADE <strong>9.918 m</strong> · t0_v=7.953 m/s · accel mean −0.96 · first step ~0.80 m / 0.1 s</div>
+                        <div class="text-slate-500">1b greedy minADE was 3.89 m (end 24.3 m). This run is a different unseeded FM draw, not a timer-regression claim. CoC matched the pin.</div>
+                    </div>
+                </div>
+                <div>
+                    <div class="font-semibold text-slate-300 mb-1">Failure cases</div>
+                    <p class="text-xs text-slate-500">No test failure. Process: #7 merged before a <code>.venv</code> table. Quality leftover unchanged: CoC says stop-sign, GT is yield-to-pedestrian; XY overshoots.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-8">
+            <div class="section-header">
+                <i class="fa-solid fa-microchip text-amber-400"></i>
+                <div class="font-semibold text-xl">Compute Footprint</div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6">
+                    <div class="text-xs text-slate-500">Peak memory (greedy e2e)</div>
+                    <div class="text-2xl font-semibold text-white mt-2">66.94 <span class="text-lg text-slate-400">GiB</span></div>
+                    <div class="text-xs text-slate-500 mt-1">RSS 66.94 · Metal 52.59 · load ended 44.32 GiB</div>
+                </div>
+                <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6">
+                    <div class="text-xs text-slate-500">Cold window / warm median</div>
+                    <div class="text-2xl font-semibold text-white mt-2">82.6 / 82.0 s</div>
+                    <div class="text-xs text-slate-500 mt-1">Cold pytest 113 s · warm suite 360 s (4 windows)</div>
+                </div>
+                <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6">
+                    <div class="text-xs text-slate-500">G1 dominant (cold and warm)</div>
+                    <div class="text-2xl font-semibold text-amber-400 mt-2">prefill</div>
+                    <div class="text-xs text-slate-500 mt-1">Warm median 58.2 s · 70.9%. Encode 21.0 s. Decode+FM &lt;5%.</div>
+                </div>
+            </div>
+        </div>
+
         <div class="mb-8">
             <div class="section-header">
                 <i class="fa-solid fa-code-branch text-sky-400"></i>
@@ -63,7 +359,8 @@
             </div>
             <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 text-sm text-slate-300 space-y-3">
                 <p>
-                    One task per branch, merge into <code>main</code> before the next starts
+                    One task per branch. Open a PR into <code>main</code>, document
+                    <code>.venv</code> tests here, then wait for user verification before merge
                     (<code>optimize-inference-time</code> landed in PR #5).
                     Do not 4-bit the expert first. Do not start Phase 3 until G1 is green.
                 </p>
@@ -88,13 +385,13 @@
                                 <td class="px-2 py-2 font-mono text-sky-300">P1a</td>
                                 <td class="px-2 py-2 font-mono">stage1c-p1-stage-timers</td>
                                 <td class="px-2 py-2">Wall-clock around encode / prefill / decode / FM (no behavior change).</td>
-                                <td class="px-2 py-2 text-sky-400">this PR</td>
+                                <td class="px-2 py-2 text-emerald-400">merged (#7)</td>
                             </tr>
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono text-sky-300">P1b</td>
                                 <td class="px-2 py-2 font-mono">stage1c-p1-baseline-table</td>
                                 <td class="px-2 py-2">3 warm trials on the default clip; fill G1; name the dominant stage.</td>
-                                <td class="px-2 py-2 text-slate-500">after P1a</td>
+                                <td class="px-2 py-2 text-sky-400">this PR</td>
                             </tr>
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono text-sky-300">P2a</td>
@@ -186,9 +483,11 @@
                 <span>Next</span>
             </div>
             <p class="text-sm text-slate-300">
-                Merge P1a timers into <code>main</code>, then open
-                <code>stage1c-p1-baseline-table</code>: 3 warm trials on the default clip.
-                Do not change Euler or decode yet.
+                Wait for user verification. Do not merge another PR until then.
+                G1 fields are filled (warm median). Dominant is prefill on both
+                cold and warm. Do not spend a week on decode or FM. Do not start
+                Phase 3 quant until you sign off. First cut after sign-off is
+                prefill work, not Euler eval.
             </p>
             <div class="mt-4 text-xs font-mono text-indigo-400">
                 reports/stage1c_progress.html · started 2026-08-29 ·
