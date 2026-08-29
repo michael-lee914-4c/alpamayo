@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stage 1c Progress • Alpamayo MLX Port</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&amp;family=Space+Grotesk:wght@500;600&amp;display=swap');
+        body { font-family: 'Inter', system-ui, sans-serif; }
+        .font-display { font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif; font-weight: 600; }
+        .section-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200">
+    <div class="max-w-5xl mx-auto px-6 py-10">
+        <div class="flex items-center justify-between mb-8">
+            <div class="flex items-center gap-x-4">
+                <div class="w-12 h-12 bg-sky-600 rounded-2xl flex items-center justify-center">
+                    <i class="fa-solid fa-gauge-high text-white text-3xl"></i>
+                </div>
+                <div>
+                    <div class="font-display text-4xl font-semibold tracking-tight">Stage <span class="stage-number">1c</span></div>
+                    <div class="text-sky-400 text-sm font-medium">Runtime / train-step speed · incremental branches</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-x-3">
+                <div class="px-4 py-1.5 bg-sky-900/40 border border-sky-700 rounded-3xl text-sky-400 text-sm flex items-center gap-x-2">
+                    <i class="fa-solid fa-clock"></i>
+                    <span class="font-semibold">IN PROGRESS</span>
+                </div>
+                <div class="text-xs text-slate-500">Aug 29, 2026 • M4 Pro Max 128 GiB</div>
+            </div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl p-8 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div>
+                    <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Stage Status</div>
+                    <div class="text-3xl font-semibold text-sky-400">In Progress</div>
+                    <div class="text-xs text-slate-500 mt-1">P0 inventory landed · G1 not green</div>
+                </div>
+                <div>
+                    <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Key Focus</div>
+                    <div class="font-semibold text-xl text-cyan-400">Diagnose, then cut work</div>
+                </div>
+                <div>
+                    <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Gate</div>
+                    <div class="font-semibold text-xl text-amber-400">G1 timers before quant</div>
+                </div>
+                <div>
+                    <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Plan</div>
+                    <a class="text-cyan-400 hover:underline text-sm" href="../mlx_port/alpamayo1-mlx-speedup-plan.html">alpamayo1-mlx-speedup-plan.html</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-8">
+            <div class="section-header">
+                <i class="fa-solid fa-code-branch text-sky-400"></i>
+                <div class="font-semibold text-xl">Incremental branches</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 text-sm text-slate-300 space-y-3">
+                <p>
+                    One task per branch, merge into <code>optimize-inference-time</code> before the next starts.
+                    Do not 4-bit the expert first. Do not start Phase 3 until G1 is green.
+                </p>
+                <div class="overflow-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
+                            <tr>
+                                <th class="px-2 py-2">Step</th>
+                                <th class="px-2 py-2">Branch</th>
+                                <th class="px-2 py-2">Scope</th>
+                                <th class="px-2 py-2">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono text-sky-300">P0</td>
+                                <td class="px-2 py-2 font-mono">stage1c-p0-inventory</td>
+                                <td class="px-2 py-2">T0.1 + T0.2: module map, dtype, <code>mx.eval</code> counts. No runtime change.</td>
+                                <td class="px-2 py-2 text-emerald-400">this PR</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono text-sky-300">P1a</td>
+                                <td class="px-2 py-2 font-mono">stage1c-p1-stage-timers</td>
+                                <td class="px-2 py-2">Wall-clock around encode / prefill / decode / FM (no behavior change).</td>
+                                <td class="px-2 py-2 text-slate-500">next</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono text-sky-300">P1b</td>
+                                <td class="px-2 py-2 font-mono">stage1c-p1-baseline-table</td>
+                                <td class="px-2 py-2">3 warm trials on the default clip; fill G1; name the dominant stage.</td>
+                                <td class="px-2 py-2 text-slate-500">after P1a</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono text-sky-300">P2a</td>
+                                <td class="px-2 py-2 font-mono">stage1c-p2-kill-per-step-eval</td>
+                                <td class="px-2 py-2">Drop <code>mx.eval</code> inside the Euler loop; keep one barrier after FM. Re-time.</td>
+                                <td class="px-2 py-2 text-slate-500">after G1</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono text-sky-300">P2b</td>
+                                <td class="px-2 py-2 font-mono">stage1c-p2-decode-host-sync</td>
+                                <td class="px-2 py-2">Cut per-token <code>mx.eval</code> / NumPy sample if G1 says decode is material.</td>
+                                <td class="px-2 py-2 text-slate-500">after G1</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono text-sky-300">P2c</td>
+                                <td class="px-2 py-2 font-mono">stage1c-p2-compile-fm</td>
+                                <td class="px-2 py-2"><code>mx.compile</code> the fixed-shape FM step. Re-time.</td>
+                                <td class="px-2 py-2 text-slate-500">after P2a</td>
+                            </tr>
+                            <tr>
+                                <td class="px-2 py-2 font-mono text-sky-300">P2d</td>
+                                <td class="px-2 py-2 font-mono">stage1c-p2-train-knobs</td>
+                                <td class="px-2 py-2">Train-config YAML: 1 traj, FM 4–6, CoT cap 32–64 or 0. Not 4-bit.</td>
+                                <td class="px-2 py-2 text-slate-500">after G1</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-xs text-slate-500">
+                    Phase 3 (mixed PTQ) and T4.3 (train graph that does not generate) stay later.
+                    Leftover 1b yield/stop quality is for MLX SFT after Bar B — not a NVIDIA T-match.
+                </p>
+            </div>
+        </div>
+
+        <div class="mb-8">
+            <div class="section-header">
+                <i class="fa-solid fa-clipboard-list text-emerald-400"></i>
+                <div class="font-semibold text-xl">P0 inventory (from code)</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 text-sm space-y-4 text-slate-300">
+                <p>
+                    Full map: <a class="text-cyan-400 hover:underline" href="../mlx_port/PORT.md"><code>mlx_port/PORT.md</code></a>.
+                </p>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <div class="text-[11px] uppercase tracking-wider text-emerald-400 mb-2">Modules</div>
+                        <ul class="space-y-1 text-xs">
+                            <li>• Encode: mlx_vlm Qwen3-VL + <code>AlpamayoPatchEmbed</code>, 16×<code>[1,H,W]</code></li>
+                            <li>• Backbone: <code>AlpamayoLanguageModel</code>, 36L, hidden 4096, GQA 8</li>
+                            <li>• Expert: <code>AlpamayoExpert</code>, 36L, 2048 / 16 Q, same VLM KV</li>
+                            <li>• FM: Euler 10, <code>n_waypoints=64</code>, then <code>action_to_traj</code></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <div class="text-[11px] uppercase tracking-wider text-amber-400 mb-2">Already visible without a timer</div>
+                        <ul class="space-y-1 text-xs">
+                            <li>• <strong>No <code>mx.compile</code></strong> on any stage</li>
+                            <li>• <code>mx.eval</code> after <em>every</em> decode token and every Euler step</li>
+                            <li>• Nucleus sample is NumPy / float32 on host</li>
+                            <li>• <code>action_in_proj</code> casts to float32 (10× per window)</li>
+                            <li>• Prefill ~32k tokens on the default clip</li>
+                        </ul>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-500">
+                    Knobs today: <code>num_traj_samples=1</code>, <code>max_generation_length=256</code>, FM=10.
+                    Training must not keep 256 CoT tokens or a 10-step Euler loop inside the optimizer step.
+                </p>
+            </div>
+        </div>
+
+        <div class="mb-8">
+            <div class="section-header">
+                <i class="fa-solid fa-ban text-rose-400"></i>
+                <div class="font-semibold text-xl">Do not</div>
+            </div>
+            <div class="bg-slate-900 border border-rose-800/50 rounded-3xl p-6 text-xs text-slate-400 space-y-1">
+                <div>• Quantize the whole model to uniform 4-bit as the first change. Do not 4-bit the expert or vision first.</div>
+                <div>• Start QLoRA before G1 timers exist. Do not backprop through packed <code>QuantizedLinear.weight</code>.</div>
+                <div>• Set <code>num_traj_samples&gt;1</code> or <code>max_generation_length=256</code> inside a training loop.</div>
+                <div>• Claim FlashDrive on Mac. Chase token-level NVIDIA numerical match.</div>
+            </div>
+        </div>
+
+        <div class="bg-indigo-950/50 border border-indigo-800 rounded-3xl p-8">
+            <div class="font-semibold text-indigo-400 mb-3 flex items-center gap-x-2">
+                <i class="fa-solid fa-arrow-right"></i>
+                <span>Next</span>
+            </div>
+            <p class="text-sm text-slate-300">
+                Merge this inventory, then open <code>stage1c-p1-stage-timers</code>:
+                instrument wall-clock only. Do not change Euler or decode yet.
+            </p>
+            <div class="mt-4 text-xs font-mono text-indigo-400">
+                reports/stage1c_progress.html · started 2026-08-29 ·
+                <a class="text-cyan-400 hover:underline" href="stage1b_progress.html">stage 1b (closed)</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
