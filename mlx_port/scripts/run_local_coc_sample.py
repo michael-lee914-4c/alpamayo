@@ -158,7 +158,8 @@ def _save_ego_plot(clip_dir: Path, xyz: np.ndarray, future_xyz: np.ndarray | Non
     draw = ImageDraw.Draw(img)
 
     def to_px(x: float, y: float) -> tuple[int, int]:
-        px = margin + (y - ymin) / span * (w - 2 * margin)
+        # Vehicle frame: x forward, y left. Screen: +x up, +y to the left.
+        px = margin + (ymax - y) / span * (w - 2 * margin)
         py = h - margin - (x - xmin) / span * (h - 2 * margin)
         return int(px), int(py)
 
@@ -181,7 +182,9 @@ def _save_ego_plot(clip_dir: Path, xyz: np.ndarray, future_xyz: np.ndarray | Non
     draw.ellipse([o[0] - 5, o[1] - 5, o[0] + 5, o[1] + 5], fill=(245, 158, 11))
     t0 = to_px(0.0, 0.0)
     draw.ellipse([t0[0] - 6, t0[1] - 6, t0[0] + 6, t0[1] + 6], fill=(244, 63, 94))
-    draw.text((12, 10), "Ego-frame XY  (x forward, y left)", fill=(226, 232, 240))
+    draw.text((12, 10), "Ego-frame XY  (x+ forward ↑, y+ left ←)", fill=(226, 232, 240))
+    draw.text((12, h // 2 - 8), "← y+", fill=(148, 163, 184))
+    draw.text((w // 2 - 12, 10), "x+ ↑", fill=(148, 163, 184))
     draw.text((12, h - 36), "cyan=history  amber=oldest  red=t0  gray=GT future", fill=(148, 163, 184))
     name = "ego_history.png"
     img.save(clip_dir / name)
@@ -435,7 +438,7 @@ def _html_report(
               {image_html}
               <div class="grid md:grid-cols-[minmax(0,1fr)_280px] gap-4 mt-4">
                 <div>
-                  <div class="text-sm font-semibold text-slate-300 mb-2">Ego-motion history (16 steps @ 10 Hz, ego frame at t0)</div>
+                  <div class="text-sm font-semibold text-slate-300 mb-2">Ego-motion history (16 steps @ 10 Hz, x+ forward ↑, y+ left ←)</div>
                   <img src="{html.escape(r['ego_plot'])}" alt="ego history" class="rounded-xl border border-slate-700 bg-slate-950 max-w-md">
                 </div>
                 <div class="overflow-auto max-h-80">
@@ -520,6 +523,11 @@ def main() -> None:
         action="store_true",
         help="Ignore cached clip result.json and rerun inference.",
     )
+    parser.add_argument(
+        "--redraw-plots",
+        action="store_true",
+        help="Reuse cached CoC JSON and only rewrite ego_history.png.",
+    )
     args = parser.parse_args()
 
     n_local = len(list_local_coc_clips())
@@ -543,6 +551,21 @@ def main() -> None:
         rec = None if args.no_reuse else (json.loads(cached.read_text()) if cached.exists() else None)
         if rec is not None and rec.get("top5_coc"):
             print(f"[coc-sample] reuse {cached}")
+            if args.redraw_plots:
+                gt = load_clip_gt(str(cid))
+                t0_us = int(gt["events"][0]["event_start_timestamp"])
+                data = load_physical_aiavdataset(
+                    str(cid),
+                    t0_us=t0_us,
+                    local_dir=str(LOCAL_DIR),
+                    maybe_stream=True,
+                    num_frames=DEFAULT_NUM_FRAMES,
+                )
+                xyz = np.asarray(data["ego_history_xyz"][0, 0])
+                fut = np.asarray(data["ego_future_xyz"][0, 0])
+                rec["ego_plot"] = _save_ego_plot(clip_dir, xyz, fut)
+                cached.write_text(json.dumps(rec, indent=2) + "\n")
+                print(f"[coc-sample] redrew ego plot {clip_dir}")
         else:
             if model is None:
                 print("[coc-sample] loading AlpamayoR1MLX…")

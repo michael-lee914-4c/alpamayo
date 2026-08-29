@@ -18,7 +18,10 @@
       Same 5 clips as <a class="text-cyan-400 hover:underline" href="../coc_sample_5_t06/index.html">coc_sample_5_t06</a>
       (seed 42, skip t0 &lt; 1.6 s). NVIDIA sampling: T=0.6, top_p=0.98,
       1 independent CoC + 1 expert trajectory per clip. Jaccard is cheap word overlap — read the sentences.
-      Generated 2026-08-29 03:35 UTC. Mean minADE: 7.84 m.
+      After <code>dxy_theta_to_v_without_v0</code> t0. Plots use the generated 64-waypoint pred
+      (<code>pred_xy_full</code>), vehicle frame x+ forward ↑ / y+ left ←.
+      Stage 1b is <a class="text-cyan-400 hover:underline" href="../stage1b_progress.html">closed</a>
+      (wiring); yield/stop quality is leftover there. Generated 2026-08-29 16:38 UTC. Mean minADE: 7.85 m.
     </p>
     <div class="overflow-auto bg-slate-900 border border-slate-700 rounded-2xl mb-10">
       <table class="w-full text-left text-sm">
@@ -26,6 +29,7 @@
           <tr>
             <th class="px-3 py-2">#</th><th class="px-3 py-2">Clip</th><th class="px-3 py-2">Cluster</th>
             <th class="px-3 py-2">minADE</th><th class="px-3 py-2">XY end</th>
+            <th class="px-3 py-2">Speed start→end</th><th class="px-3 py-2">Accel mean</th>
             <th class="px-3 py-2">GT CoC</th><th class="px-3 py-2">Pred CoC</th>
           </tr>
         </thead>
@@ -35,18 +39,26 @@
               <td class="px-3 py-2 text-xs">WORK_ZONES_TEMP_TRAFFIC_CONTROL</td>
               <td class="px-3 py-2 text-xs tabular-nums text-amber-300">9.19</td>
               <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
-                GT [68.1481, 31.8174] · pred [68.1305, 9.7953]
+                GT [68.1481, 31.8174] · pred [68.1384, 9.798]
               </td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
+                GT 7.258→15.641 · pred 7.2→14.331
+              </td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">1.60</td>
               <td class="px-3 py-2 text-xs text-slate-300">Turn left while keeping a safe distance from the construction cones on the right.</td>
               <td class="px-3 py-2 text-xs text-amber-200">Slow down due to a road worker directing traffic.</td>
             </tr><tr>
               <td class="px-3 py-2 text-slate-400">1</td>
               <td class="px-3 py-2 font-mono text-[11px]"><a class="text-cyan-400 hover:underline" href="#clip-1">8e83f069…</a></td>
               <td class="px-3 py-2 text-xs">PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY</td>
-              <td class="px-3 py-2 text-xs tabular-nums text-amber-300">6.04</td>
+              <td class="px-3 py-2 text-xs tabular-nums text-amber-300">6.05</td>
               <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
-                GT [28.212, -0.4333] · pred [43.2211, -3.7466]
+                GT [28.212, -0.4333] · pred [43.2332, -3.7486]
               </td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
+                GT 7.483→2.184 · pred 7.519→6.957
+              </td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">-0.15</td>
               <td class="px-3 py-2 text-xs text-slate-300">Decelerate to maintain a safe distance from the pedestrians crossing the street.</td>
               <td class="px-3 py-2 text-xs text-amber-200">Stop to yield to the pedestrian in the crosswalk ahead.</td>
             </tr><tr>
@@ -55,8 +67,12 @@
               <td class="px-3 py-2 text-xs">PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY</td>
               <td class="px-3 py-2 text-xs tabular-nums text-amber-300">6.46</td>
               <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
-                GT [9.1462, 0.0052] · pred [24.8355, -1.0954]
+                GT [9.1462, 0.0052] · pred [24.8419, -1.096]
               </td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
+                GT 3.984→0.16 · pred 4.057→3.918
+              </td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">-0.07</td>
               <td class="px-3 py-2 text-xs text-slate-300">Yield to the pedestrian crossing the road.</td>
               <td class="px-3 py-2 text-xs text-amber-200">Stop to yield to the cross-traffic vehicle ahead.</td>
             </tr><tr>
@@ -65,18 +81,26 @@
               <td class="px-3 py-2 text-xs">PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY</td>
               <td class="px-3 py-2 text-xs tabular-nums text-amber-300">7.95</td>
               <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
-                GT [13.7136, -0.1715] · pred [28.083, -1.0578]
+                GT [13.7136, -0.1715] · pred [28.0939, -1.0583]
               </td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
+                GT 7.243→0.722 · pred 7.335→1.982
+              </td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">-1.28</td>
               <td class="px-3 py-2 text-xs text-slate-300">Yield to the pedestrians crossing the road.</td>
               <td class="px-3 py-2 text-xs text-amber-200">Stop to yield to the pedestrian crossing ahead</td>
             </tr><tr>
               <td class="px-3 py-2 text-slate-400">4</td>
               <td class="px-3 py-2 font-mono text-[11px]"><a class="text-cyan-400 hover:underline" href="#clip-4">36cb5485…</a></td>
               <td class="px-3 py-2 text-xs">ANIMALS_BIRDS_ROADKILL</td>
-              <td class="px-3 py-2 text-xs tabular-nums text-amber-300">9.57</td>
+              <td class="px-3 py-2 text-xs tabular-nums text-amber-300">9.58</td>
               <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
-                GT [21.0074, -0.1321] · pred [37.416, 18.234]
+                GT [21.0074, -0.1321] · pred [37.4214, 18.2443]
               </td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
+                GT 9.574→0.573 · pred 9.684→7.154
+              </td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">-0.61</td>
               <td class="px-3 py-2 text-xs text-slate-300">Stop for the stop sign while waiting for pedestrians to cross the street.</td>
               <td class="px-3 py-2 text-xs text-amber-200">Stop to yield to the pedestrian in the crosswalk.</td>
             </tr></tbody>
@@ -88,7 +112,7 @@
                   <div class="font-display text-xl text-white">Clip 0 · <span class="font-mono text-sm text-cyan-300">faff17c7-4572-472a-be28-0f035bb88a37</span></div>
                   <div class="text-xs text-slate-400 mt-1">chunk=4 · train · WORK_ZONES_TEMP_TRAFFIC_CONTROL · t0_us=5627325 · seed=42</div>
                 </div>
-                <div class="text-xs text-slate-400">minADE=<span class="text-amber-300 font-semibold">9.187 m</span> · jaccard=0.048</div>
+                <div class="text-xs text-slate-400">minADE=<span class="text-amber-300 font-semibold">9.185 m</span> · jaccard=0.048</div>
               </div>
               <div class="grid md:grid-cols-2 gap-4 mb-5">
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
@@ -107,19 +131,26 @@
                   · speed [7.258, 15.641] m/s
                 </div>
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-amber-200">
-                  Pred XY start [0.7199, 0.0021] → end [68.1305, 9.7953] · path 68.831 m
-                  · speed [7.199, 14.33] m/s
+                  Pred XY start [0.72, 0.0021] → end [68.1384, 9.798] · path 68.8393 m
+                  · speed [7.2, 14.331] m/s
                 </div>
+              </div>
+              
+              <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 mb-5 text-[11px] font-mono text-slate-300">
+                expert t0_v=7.195375919342041 m/s · accel mean=1.6023914813995361
+                min=-0.21246230602264404 max=3.5168540477752686 ·
+                kappa mean=0.10917621850967407 |max|=0.36390021443367004 ·
+                pos0_ok=True hide=None:None
               </div>
               
               <div class="grid md:grid-cols-2 gap-4 mb-5">
                 <figure class="m-0">
                   <img src="00_faff17c7/traj_xy.png" alt="pred vs GT XY" class="w-full rounded-xl border border-slate-700 bg-slate-950">
-                  <figcaption class="mt-1 text-[11px] text-slate-500">Bird's-eye XY · cyan history · gray GT · amber pred</figcaption>
+                  <figcaption class="mt-1 text-[11px] text-slate-500">Bird's-eye XY · x+ forward ↑ · y+ left ← · cyan history · gray GT · amber pred (64 waypoints)</figcaption>
                 </figure>
                 <figure class="m-0">
                   <img src="00_faff17c7/traj_speed.png" alt="speed vs time" class="w-full rounded-xl border border-slate-700 bg-slate-950">
-                  <figcaption class="mt-1 text-[11px] text-slate-500">Waypoint speed (m/s)</figcaption>
+                  <figcaption class="mt-1 text-[11px] text-slate-500">Waypoint speed (m/s) from the 64-pt pred</figcaption>
                 </figure>
               </div>
               <div class="text-sm font-semibold text-slate-300 mb-2">16-image history (4 cameras × 4 frames)</div>
@@ -178,7 +209,7 @@
                   <div class="font-display text-xl text-white">Clip 1 · <span class="font-mono text-sm text-cyan-300">8e83f069-5fc5-4329-8589-4527de19d03e</span></div>
                   <div class="text-xs text-slate-400 mt-1">chunk=176 · train · PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY · t0_us=1733299 · seed=43</div>
                 </div>
-                <div class="text-xs text-slate-400">minADE=<span class="text-amber-300 font-semibold">6.043 m</span> · jaccard=0.118</div>
+                <div class="text-xs text-slate-400">minADE=<span class="text-amber-300 font-semibold">6.049 m</span> · jaccard=0.118</div>
               </div>
               <div class="grid md:grid-cols-2 gap-4 mb-5">
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
@@ -197,19 +228,26 @@
                   · speed [7.483, 2.184] m/s
                 </div>
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-amber-200">
-                  Pred XY start [0.7517, -0.0021] → end [43.2211, -3.7466] · path 43.3832 m
-                  · speed [7.517, 6.955] m/s
+                  Pred XY start [0.7519, -0.0021] → end [43.2332, -3.7486] · path 43.3954 m
+                  · speed [7.519, 6.957] m/s
                 </div>
+              </div>
+              
+              <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 mb-5 text-[11px] font-mono text-slate-300">
+                expert t0_v=7.529344081878662 m/s · accel mean=-0.1505715548992157
+                min=-2.4201560020446777 max=2.941923141479492 ·
+                kappa mean=-0.07041312754154205 |max|=0.29398488998413086 ·
+                pos0_ok=True hide=None:None
               </div>
               
               <div class="grid md:grid-cols-2 gap-4 mb-5">
                 <figure class="m-0">
                   <img src="01_8e83f069/traj_xy.png" alt="pred vs GT XY" class="w-full rounded-xl border border-slate-700 bg-slate-950">
-                  <figcaption class="mt-1 text-[11px] text-slate-500">Bird's-eye XY · cyan history · gray GT · amber pred</figcaption>
+                  <figcaption class="mt-1 text-[11px] text-slate-500">Bird's-eye XY · x+ forward ↑ · y+ left ← · cyan history · gray GT · amber pred (64 waypoints)</figcaption>
                 </figure>
                 <figure class="m-0">
                   <img src="01_8e83f069/traj_speed.png" alt="speed vs time" class="w-full rounded-xl border border-slate-700 bg-slate-950">
-                  <figcaption class="mt-1 text-[11px] text-slate-500">Waypoint speed (m/s)</figcaption>
+                  <figcaption class="mt-1 text-[11px] text-slate-500">Waypoint speed (m/s) from the 64-pt pred</figcaption>
                 </figure>
               </div>
               <div class="text-sm font-semibold text-slate-300 mb-2">16-image history (4 cameras × 4 frames)</div>
@@ -268,7 +306,7 @@
                   <div class="font-display text-xl text-white">Clip 2 · <span class="font-mono text-sm text-cyan-300">1946f1c3-8638-4648-8944-506e6bffc4df</span></div>
                   <div class="text-xs text-slate-400 mt-1">chunk=177 · train · PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY · t0_us=5699907 · seed=44</div>
                 </div>
-                <div class="text-xs text-slate-400">minADE=<span class="text-amber-300 font-semibold">6.461 m</span> · jaccard=0.273</div>
+                <div class="text-xs text-slate-400">minADE=<span class="text-amber-300 font-semibold">6.464 m</span> · jaccard=0.273</div>
               </div>
               <div class="grid md:grid-cols-2 gap-4 mb-5">
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
@@ -287,19 +325,26 @@
                   · speed [3.984, 0.16] m/s
                 </div>
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-amber-200">
-                  Pred XY start [0.4056, 0.0002] → end [24.8355, -1.0954] · path 24.8596 m
-                  · speed [4.056, 3.917] m/s
+                  Pred XY start [0.4057, 0.0002] → end [24.8419, -1.096] · path 24.866 m
+                  · speed [4.057, 3.918] m/s
                 </div>
+              </div>
+              
+              <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 mb-5 text-[11px] font-mono text-slate-300">
+                expert t0_v=4.047591686248779 m/s · accel mean=-0.06574688106775284
+                min=-0.6901170015335083 max=0.846832811832428 ·
+                kappa mean=-0.1384410262107849 |max|=0.6969740986824036 ·
+                pos0_ok=True hide=None:None
               </div>
               
               <div class="grid md:grid-cols-2 gap-4 mb-5">
                 <figure class="m-0">
                   <img src="02_1946f1c3/traj_xy.png" alt="pred vs GT XY" class="w-full rounded-xl border border-slate-700 bg-slate-950">
-                  <figcaption class="mt-1 text-[11px] text-slate-500">Bird's-eye XY · cyan history · gray GT · amber pred</figcaption>
+                  <figcaption class="mt-1 text-[11px] text-slate-500">Bird's-eye XY · x+ forward ↑ · y+ left ← · cyan history · gray GT · amber pred (64 waypoints)</figcaption>
                 </figure>
                 <figure class="m-0">
                   <img src="02_1946f1c3/traj_speed.png" alt="speed vs time" class="w-full rounded-xl border border-slate-700 bg-slate-950">
-                  <figcaption class="mt-1 text-[11px] text-slate-500">Waypoint speed (m/s)</figcaption>
+                  <figcaption class="mt-1 text-[11px] text-slate-500">Waypoint speed (m/s) from the 64-pt pred</figcaption>
                 </figure>
               </div>
               <div class="text-sm font-semibold text-slate-300 mb-2">16-image history (4 cameras × 4 frames)</div>
@@ -358,7 +403,7 @@
                   <div class="font-display text-xl text-white">Clip 3 · <span class="font-mono text-sm text-cyan-300">8e06f83c-4de6-4cde-82ab-4a747645f80a</span></div>
                   <div class="text-xs text-slate-400 mt-1">chunk=26 · train · PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY · t0_us=8461666 · seed=45</div>
                 </div>
-                <div class="text-xs text-slate-400">minADE=<span class="text-amber-300 font-semibold">7.949 m</span> · jaccard=0.444</div>
+                <div class="text-xs text-slate-400">minADE=<span class="text-amber-300 font-semibold">7.954 m</span> · jaccard=0.444</div>
               </div>
               <div class="grid md:grid-cols-2 gap-4 mb-5">
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
@@ -377,19 +422,26 @@
                   · speed [7.243, 0.722] m/s
                 </div>
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-amber-200">
-                  Pred XY start [0.7333, -0.0035] → end [28.083, -1.0578] · path 28.1029 m
-                  · speed [7.333, 1.98] m/s
+                  Pred XY start [0.7335, -0.0035] → end [28.0939, -1.0583] · path 28.1138 m
+                  · speed [7.335, 1.982] m/s
                 </div>
+              </div>
+              
+              <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 mb-5 text-[11px] font-mono text-slate-300">
+                expert t0_v=7.357150554656982 m/s · accel mean=-1.2802929878234863
+                min=-3.8483707904815674 max=0.37667524814605713 ·
+                kappa mean=0.03176626190543175 |max|=0.7386441826820374 ·
+                pos0_ok=True hide=None:None
               </div>
               
               <div class="grid md:grid-cols-2 gap-4 mb-5">
                 <figure class="m-0">
                   <img src="03_8e06f83c/traj_xy.png" alt="pred vs GT XY" class="w-full rounded-xl border border-slate-700 bg-slate-950">
-                  <figcaption class="mt-1 text-[11px] text-slate-500">Bird's-eye XY · cyan history · gray GT · amber pred</figcaption>
+                  <figcaption class="mt-1 text-[11px] text-slate-500">Bird's-eye XY · x+ forward ↑ · y+ left ← · cyan history · gray GT · amber pred (64 waypoints)</figcaption>
                 </figure>
                 <figure class="m-0">
                   <img src="03_8e06f83c/traj_speed.png" alt="speed vs time" class="w-full rounded-xl border border-slate-700 bg-slate-950">
-                  <figcaption class="mt-1 text-[11px] text-slate-500">Waypoint speed (m/s)</figcaption>
+                  <figcaption class="mt-1 text-[11px] text-slate-500">Waypoint speed (m/s) from the 64-pt pred</figcaption>
                 </figure>
               </div>
               <div class="text-sm font-semibold text-slate-300 mb-2">16-image history (4 cameras × 4 frames)</div>
@@ -448,7 +500,7 @@
                   <div class="font-display text-xl text-white">Clip 4 · <span class="font-mono text-sm text-cyan-300">36cb5485-5c56-48c5-8219-90095851d627</span></div>
                   <div class="text-xs text-slate-400 mt-1">chunk=57 · train · ANIMALS_BIRDS_ROADKILL · t0_us=9746740 · seed=46</div>
                 </div>
-                <div class="text-xs text-slate-400">minADE=<span class="text-amber-300 font-semibold">9.572 m</span> · jaccard=0.214</div>
+                <div class="text-xs text-slate-400">minADE=<span class="text-amber-300 font-semibold">9.578 m</span> · jaccard=0.214</div>
               </div>
               <div class="grid md:grid-cols-2 gap-4 mb-5">
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
@@ -467,19 +519,26 @@
                   · speed [9.574, 0.573] m/s
                 </div>
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-amber-200">
-                  Pred XY start [0.9682, -0.0023] → end [37.416, 18.234] · path 41.6225 m
-                  · speed [9.682, 7.152] m/s
+                  Pred XY start [0.9684, -0.0023] → end [37.4214, 18.2443] · path 41.6319 m
+                  · speed [9.684, 7.154] m/s
                 </div>
+              </div>
+              
+              <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 mb-5 text-[11px] font-mono text-slate-300">
+                expert t0_v=9.700448989868164 m/s · accel mean=-0.6099350452423096
+                min=-3.1774535179138184 max=2.219844102859497 ·
+                kappa mean=0.8505354523658752 |max|=3.182152032852173 ·
+                pos0_ok=True hide=None:None
               </div>
               
               <div class="grid md:grid-cols-2 gap-4 mb-5">
                 <figure class="m-0">
                   <img src="04_36cb5485/traj_xy.png" alt="pred vs GT XY" class="w-full rounded-xl border border-slate-700 bg-slate-950">
-                  <figcaption class="mt-1 text-[11px] text-slate-500">Bird's-eye XY · cyan history · gray GT · amber pred</figcaption>
+                  <figcaption class="mt-1 text-[11px] text-slate-500">Bird's-eye XY · x+ forward ↑ · y+ left ← · cyan history · gray GT · amber pred (64 waypoints)</figcaption>
                 </figure>
                 <figure class="m-0">
                   <img src="04_36cb5485/traj_speed.png" alt="speed vs time" class="w-full rounded-xl border border-slate-700 bg-slate-950">
-                  <figcaption class="mt-1 text-[11px] text-slate-500">Waypoint speed (m/s)</figcaption>
+                  <figcaption class="mt-1 text-[11px] text-slate-500">Waypoint speed (m/s) from the 64-pt pred</figcaption>
                 </figure>
               </div>
               <div class="text-sm font-semibold text-slate-300 mb-2">16-image history (4 cameras × 4 frames)</div>

@@ -37,6 +37,13 @@ from mlx_port.scripts.run_local_coc_sample import (
     _save_contact_sheet,
     _save_frames,
 )
+from mlx_port.traj_sample_plot_utils import (
+    DT_S,
+    _as_xy,
+    _require_full_xy,
+    _speed_mps,
+    _xy_for_redraw as _xy_from_cached_record,
+)
 
 # Same five clips as reports/coc_sample_5_t06 (seed 42, skip t0 < 1.6s).
 CLIP_IDS = [
@@ -48,7 +55,6 @@ CLIP_IDS = [
 ]
 REPORT_DIR = Path("/Users/michaellee/Projects/alpamayo/reports/traj_sample_5_t06")
 SEED = 42
-DT_S = 0.1
 NVIDIA_TEMPERATURE = 0.6
 NVIDIA_TOP_P = 0.98
 
@@ -64,21 +70,6 @@ def _font(size: int) -> ImageFont.ImageFont:
     return ImageFont.load_default()
 
 
-def _as_xy(arr: np.ndarray) -> np.ndarray:
-    a = np.asarray(arr, dtype=np.float64)
-    if a.ndim == 4:
-        a = a[0, 0]
-    elif a.ndim == 3:
-        a = a[0]
-    return a[:, :2]
-
-
-def _speed_mps(xy: np.ndarray) -> np.ndarray:
-    xy = np.asarray(xy, dtype=np.float64)
-    prev = np.concatenate([np.zeros((1, 2), dtype=np.float64), xy[:-1]], axis=0)
-    return np.linalg.norm(xy - prev, axis=-1) / DT_S
-
-
 def _save_traj_plots(
     clip_dir: Path,
     hist_xy: np.ndarray,
@@ -88,8 +79,8 @@ def _save_traj_plots(
 ) -> dict[str, str]:
     """Bird's-eye XY (x forward, y left) plus speed vs time."""
     hist_xy = np.asarray(hist_xy, dtype=np.float64)
-    gt_xy = np.asarray(gt_xy, dtype=np.float64)
-    pred_xy = np.asarray(pred_xy, dtype=np.float64)
+    gt_xy = _require_full_xy(gt_xy, "gt_xy")
+    pred_xy = _require_full_xy(pred_xy, "pred_xy")
 
     all_xy = np.concatenate([hist_xy, gt_xy, pred_xy], axis=0)
     pad = 2.0
@@ -107,7 +98,8 @@ def _save_traj_plots(
     font_sm = _font(12)
 
     def to_px(x: float, y: float) -> tuple[int, int]:
-        px = margin + (y - ymin) / span * (w - 2 * margin)
+        # Vehicle frame: x forward, y left. Screen: +x up, +y to the left.
+        px = margin + (ymax - y) / span * (w - 2 * margin)
         py = h - margin - (x - xmin) / span * (h - 2 * margin)
         return int(px), int(py)
 
@@ -133,7 +125,9 @@ def _save_traj_plots(
     poly(pred_xy, (251, 146, 60), 3, 2)
     t0 = to_px(0.0, 0.0)
     draw.ellipse([t0[0] - 7, t0[1] - 7, t0[0] + 7, t0[1] + 7], fill=(244, 63, 94))
-    draw.text((14, 12), "Ego-frame XY  (x forward ↑, y left →)", fill=(226, 232, 240), font=font)
+    draw.text((14, 12), "Ego-frame XY  (x+ forward ↑, y+ left ←)", fill=(226, 232, 240), font=font)
+    draw.text((14, h // 2 - 8), "← y+", fill=(148, 163, 184), font=font_sm)
+    draw.text((w // 2 - 10, 12), "x+ ↑", fill=(148, 163, 184), font=font_sm)
     draw.text(
         (14, h - 48),
         f"cyan=history  gray=GT future  amber=pred  red=t0    minADE={min_ade:.2f} m",
@@ -227,6 +221,9 @@ def run_one_clip(model, processor, clip_id: str, clip_dir: Path, seed: int) -> d
     gt_xy = _as_xy(data["ego_future_xyz"])
     pred_arr = None if pred_xyz is None else np.asarray(pred_xyz)
     pred_xy = None if pred_arr is None else _pred_xy_for_ade(pred_arr)[0]
+    if pred_xy is not None:
+        pred_xy = _require_full_xy(pred_xy, "pred_xy")
+    gt_xy = _require_full_xy(gt_xy, "gt_xy")
     ade = None if pred_xy is None else min_ade_xy(pred_xy[None, ...], gt_xy)
 
     clip_dir.mkdir(parents=True, exist_ok=True)
@@ -255,6 +252,11 @@ def run_one_clip(model, processor, clip_id: str, clip_dir: Path, seed: int) -> d
         "pred_xyz_shape": None if pred_arr is None else list(pred_arr.shape),
         "gt_xy": _xy_stats(gt_xy),
         "pred_xy": None if pred_xy is None else _xy_stats(pred_xy),
+        "hist_xy_full": np.round(hist_xy, 4).tolist(),
+        "gt_xy_full": np.round(gt_xy, 4).tolist(),
+        "pred_xy_full": None if pred_xy is None else np.round(pred_xy, 4).tolist(),
+        "pred_speed_full": None if pred_xy is None else np.round(_speed_mps(pred_xy), 4).tolist(),
+        "gt_speed_full": np.round(_speed_mps(gt_xy), 4).tolist(),
         "gt_speed_start_end": [
             round(float(_speed_mps(gt_xy)[0]), 3),
             round(float(_speed_mps(gt_xy)[-1]), 3),
@@ -267,6 +269,7 @@ def run_one_clip(model, processor, clip_id: str, clip_dir: Path, seed: int) -> d
                 round(float(_speed_mps(pred_xy)[-1]), 3),
             ]
         ),
+        "expert": (extra or {}).get("expert"),
         "image_grid": image_grid,
         "contact_sheet": contact,
         "traj_xy": plots.get("traj_xy"),
@@ -282,6 +285,27 @@ def run_one_clip(model, processor, clip_id: str, clip_dir: Path, seed: int) -> d
     return rec
 
 
+def _xy_for_redraw(rec: dict, clip_id: str) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:
+    """Hist/GT/pred XY for a plot redraw. Pred is the saved 64-pt path only — no interpolation."""
+    if rec.get("hist_xy_full") is not None and rec.get("gt_xy_full") is not None:
+        return _xy_from_cached_record(rec, clip_id)
+    gt_meta = load_clip_gt(clip_id)
+    t0_us = int(gt_meta["events"][0]["event_start_timestamp"])
+    data = load_physical_aiavdataset(
+        clip_id,
+        t0_us=t0_us,
+        local_dir=str(LOCAL_DIR),
+        maybe_stream=True,
+        num_frames=DEFAULT_NUM_FRAMES,
+    )
+    filled = {
+        **rec,
+        "hist_xy_full": _as_xy(data["ego_history_xyz"]).tolist(),
+        "gt_xy_full": _as_xy(data["ego_future_xyz"]).tolist(),
+    }
+    return _xy_from_cached_record(filled, clip_id)
+
+
 def _html_report(results: list[dict], generated_at: str) -> str:
     ades = [r["min_ade_m"] for r in results if r.get("min_ade_m") is not None]
     mean_ade = float(np.mean(ades)) if ades else None
@@ -292,6 +316,11 @@ def _html_report(results: list[dict], generated_at: str) -> str:
         ade = "—" if r.get("min_ade_m") is None else f"{r['min_ade_m']:.2f}"
         p_end = r.get("pred_xy") or {}
         g_end = r.get("gt_xy") or {}
+        gs = r.get("gt_speed_start_end") or [None, None]
+        ps = r.get("pred_speed_start_end") or [None, None]
+        exp0 = (r.get("expert") or [{}])[0] if r.get("expert") else {}
+        accel = exp0.get("accel_mean")
+        accel_txt = "—" if accel is None else f"{accel:.2f}"
         rows.append(
             f"""<tr>
               <td class="px-3 py-2 text-slate-400">{i}</td>
@@ -301,6 +330,10 @@ def _html_report(results: list[dict], generated_at: str) -> str:
               <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
                 GT {g_end.get('end', '—')} · pred {p_end.get('end', '—')}
               </td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
+                GT {gs[0]}→{gs[1]} · pred {ps[0]}→{ps[1]}
+              </td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">{accel_txt}</td>
               <td class="px-3 py-2 text-xs text-slate-300">{gt}</td>
               <td class="px-3 py-2 text-xs text-amber-200">{pred}</td>
             </tr>"""
@@ -314,6 +347,16 @@ def _html_report(results: list[dict], generated_at: str) -> str:
         ade = "n/a" if r.get("min_ade_m") is None else f"{r['min_ade_m']:.3f} m"
         p = r.get("pred_xy") or {}
         g = r.get("gt_xy") or {}
+        exp0 = (r.get("expert") or [{}])[0] if r.get("expert") else {}
+        exp_html = ""
+        if exp0:
+            exp_html = f"""
+              <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 mb-5 text-[11px] font-mono text-slate-300">
+                expert t0_v={exp0.get('t0_v')} m/s · accel mean={exp0.get('accel_mean')}
+                min={exp0.get('accel_min')} max={exp0.get('accel_max')} ·
+                kappa mean={exp0.get('kappa_mean')} |max|={exp0.get('kappa_abs_max')} ·
+                pos0_ok={exp0.get('pos0_matches_offset_plus_delta')} hide={exp0.get('hide_start')}:{exp0.get('hide_end')}
+              </div>"""
         thumbs = []
         for cam_i, cam_name in enumerate(r["cameras"]):
             cells = []
@@ -335,11 +378,11 @@ def _html_report(results: list[dict], generated_at: str) -> str:
               <div class="grid md:grid-cols-2 gap-4 mb-5">
                 <figure class="m-0">
                   <img src="{html.escape(r['traj_xy'])}" alt="pred vs GT XY" class="w-full rounded-xl border border-slate-700 bg-slate-950">
-                  <figcaption class="mt-1 text-[11px] text-slate-500">Bird's-eye XY · cyan history · gray GT · amber pred</figcaption>
+                  <figcaption class="mt-1 text-[11px] text-slate-500">Bird's-eye XY · x+ forward ↑ · y+ left ← · cyan history · gray GT · amber pred (64 waypoints)</figcaption>
                 </figure>
                 <figure class="m-0">
                   <img src="{html.escape(r.get('traj_speed') or '')}" alt="speed vs time" class="w-full rounded-xl border border-slate-700 bg-slate-950">
-                  <figcaption class="mt-1 text-[11px] text-slate-500">Waypoint speed (m/s)</figcaption>
+                  <figcaption class="mt-1 text-[11px] text-slate-500">Waypoint speed (m/s) from the 64-pt pred</figcaption>
                 </figure>
               </div>"""
         sections.append(
@@ -372,6 +415,7 @@ def _html_report(results: list[dict], generated_at: str) -> str:
                   · speed {r.get('pred_speed_start_end')} m/s
                 </div>
               </div>
+              {exp_html}
               {plot_html}
               <div class="text-sm font-semibold text-slate-300 mb-2">16-image history (4 cameras × 4 frames)</div>
               {image_html}
@@ -399,7 +443,10 @@ def _html_report(results: list[dict], generated_at: str) -> str:
       Same 5 clips as <a class="text-cyan-400 hover:underline" href="../coc_sample_5_t06/index.html">coc_sample_5_t06</a>
       (seed {SEED}, skip t0 &lt; 1.6 s). NVIDIA sampling: T={NVIDIA_TEMPERATURE}, top_p={NVIDIA_TOP_P},
       1 independent CoC + 1 expert trajectory per clip. Jaccard is cheap word overlap — read the sentences.
-      Generated {html.escape(generated_at)}. Mean minADE: {mean_txt}.
+      After <code>dxy_theta_to_v_without_v0</code> t0. Plots use the generated 64-waypoint pred
+      (<code>pred_xy_full</code>), vehicle frame x+ forward ↑ / y+ left ←.
+      Stage 1b is <a class="text-cyan-400 hover:underline" href="../stage1b_progress.html">closed</a>
+      (wiring); yield/stop quality is leftover there. Generated {html.escape(generated_at)}. Mean minADE: {mean_txt}.
     </p>
     <div class="overflow-auto bg-slate-900 border border-slate-700 rounded-2xl mb-10">
       <table class="w-full text-left text-sm">
@@ -407,6 +454,7 @@ def _html_report(results: list[dict], generated_at: str) -> str:
           <tr>
             <th class="px-3 py-2">#</th><th class="px-3 py-2">Clip</th><th class="px-3 py-2">Cluster</th>
             <th class="px-3 py-2">minADE</th><th class="px-3 py-2">XY end</th>
+            <th class="px-3 py-2">Speed start→end</th><th class="px-3 py-2">Accel mean</th>
             <th class="px-3 py-2">GT CoC</th><th class="px-3 py-2">Pred CoC</th>
           </tr>
         </thead>
@@ -427,6 +475,11 @@ def main() -> None:
         "--no-reuse",
         action="store_true",
         help="Ignore cached clip result.json and rerun inference.",
+    )
+    parser.add_argument(
+        "--redraw-plots",
+        action="store_true",
+        help="Reuse cached CoC/traj JSON and only rewrite XY/speed PNGs.",
     )
     args = parser.parse_args()
     report_dir = args.report_dir
@@ -449,6 +502,25 @@ def main() -> None:
         rec = None if args.no_reuse else (json.loads(cached.read_text()) if cached.exists() else None)
         if rec is not None and rec.get("pred_xy") is not None:
             print(f"[traj-sample] reuse {cached}")
+            if args.redraw_plots:
+                hist_xy, gt_xy, pred_xy = _xy_for_redraw(rec, cid)
+                if pred_xy is not None:
+                    ade = rec.get("min_ade_m") or 0.0
+                    clip_dir.mkdir(parents=True, exist_ok=True)
+                    plots = _save_traj_plots(clip_dir, hist_xy, gt_xy, pred_xy, float(ade))
+                    rec["traj_xy"] = plots.get("traj_xy")
+                    rec["traj_speed"] = plots.get("traj_speed")
+                    rec["hist_xy_full"] = np.round(hist_xy, 4).tolist()
+                    rec["gt_xy_full"] = np.round(gt_xy, 4).tolist()
+                    rec.pop("pred_xy_plot", None)
+                    rec.pop("pred_xy_plot_note", None)
+                    cached.write_text(json.dumps(rec, indent=2) + "\n")
+                    print(f"[traj-sample] redrew plots {clip_dir}")
+                else:
+                    print(
+                        "[traj-sample] skip redraw: no pred_xy_full in cache "
+                        "(re-run with --no-reuse to persist the 64-pt pred)"
+                    )
         else:
             if model is None:
                 print("[traj-sample] loading AlpamayoR1MLX (expert on)…")

@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alpamayo MLX Port Plan • v5 • M4 Max 128 GiB</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&amp;family=Space+Grotesk:wght@500;600&amp;display=swap');
+        
+        body { font-family: 'Inter', system_ui, sans-serif; }
+        .font-display { font-family: 'Space Grotesk', 'Inter', system_ui, sans-serif; font-weight: 600; }
+        
+        .section-card { transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1); }
+        .section-card:hover { transform: translateY(-2px); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1); }
+        
+        .stage-header { background: linear-gradient(90deg, #0f172a, #1e2937); }
+        .metric-badge { background: #0f172a; color: #67e8f9; font-size: 0.75rem; padding: 0.125rem 0.5rem; border-radius: 9999px; font-weight: 600; }
+        
+        .report-badge {
+            background: #312e81;
+            color: #a5b4fc;
+            font-size: 0.65rem;
+            padding: 0.1rem 0.5rem;
+            border-radius: 9999px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200">
+    <!-- Top Navigation -->
+    <nav class="border-b border-slate-800 bg-slate-900 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-x-3">
+                <div class="w-10 h-10 bg-cyan-500 rounded-2xl flex items-center justify-center">
+                    <i class="fa-solid fa-robot text-white text-3xl"></i>
+                </div>
+                <div>
+                    <span class="font-display text-3xl font-semibold tracking-tighter">Alpamayo</span>
+                    <span class="font-display text-3xl font-semibold tracking-tighter text-cyan-400">MLX</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-x-3 text-sm">
+                <div class="px-4 py-1.5 bg-sky-900/30 border border-sky-700 rounded-3xl flex items-center gap-x-2">
+                    <i class="fa-solid fa-forward text-sky-400"></i>
+                    <span class="font-medium text-sky-400">Next: Stage 1c</span>
+                </div>
+                <div class="text-xs text-slate-500">v5 • Aug 29, 2026</div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <div class="max-w-7xl mx-auto px-6 pt-10 pb-6">
+        <div class="flex flex-col lg:flex-row lg:items-end gap-y-6 lg:justify-between">
+            <div>
+                <div class="inline-flex items-center gap-x-2 px-4 py-1 bg-slate-900 border border-slate-700 rounded-3xl text-sm mb-4">
+                    <i class="fa-solid fa-microchip text-cyan-400"></i>
+                    <span class="font-medium">M4 Pro Max • 128 GiB Unified Memory</span>
+                </div>
+                <h1 class="font-display text-6xl font-semibold tracking-tighter leading-none">
+                    Alpamayo SFT<br>
+                    <span class="bg-gradient-to-r from-cyan-400 to-violet-400 bg-clip-text text-transparent">→ MLX Port Plan</span>
+                </h1>
+                <p class="mt-4 max-w-2xl text-xl text-slate-400">
+                    Inference is real (~118&nbsp;s / window) but ~150× slower than NVIDIA (~704&nbsp;ms).
+                    Stage 1b is closed (wired expert, physical pred_xyz; qualitative contract; no NVIDIA T-match).
+                    Stage 1c makes a train step practical before Stage 2–3 SFT.
+                    Detail:
+                    <a class="text-cyan-400 hover:underline" href="alpamayo1-mlx-speedup-plan.html">alpamayo1-mlx-speedup-plan.html</a>.
+                </p>
+            </div>
+            
+            <div class="lg:text-right">
+                <div class="inline-block bg-slate-900 border border-slate-700 rounded-3xl px-6 py-4">
+                    <div class="text-xs text-slate-500">LOCAL PATHS</div>
+                    <div class="font-mono text-xs mt-1 text-cyan-400">alpamayo/pre-trained/Alpamayo-R1-10B/</div>
+                    <div class="font-mono text-xs text-cyan-400">alpamayo/pre-trained/Qwen3-VL-8B-Instruct/</div>
+                    <div class="font-mono text-xs text-cyan-400">/Volumes/MicronSSD/pai_coc/</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status snapshot (as of 2026-08-29) -->
+    <div class="max-w-7xl mx-auto px-6 pb-10">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
+            <div class="bg-slate-900 border border-emerald-800 rounded-2xl p-4">
+                <div class="text-slate-500 mb-1">Stage 0</div>
+                <div class="font-semibold text-emerald-400">COMPLETE</div>
+                <div class="text-slate-500 mt-1">Python 3.12 · .venv · MLX GPU</div>
+            </div>
+            <div class="bg-slate-900 border border-emerald-800 rounded-2xl p-4">
+                <div class="text-slate-500 mb-1">Stage 1</div>
+                <div class="font-semibold text-emerald-400">COMPLETE</div>
+                <div class="text-slate-500 mt-1">VLM / CoC closed 2026-08-28</div>
+            </div>
+            <div class="bg-slate-900 border border-emerald-800 rounded-2xl p-4">
+                <div class="text-slate-500 mb-1">Stage 1b</div>
+                <div class="font-semibold text-emerald-400">COMPLETE</div>
+                <div class="text-slate-500 mt-1">Wired · leftover quality listed</div>
+            </div>
+            <div class="bg-slate-900 border border-sky-800 rounded-2xl p-4">
+                <div class="text-slate-500 mb-1">Stage 1c</div>
+                <div class="font-semibold text-sky-400">NOT STARTED</div>
+                <div class="text-slate-500 mt-1">1b contract tell done · blocks SFT</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-2xl p-4">
+                <div class="text-slate-500 mb-1">Stage 2</div>
+                <div class="font-semibold text-slate-400">BLOCKED</div>
+                <div class="text-slate-500 mt-1">Wait for 1c Bar B</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-2xl p-4">
+                <div class="text-slate-500 mb-1">Stage 3</div>
+                <div class="font-semibold text-slate-400">BLOCKED</div>
+                <div class="text-slate-500 mt-1">Wait for 1c T4.3</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mandatory Progress Reporting -->
+    <div class="max-w-7xl mx-auto px-6 pb-10">
+        <div class="bg-indigo-950 border border-indigo-700 rounded-3xl p-8">
+            <div class="flex items-center gap-x-3 mb-4">
+                <i class="fa-solid fa-file-code text-indigo-400 text-2xl"></i>
+                <div>
+                    <div class="font-semibold text-xl text-indigo-400">Mandatory Skill: Per-Stage HTML Progress Reports</div>
+                    <div class="text-xs text-indigo-300">This is now a required deliverable for every stage</div>
+                </div>
+            </div>
+            
+            <div class="text-sm text-slate-300 mb-4">
+                For <strong>every stage</strong>, the agent must generate a dedicated, self-contained HTML report file saved in <span class="font-mono text-indigo-300">reports/</span> folder:
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 text-xs">
+                <div class="bg-slate-900 border border-indigo-800 rounded-2xl p-4">
+                    <div class="font-semibold text-indigo-400 mb-1">reports/stage0_progress.html</div>
+                    <div class="text-emerald-400 mb-1">exists · COMPLETE</div>
+                    <div class="text-slate-400">Venv, package versions, MLX GPU verify</div>
+                </div>
+                <div class="bg-slate-900 border border-indigo-800 rounded-2xl p-4">
+                    <div class="font-semibold text-indigo-400 mb-1">reports/stage1_progress.html</div>
+                    <div class="text-emerald-400 mb-1">exists · COMPLETE</div>
+                    <div class="text-slate-400">VLM / CoC inference (closed 2026-08-28)</div>
+                </div>
+                <div class="bg-slate-900 border border-indigo-800 rounded-2xl p-4">
+                    <div class="font-semibold text-indigo-400 mb-1">reports/stage1b_progress.html</div>
+                    <div class="text-emerald-400 mb-1">exists · COMPLETE</div>
+                    <div class="text-slate-400">Expert wired · leftover yield/stop + parity</div>
+                </div>
+                <div class="bg-slate-900 border border-sky-800 rounded-2xl p-4">
+                    <div class="font-semibold text-sky-400 mb-1">reports/stage1c_progress.html</div>
+                    <div class="text-slate-500 mb-1">not written yet</div>
+                    <div class="text-slate-400">Stage timers, compile/dtype, PTQ, train-step ms</div>
+                </div>
+                <div class="bg-slate-900 border border-indigo-800 rounded-2xl p-4">
+                    <div class="font-semibold text-indigo-400 mb-1">reports/stage2_progress.html</div>
+                    <div class="text-slate-500 mb-1">blocked</div>
+                    <div class="text-slate-400">Training loss curves, discrete token accuracy</div>
+                </div>
+                <div class="bg-slate-900 border border-indigo-800 rounded-2xl p-4">
+                    <div class="font-semibold text-indigo-400 mb-1">reports/stage3_progress.html</div>
+                    <div class="text-slate-500 mb-1">blocked</div>
+                    <div class="text-slate-400">Flow-matching loss, final minADE</div>
+                </div>
+            </div>
+            
+            <div class="mt-4 text-xs text-indigo-300">
+                Each report must include: code diffs summary • key metrics • training curves (embedded as base64 or linked) • compute footprint (peak RAM, GPU-equivalent time, power if measurable) • qualitative examples.
+                Stage 1c also logs the speedup-plan handoff: encode/prefill/decode/fm ms, dtype, compiled?, 50-clip ADE, train-step ms.
+            </div>
+        </div>
+    </div>
+
+    <!-- Hardware Banner -->
+    <div class="max-w-7xl mx-auto px-6 pb-10">
+        <div class="bg-gradient-to-r from-slate-900 to-slate-800 border border-slate-700 rounded-3xl p-8 flex flex-col md:flex-row items-center gap-8">
+            <div class="flex-1">
+                <div class="uppercase text-xs tracking-[2px] text-cyan-400 font-semibold">TARGET HARDWARE</div>
+                <div class="text-4xl font-semibold tracking-tight mt-1">M4 Pro Max<br>128 GiB Unified Memory</div>
+            </div>
+            <div class="grid grid-cols-3 gap-4 w-full md:w-auto">
+                <div class="text-center bg-slate-950/60 border border-slate-700 rounded-2xl p-4">
+                    <div class="text-xs text-slate-500">Current infer (1 window)</div>
+                    <div class="text-3xl font-semibold text-amber-400 mt-1">~110 s</div>
+                </div>
+                <div class="text-center bg-slate-950/60 border border-slate-700 rounded-2xl p-4">
+                    <div class="text-xs text-slate-500">NVIDIA baseline (same 10B)</div>
+                    <div class="text-3xl font-semibold text-slate-200 mt-1">704 ms</div>
+                </div>
+                <div class="text-center bg-slate-950/60 border border-slate-700 rounded-2xl p-4">
+                    <div class="text-xs text-slate-500">Stage 1c infer target</div>
+                    <div class="text-3xl font-semibold text-emerald-400 mt-1">&lt; 2 s</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stages -->
+    <div class="max-w-7xl mx-auto px-6 pb-16 space-y-8">
+        
+        <!-- Stage 0 -->
+        <div class="section-card bg-slate-900 border border-emerald-700/50 rounded-3xl overflow-hidden">
+            <div class="stage-header px-8 py-5 flex items-center justify-between">
+                <div class="flex items-center gap-x-4">
+                    <div class="w-9 h-9 bg-emerald-600 text-white rounded-2xl flex items-center justify-center font-mono font-bold">0</div>
+                    <div>
+                        <div class="font-semibold text-xl">Environment Setup (Python + MLX Packages)</div>
+                        <div class="text-sm text-emerald-400">Closed · Python 3.12.13 · .venv</div>
+                    </div>
+                </div>
+                <div class="metric-badge bg-emerald-900 text-emerald-300">COMPLETE</div>
+            </div>
+            
+            <div class="p-8 text-sm">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <div class="font-semibold text-emerald-400 mb-3">Landed</div>
+                        <ul class="space-y-2 text-slate-300 text-sm">
+                            <li>• <code class="text-cyan-300">.venv</code> on Python 3.12.13; MLX default device GPU</li>
+                            <li>• mlx / mlx-lm / mlx-vlm + safetensors, pillow, opencv, omegaconf, wandb</li>
+                            <li>• Weights at <code class="text-cyan-300">pre-trained/Alpamayo-R1-10B</code> and Qwen3-VL-8B; PAI-CoC on the SSD</li>
+                        </ul>
+                    </div>
+                    <div class="bg-slate-950 border border-slate-700 rounded-2xl p-5 text-xs">
+                        <div class="font-semibold text-emerald-400 mb-2">Report</div>
+                        <div class="text-slate-300">Verified on Apple Silicon (mlx 0.31.x at setup). See <span class="font-mono text-indigo-300">reports/stage0_progress.html</span>.</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="px-8 py-4 border-t border-slate-700 bg-slate-950 flex items-center justify-between text-xs">
+                <div><span class="font-semibold">Report:</span> <span class="font-mono text-indigo-300">reports/stage0_progress.html</span></div>
+                <div class="report-badge">MANDATORY</div>
+            </div>
+        </div>
+
+        <!-- Stage 1 -->
+        <div class="section-card bg-slate-900 border border-emerald-700/50 rounded-3xl overflow-hidden">
+            <div class="stage-header px-8 py-5 flex items-center justify-between">
+                <div class="flex items-center gap-x-4">
+                    <div class="w-9 h-9 bg-emerald-600 text-white rounded-2xl flex items-center justify-center font-mono font-bold">1</div>
+                    <div>
+                        <div class="font-semibold text-xl">Stage 1: VLM / CoC Inference</div>
+                        <div class="text-sm text-emerald-400">Closed 2026-08-28</div>
+                    </div>
+                </div>
+                <div class="metric-badge bg-emerald-900 text-emerald-300">COMPLETE</div>
+            </div>
+            
+            <div class="p-8">
+                <div class="uppercase text-xs tracking-widest text-slate-500 mb-2">Landed</div>
+                <div class="text-sm text-slate-300 mb-4">
+                    Alpamayo VLM on MLX • NVIDIA CoC sampling (T=0.6, top_p=0.98) • readable CoC on local PAI-CoC • Grok semantic judge.
+                    5-clip CoC eval written. Trajectory / minADE is Stage 1b (closed 2026-08-29). Default-clip greedy ≠ GT pedestrian was accepted as closed.
+                </div>
+            </div>
+            
+            <div class="px-8 py-4 border-t border-slate-700 bg-slate-950 flex items-center justify-between text-xs">
+                <div><span class="font-semibold">Report:</span> <span class="font-mono text-indigo-300">reports/stage1_progress.html</span></div>
+                <div class="report-badge">MANDATORY</div>
+            </div>
+        </div>
+
+        <!-- Stage 1b -->
+        <div class="section-card bg-slate-900 border border-cyan-700/50 rounded-3xl overflow-hidden">
+            <div class="stage-header px-8 py-5 flex items-center justify-between">
+                <div class="flex items-center gap-x-4">
+                    <div class="w-9 h-9 bg-cyan-600 text-white rounded-2xl flex items-center justify-center font-mono font-bold">1b</div>
+                    <div>
+                        <div class="font-semibold text-xl">Stage 1b: Action Expert + Trajectory</div>
+                        <div class="text-sm text-cyan-400">Closed 2026-08-29 · leftover quality listed</div>
+                    </div>
+                </div>
+                <div class="metric-badge bg-emerald-900 text-emerald-300">COMPLETE</div>
+            </div>
+            
+            <div class="p-8 space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <div class="uppercase text-xs tracking-widest text-emerald-400 mb-2">Landed</div>
+                        <ul class="space-y-1 text-slate-300">
+                            <li>• Real <code class="text-cyan-300">PerWaypointActionInProjV2</code>, <code class="text-cyan-300">n_waypoints=64</code>, mlx_vlm expert, NVIDIA <code class="text-cyan-300">step_fn</code></li>
+                            <li>• Greedy e2e (T=0, after v0): <code class="text-cyan-300">pred_xyz</code> <code>(1,1,1,64,3)</code>, minADE <strong>3.89 m</strong> (was 6.96 m)</li>
+                            <li>• 5-clip T=0.6 × 1 traj: mean minADE <strong>7.85 m</strong> (6.05–9.58). First-step speed matches GT on all 5</li>
+                            <li>• Physical meters, not a stub. 64-pt <code class="text-cyan-300">pred_xy_full</code>. Plots in <span class="font-mono text-indigo-300">reports/traj_sample_5_t06/</span></li>
+                            <li>• <code class="text-cyan-300">dxy_theta_to_v_without_v0</code> for t0. Live RoPE/mask contract holds; accel mean −2.19 (not mute)</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <div class="uppercase text-xs tracking-widest text-amber-400 mb-2">Leftover (not the close criterion)</div>
+                        <ul class="space-y-1 text-slate-300">
+                            <li>• Yield/stop overshoot: clips 1–2 stay cruise; clip 3 brakes but XY long; clip 4 little brake + spurious left</li>
+                            <li>• Missed left on clip 0 (GT y=+31.8 vs pred +9.8)</li>
+                            <li>• Default clip: late brake then reverse, ends 24.3 m vs GT 18.8 m</li>
+                            <li>• Token-level NVIDIA numerical match is not a goal; MLX SFT after 1c closes remaining drift</li>
+                        </ul>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-400">
+                    Wiring gate is closed. Qualitative contract is enough. Quality leftover is for MLX SFT after 1c,
+                    not a CUDA same-noise dump. Stage 1c is next. SFT stays gated on 1c speed.
+                </p>
+            </div>
+            
+            <div class="px-8 py-4 border-t border-slate-700 bg-slate-950 flex items-center justify-between text-xs">
+                <div><span class="font-semibold">Report:</span> <span class="font-mono text-indigo-300">reports/stage1b_progress.html</span></div>
+                <div class="report-badge">MANDATORY</div>
+            </div>
+        </div>
+
+        <!-- Stage 1c -->
+        <div class="section-card bg-slate-900 border border-sky-700/50 rounded-3xl overflow-hidden">
+            <div class="stage-header px-8 py-5 flex items-center justify-between">
+                <div class="flex items-center gap-x-4">
+                    <div class="w-9 h-9 bg-sky-600 text-white rounded-2xl flex items-center justify-center font-mono font-bold">1c</div>
+                    <div>
+                        <div class="font-semibold text-xl">Stage 1c: Runtime / Inference Speedup</div>
+                        <div class="text-sm text-sky-400">4–8 days • Blocks SFT</div>
+                    </div>
+                </div>
+                <div class="metric-badge bg-sky-950 text-sky-300">NOT STARTED</div>
+            </div>
+
+            <div class="p-8 space-y-4">
+                <div>
+                    <div class="uppercase text-xs tracking-widest text-slate-500 mb-2">Why this is now in the port</div>
+                    <div class="text-sm text-slate-300">
+                        A full window (encode → prefill → CoC decode → 10-step flow-matching) is ~110&nbsp;s on M4 Max.
+                        That is a port/pipeline problem, not a 128&nbsp;GiB memory problem. NVIDIA’s own SFT graph is
+                        encode + one backbone forward + one expert CFM step — not a 110&nbsp;s rollout.
+                        Execute the phases in
+                        <a class="text-cyan-400 hover:underline" href="alpamayo1-mlx-speedup-plan.html">alpamayo1-mlx-speedup-plan.html</a>
+                        in order. A phase is done only when its gate table is green.
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                    <div class="bg-slate-950 border border-slate-700 rounded-2xl p-4">
+                        <div class="text-xs uppercase tracking-wider text-sky-400 mb-1">Bar A — Diagnose</div>
+                        <div class="text-slate-300">Stage timer on a fixed clip: encode / prefill / CoT decode / FM. Dtype, compile, <code class="text-cyan-300">num_traj_samples</code>, FM steps, max CoT tokens.</div>
+                    </div>
+                    <div class="bg-slate-950 border border-slate-700 rounded-2xl p-4">
+                        <div class="text-xs uppercase tracking-wider text-sky-400 mb-1">Bar B — Trainable</div>
+                        <div class="text-slate-300">Teacher-forced or CoT-off train step in tens of seconds or less. LoRA/QLoRA path works. Do not call the infer rollout every step.</div>
+                    </div>
+                    <div class="bg-slate-950 border border-slate-700 rounded-2xl p-4">
+                        <div class="text-xs uppercase tracking-wider text-sky-400 mb-1">Bar C — Fast infer</div>
+                        <div class="text-slate-300">Toward a few seconds, then &lt;2&nbsp;s if stream + speculative CoT land. ADE within ~0.1–0.2&nbsp;m of bf16 on a frozen 50-clip slice.</div>
+                    </div>
+                </div>
+                <div>
+                    <div class="uppercase text-xs tracking-widest text-slate-500 mb-2">Phases (do not skip G1)</div>
+                    <ol class="list-decimal list-inside space-y-1 text-sm text-slate-300">
+                        <li><span class="text-sky-300 font-medium">P0 Inventory</span> — map modules to the four stages; count <code class="text-cyan-300">mx.eval</code> / host roundtrips.</li>
+                        <li><span class="text-sky-300 font-medium">P1 Profile</span> — 3 warm trials, median wall-clock. Do not start quant until G1 is green.</li>
+                        <li><span class="text-sky-300 font-medium">P2 Compile / dtype / cut work</span> — bf16 hot path, <code class="text-cyan-300">mx.compile</code> FM + a backbone block, kill per-step eval, train knobs (1 traj, FM 4–6, CoT cap 32–64 or 0).</li>
+                        <li><span class="text-sky-300 font-medium">P3 Mixed PTQ</span> — 4-bit language tower only after G2. Expert and vision stay denser. ParoQuant preferred over naive affine for CoT.</li>
+                        <li><span class="text-sky-300 font-medium">T4.3 Train graph</span> — replace rollout-in-the-loop with official Stage-1 CE / Stage-2 CFM. Bigger win than 4-bit if the current “train” path generates.</li>
+                    </ol>
+                    <p class="mt-3 text-xs text-slate-400">
+                        Phases 5–6 (stream KV, speculative CoT, adaptive FM, distill a student) are in the speedup plan.
+                        They are how infer leaves the multi-second regime; they are not required to start a Stage 2 smoke once Bar B is green.
+                    </p>
+                </div>
+                <div class="bg-rose-950/40 border border-rose-800/60 rounded-2xl p-4 text-sm text-slate-300">
+                    <div class="font-semibold text-rose-300 mb-2">Do not</div>
+                    <ul class="space-y-1 text-xs">
+                        <li>• Quantize the whole model to uniform 4-bit as the first change, or 4-bit the expert/vision before the language tower is proven.</li>
+                        <li>• Start a multi-day QLoRA run before Phase 1 timers exist. Do not backprop through packed <code class="text-cyan-300">QuantizedLinear.weight</code>.</li>
+                        <li>• Set <code class="text-cyan-300">num_traj_samples&gt;1</code> or <code class="text-cyan-300">max_generation_length=256</code> inside a training loop.</li>
+                        <li>• Claim “FlashDrive on Mac.” Steal algorithms; reimplement with compiled MLX closures.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="px-8 py-4 border-t border-slate-700 bg-slate-950 flex items-center justify-between text-xs">
+                <div><span class="font-semibold">Report:</span> <span class="font-mono text-indigo-300">reports/stage1c_progress.html</span> · plan <span class="font-mono text-sky-300">mlx_port/alpamayo1-mlx-speedup-plan.html</span></div>
+                <div class="report-badge">MANDATORY</div>
+            </div>
+        </div>
+
+        <!-- Stage 2 -->
+        <div class="section-card bg-slate-900 border border-violet-700/50 rounded-3xl overflow-hidden">
+            <div class="stage-header px-8 py-5 flex items-center justify-between">
+                <div class="flex items-center gap-x-4">
+                    <div class="w-9 h-9 bg-violet-600 text-white rounded-2xl flex items-center justify-center font-mono font-bold">2</div>
+                    <div>
+                        <div class="font-semibold text-xl">Stage 2: VLM Discrete Token SFT</div>
+                        <div class="text-sm text-violet-400">5–8 days</div>
+                    </div>
+                </div>
+                <div class="metric-badge bg-slate-800 text-slate-400">BLOCKED on 1c</div>
+            </div>
+            
+            <div class="p-8 text-sm text-slate-300 space-y-2">
+                <p>
+                    Fine-tune the VLM (NVIDIA Stage 1: backbone CE; CoC can be teacher-forced or off).
+                    On Mac this is QLoRA on a frozen W4/PARO language tower (speedup T4.1), not a full 10B finetune.
+                </p>
+                <p class="text-xs text-slate-400">
+                    Unblocked when Stage 1c Bar B is green: train step is encode + one backbone forward, not
+                    <code class="text-cyan-300">sample_trajectories_from_data_with_vlm_rollout</code>.
+                    Do not start a multi-day run before G1 timers exist.
+                </p>
+            </div>
+            
+            <div class="px-8 py-4 border-t border-slate-700 bg-slate-950 flex items-center justify-between text-xs">
+                <div><span class="font-semibold">Report:</span> <span class="font-mono text-indigo-300">reports/stage2_progress.html</span> (loss curves, discrete accuracy, footprint)</div>
+                <div class="report-badge">MANDATORY</div>
+            </div>
+        </div>
+
+        <!-- Stage 3 -->
+        <div class="section-card bg-slate-900 border border-rose-700/50 rounded-3xl overflow-hidden">
+            <div class="stage-header px-8 py-5 flex items-center justify-between">
+                <div class="flex items-center gap-x-4">
+                    <div class="w-9 h-9 bg-rose-600 text-white rounded-2xl flex items-center justify-center font-mono font-bold">3</div>
+                    <div>
+                        <div class="font-semibold text-xl">Stage 3: Diffusion Expert SFT</div>
+                        <div class="text-sm text-rose-400">5–8 days</div>
+                    </div>
+                </div>
+                <div class="metric-badge bg-slate-800 text-slate-400">BLOCKED on 1c</div>
+            </div>
+            
+            <div class="p-8 text-sm text-slate-300 space-y-2">
+                <p>
+                    Freeze the Stage 2 VLM. Train the 2.3B expert with the official CFM loss (one sampled timestep per step).
+                    Expert stays bf16 or W8 — 128&nbsp;GiB can hold that. Do not 4-bit the expert first.
+                </p>
+                <p class="text-xs text-slate-400">
+                    Unblocked when Stage 1c T4.3 is landed: the train timer must not include autoregressive CoT or a 10-step Euler loop.
+                </p>
+            </div>
+            
+            <div class="px-8 py-4 border-t border-slate-700 bg-slate-950 flex items-center justify-between text-xs">
+                <div><span class="font-semibold">Report:</span> <span class="font-mono text-indigo-300">reports/stage3_progress.html</span> (flow-matching loss, final metrics, full footprint)</div>
+                <div class="report-badge">MANDATORY</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="max-w-7xl mx-auto px-6 pb-12">
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl p-8">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-y-6">
+                <div>
+                    <div class="font-display text-3xl font-semibold tracking-tight">Total Timeline</div>
+                    <div class="text-5xl font-semibold text-cyan-400 mt-1">21–35 days</div>
+                    <div class="text-sm text-slate-400 mt-2">
+                        0, 1, and 1b closed. 1c not started (unblocks SFT). 1b leftover yield/stop is for MLX SFT after 1c, not NVIDIA numerical match.
+                        Optional P5–P6 extra if 10B infer stays too slow for RL.
+                    </div>
+                </div>
+                
+                <div class="text-right">
+                    <a href="alpamayo1-mlx-speedup-plan.html" class="inline-flex items-center gap-x-2 px-6 py-3 bg-white text-slate-950 rounded-3xl font-semibold text-sm hover:bg-cyan-300 transition-colors">
+                        <span>Open Stage 1c speedup plan</span>
+                        <i class="fa-solid fa-arrow-right ml-2"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="text-center text-xs text-slate-500 mt-8">
+            v5 • Aug 29, 2026 • Stage 1c speedup unblocks SFT • M4 Max 128 GiB • Mandatory HTML reports for every stage
+        </div>
+    </div>
+
+    <script>
+        function initialize() {
+            console.log('%c[Alpamayo MLX] v5 plan loaded (Stage 1c speedup before SFT).', 'color:#64748b');
+        }
+        window.onload = initialize;
+    </script>
+</body>
+</html>

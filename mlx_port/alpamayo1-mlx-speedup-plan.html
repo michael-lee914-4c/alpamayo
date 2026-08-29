@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Alpamayo 1 × MLX Speedup — Agent Work Plan</title>
+  <style>
+    :root {
+      --bg: #0e1116;
+      --bg-elev: #161b22;
+      --bg-card: #1c222b;
+      --line: #2b3340;
+      --text: #e7ecf3;
+      --muted: #9aa7b5;
+      --dim: #6d7a88;
+      --amber: #e8b86d;
+      --amber-dim: #8a6a38;
+      --green: #7dcea0;
+      --red: #e07a7a;
+      --blue: #7eb0d6;
+      --purple: #b59ad9;
+      --mono: "IBM Plex Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+      --sans: "IBM Plex Sans", "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.55; }
+    body { font-size: 15.5px; }
+    a { color: var(--amber); }
+    code, kbd, pre { font-family: var(--mono); font-size: 0.86em; }
+    code { background: #0b0e13; padding: 0.12em 0.38em; border-radius: 4px; color: #f0d9a8; }
+    pre { background: #0b0e13; border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; overflow-x: auto; color: #d7e0ea; }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 28px 80px; }
+    header.hero { border-bottom: 1px solid var(--line); padding-bottom: 28px; margin-bottom: 28px; }
+    .kicker { color: var(--amber); letter-spacing: 0.14em; text-transform: uppercase; font-size: 11px; font-weight: 600; }
+    h1 { font-size: 2.05rem; line-height: 1.15; margin: 8px 0 12px; font-weight: 650; letter-spacing: -0.02em; }
+    h2 { font-size: 1.28rem; margin: 36px 0 12px; padding-top: 8px; border-top: 1px solid var(--line); letter-spacing: -0.01em; }
+    h3 { font-size: 1.02rem; margin: 22px 0 8px; color: var(--amber); }
+    .lede { color: var(--muted); font-size: 1.05rem; max-width: 46em; }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .pill { border: 1px solid var(--line); background: var(--bg-elev); color: var(--muted); padding: 4px 10px; border-radius: 999px; font-size: 12px; }
+    .pill strong { color: var(--text); font-weight: 600; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+    @media (max-width: 860px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+    .card { background: var(--bg-card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+    .card h3 { margin-top: 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--dim); font-weight: 600; font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; }
+    .ok { color: var(--green); }
+    .bad { color: var(--red); }
+    .warn { color: var(--amber); }
+    .note { color: var(--muted); font-size: 13px; }
+    .task { background: var(--bg-card); border: 1px solid var(--line); border-left: 3px solid var(--amber); border-radius: 8px; padding: 14px 16px; margin: 12px 0; }
+    .task.gate { border-left-color: var(--purple); }
+    .task.forbid { border-left-color: var(--red); }
+    .task header { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline; margin-bottom: 6px; }
+    .tid { font-family: var(--mono); color: var(--amber); font-size: 12.5px; font-weight: 650; }
+    .tname { font-weight: 650; }
+    .deps { font-size: 12.5px; color: var(--dim); }
+    ul.tight > li { margin: 3px 0; }
+    .callout { background: #1a1712; border: 1px solid var(--amber-dim); border-radius: 8px; padding: 12px 14px; color: #f0e2c6; }
+    .callout.danger { background: #1a1214; border-color: #6a3030; color: #f0c8c8; }
+    toc a { text-decoration: none; color: var(--muted); }
+    toc a:hover { color: var(--text); }
+    toc ol { padding-left: 1.2em; }
+    footer { margin-top: 48px; color: var(--dim); font-size: 12.5px; border-top: 1px solid var(--line); padding-top: 16px; }
+    .bar { height: 8px; background: #0b0e13; border-radius: 99px; overflow: hidden; display: flex; }
+    .bar span { display: block; height: 100%; }
+    .toc-box { background: var(--bg-elev); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div class="kicker">Agent work plan · verified 2026-08-29</div>
+    <h1>Alpamayo 1 on MLX:<br />make inference fast enough to train</h1>
+    <p class="lede">
+      This is <strong>Stage 1c</strong> of
+      <a href="alpamayo_mlx_port_plan.html">alpamayo_mlx_port_plan.html</a>.
+      Target machine: Mac M4 Max, 128&nbsp;GB unified memory.
+      Current single-window inference is ~110&nbsp;s. That is ~150× slower than the
+      NVIDIA baseline for the same 10B VLA (~704&nbsp;ms) and blocks any practical
+      SFT or RL loop. Quantization is one lever, not the first one.
+      Stage 1b (action expert / physical <code>pred_xyz</code>) is closed — leftover yield/stop quality is on
+      <a href="../reports/stage1b_progress.html">reports/stage1b_progress.html</a>.
+      Progress report: <code>reports/stage1c_progress.html</code>. Stages 2–3 stay blocked until Bar B is green.
+    </p>
+    <div class="meta">
+      <span class="pill"><strong>Model</strong> Alpamayo 1 / Alpamayo-R1-10B</span>
+      <span class="pill"><strong>Stack</strong> MLX · Apple Silicon</span>
+      <span class="pill"><strong>Goal</strong> usable train step, then &lt;2&nbsp;s infer</span>
+      <span class="pill"><strong>Constraint</strong> QuantizedLinear packed weights have no grads</span>
+    </div>
+  </header>
+
+  <div class="toc-box">
+    <strong>Read this first.</strong> Execute phases in order. Do not start Phase 3 until Phase 1 numbers exist.
+    A phase is done only when its gate table is green.
+    <ol>
+      <li><a href="#mission">Mission and success bars</a></li>
+      <li><a href="#facts">Verified facts (and corrections)</a></li>
+      <li><a href="#forbid">Do not do</a></li>
+      <li><a href="#p0">Phase 0 — Inventory the port</a></li>
+      <li><a href="#p1">Phase 1 — Profile one window</a></li>
+      <li><a href="#p2">Phase 2 — Compile, dtype, cut train-time work</a></li>
+      <li><a href="#p3">Phase 3 — Mixed-precision PTQ</a></li>
+      <li><a href="#p4">Phase 4 — Train in low precision the MLX way</a></li>
+      <li><a href="#p5">Phase 5 — Pipeline: stream, speculate, skip FM steps</a></li>
+      <li><a href="#p6">Phase 6 — Distill a student (if 10B still too slow)</a></li>
+      <li><a href="#metrics">Metrics, gates, handoff</a></li>
+    </ol>
+  </div>
+
+  <h2 id="mission">1. Mission and success bars</h2>
+  <p>
+    Produce a faster Alpamayo 1 MLX inference path so on-device training is
+    possible. Prefer changes that keep trajectory quality (minADE / ADE@6.4s)
+    and CoT validity. The 10B model is the teacher. A smaller student is an
+    allowed end-state if the teacher cannot be rolled out cheaply.
+  </p>
+  <div class="grid-3">
+    <div class="card">
+      <h3>Bar A — Diagnose</h3>
+      <p>Stage timer for one window: encode / prefill / CoT decode / flow-matching. Dtype, compile status, <code>num_traj_samples</code>, FM steps, max CoT tokens recorded.</p>
+    </div>
+    <div class="card">
+      <h3>Bar B — Trainable</h3>
+      <p>Teacher-forced or CoT-disabled train step on M4 Max in tens of seconds or less, not 110&nbsp;s. LoRA/QLoRA path works.</p>
+    </div>
+    <div class="card">
+      <h3>Bar C — Fast infer</h3>
+      <p>Single-window inference toward a few seconds, then &lt;2&nbsp;s if streaming + speculative CoT land. Quality within ~0.1–0.2&nbsp;m ADE of the bf16 port on a fixed 50-clip slice.</p>
+    </div>
+  </div>
+
+  <h2 id="facts">2. Verified facts (and what the last plan got wrong)</h2>
+  <h3>Architecture — keep these numbers</h3>
+  <table>
+    <thead><tr><th>Piece</th><th>Value</th><th>Implication</th></tr></thead>
+    <tbody>
+      <tr><td>Total / split</td><td>10B = 8.2B Cosmos-Reason backbone + 2.3B action expert</td><td>Quantize the language tower first. Expert is small enough to stay denser.</td></tr>
+      <tr><td>Cameras</td><td>4: front-wide, front-tele, cross-left, cross-right</td><td>Vision prefill scales with cameras × frames.</td></tr>
+      <tr><td>Image history</td><td>0.4&nbsp;s @ 10&nbsp;Hz → 4 frames / camera = 16 RGB frames</td><td>Native 1080×1920, processor downsamples to ~320×576. Thousands of vision tokens.</td></tr>
+      <tr><td>Ego history</td><td>16 poses @ 10&nbsp;Hz (1.6&nbsp;s)</td><td>Cheap vs vision. Do not over-optimize this.</td></tr>
+      <tr><td>Trajectory</td><td>6.4&nbsp;s horizon, 64 waypoints @ 10&nbsp;Hz, unicycle accel+curvature</td><td>Expert outputs (64, 2) then integrates to xyz/rot.</td></tr>
+      <tr><td>Flow matching</td><td>Euler, <strong>default 10 inference steps</strong></td><td>Corrected: not 20–50. Still worth trying 4–8 with an ADE check.</td></tr>
+      <tr><td>CoT cap</td><td><code>max_generation_length=256</code> in official SFT eval</td><td>FlashDrive measured ~16 CoT tokens average on this domain. Train rollouts should not emit 256.</td></tr>
+      <tr><td>Traj samples</td><td>Official <code>test_inference.py</code> uses <code>num_traj_samples=1</code>. Sampling API elsewhere defaults to 6.</td><td>Inspect the port. Training must be 1.</td></tr>
+      <tr><td>NVIDIA latency</td><td>Alpamayo 1 FlashDrive baseline 704&nbsp;ms → 155&nbsp;ms on RTX PRO 6000 (4.5×). 1.5 is 716→159&nbsp;ms.</td><td>110&nbsp;s on M4 Max is a port/pipeline problem, not a 128&nbsp;GB memory problem.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Four-stage inference (this is the unit of work)</h3>
+  <div class="card">
+    <ol class="tight">
+      <li><strong>Encode</strong> — vision tower over 16 frames.</li>
+      <li><strong>Prefill</strong> — backbone over vision + ego + prompt tokens (compute-bound, long sequence).</li>
+      <li><strong>Decode</strong> — autoregressive Chain-of-Causation text (memory-bound per token).</li>
+      <li><strong>Action</strong> — 10× (or N×) 2.3B expert forwards, KV from the VLM reused across steps.</li>
+    </ol>
+    <p class="note">FlashDrive stage split on 1.5 / RTX PRO 6000: encode 88 · prefill 177 · decode 264 · action 187 = 716&nbsp;ms. No single stage is the whole bill. Do not optimize blind.</p>
+  </div>
+
+  <h3>MLX constraints — still true as of late Aug 2026</h3>
+  <ul>
+    <li><code>nn.quantize(..., mode="affine", bits=4, group_size=64)</code> is the production weight-only path. Bits in {2,3,4,5,6,8}. Predicate may return a dict of <code>{bits, group_size}</code>.</li>
+    <li><code>QuantizedLinear</code> packed integer weights are frozen. No gradients through the int codes. DWQ unfreezes only <code>scales</code> and <code>biases</code>.</li>
+    <li>Activation quant (<code>QQLinear</code>, <code>quantize_input=True</code>) only for <code>nvfp4</code> / <code>mxfp8</code>.</li>
+    <li>Train paths that exist: QLoRA on a frozen quantized base; DWQ distillation of scales/biases; LoRA on bf16; community fake-quant QAT in mlx-lm-lora. There is no “full finetune the 4-bit 10B.”</li>
+    <li><code>mx.compile</code> is the CUDA-graph analog. Official NVIDIA code has <code>enable_diffusion_expert_cuda_graph()</code> — that API is CUDA. Reimplement with compiled fixed-shape MLX closures.</li>
+  </ul>
+
+  <h3>External stacks you may reuse, not drop in</h3>
+  <table>
+    <thead><tr><th>Thing</th><th>Status</th><th>Agent action</th></tr></thead>
+    <tbody>
+      <tr><td>FlashDrive (<code>z-lab/flashdrive</code>)</td><td class="bad">CUDA only</td><td>Steal algorithms. Do not import the repo as a runtime.</td></tr>
+      <tr><td><code>z-lab/Alpamayo-R1-10B-PARO</code></td><td class="ok">W4A8 language weights exist for Alpamayo 1</td><td>Try loading via <code>pip install "paroquant[mlx]"</code>. Keep expert bf16/W8.</td></tr>
+      <tr><td><code>z-lab/Alpamayo-R1-10B-DFlash</code></td><td class="warn">Draft weights exist; runtime is CUDA FlashDrive</td><td>Port draft+verify with <code>dflash-mlx</code> ideas. Do not expect a one-liner.</td></tr>
+      <tr><td>ParoQuant MLX extra</td><td class="ok">Official Apple Silicon path</td><td>Preferred 4-bit recipe for the reasoning tower. Naive affine 4-bit lets CoT error accumulate.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <strong>Correction log vs the previous narrative.</strong>
+    Flow-matching default is 10 steps, not 20–50.
+    Official test script samples 1 trajectory; do not assume 6 without reading the port.
+    FlashDrive 4.5× is real for Alpamayo 1 (704→155&nbsp;ms) but on NVIDIA, not Mac.
+    Memory is not the bottleneck on 128&nbsp;GB. Compile + cut work will beat a blind 4-bit cast.
+  </div>
+
+  <h2 id="forbid">3. Do not do</h2>
+  <div class="task forbid">
+    <header><span class="tid">STOP</span><span class="tname">Hard constraints</span></header>
+    <ul class="tight">
+      <li>Do not quantize the whole model to uniform 4-bit as the first change.</li>
+      <li>Do not 4-bit the action expert or vision tower until the language tower is proven.</li>
+      <li>Do not start a multi-day QLoRA run before Phase 1 timers exist.</li>
+      <li>Do not try to backprop through packed <code>QuantizedLinear.weight</code>.</li>
+      <li>Do not set <code>num_traj_samples&gt;1</code> or <code>max_generation_length=256</code> inside a training loop.</li>
+      <li>Do not evaluate quality with a single cherry-picked clip. Use a frozen 50-clip slice and the same seeds.</li>
+      <li>Do not claim “FlashDrive on Mac.” Reimplement the techniques.</li>
+      <li>Do not switch to Alpamayo 1.5 mid-stream unless the user says so. This plan is Alpamayo 1 / R1-10B.</li>
+    </ul>
+  </div>
+
+  <h2 id="p0">Phase 0 — Inventory the port</h2>
+  <p class="note">Owner: Port agent. Depends on: access to the user’s MLX tree. Timebox: 2–4 hours.</p>
+
+  <div class="task">
+    <header><span class="tid">T0.1</span><span class="tname">Map modules to the four stages</span><span class="deps">→ T1.1</span></header>
+    <p>Walk the MLX port and write a one-page map:</p>
+    <ul class="tight">
+      <li>Vision encoder class, input shape after processor, token count per window.</li>
+      <li>Backbone class (Cosmos-Reason / Qwen3-VL lineage), layer count, dtype.</li>
+      <li>Generation loop: KV cache? <code>mx.eval</code> per token? compiled?</li>
+      <li>Action expert class, how KV is passed in, FM <code>num_inference_steps</code>.</li>
+      <li>Current <code>num_traj_samples</code>, <code>max_generation_length</code>, temperature / top_p.</li>
+    </ul>
+    <p><strong>Done when:</strong> a short <code>PORT.md</code> exists with file paths and those numbers filled from code, not memory.</p>
+  </div>
+
+  <div class="task">
+    <header><span class="tid">T0.2</span><span class="tname">Confirm dtype and eval policy</span></header>
+    <p>If any hot path is float32, that is a Phase 2 bug, not a Phase 3 job. Search for <code>mx.eval</code> inside token and FM loops — per-step eval will dominate 110&nbsp;s by itself.</p>
+    <p><strong>Done when:</strong> dtype of backbone, vision, expert, and action projections is written down. Count of <code>mx.eval</code> / <code>.item()</code> / numpy roundtrips in one window is written down.</p>
+  </div>
+
+  <h2 id="p1">Phase 1 — Profile one window</h2>
+  <p class="note">Owner: Perf agent. Depends on: T0.1. Timebox: half a day. Do not skip.</p>
+
+  <div class="task">
+    <header><span class="tid">T1.1</span><span class="tname">Stage wall-clock on a fixed clip</span></header>
+    <pre>t0 encode
+t1 prefill
+t2 CoT decode   # also tokens generated, ms/token
+t3 FM loop      # also ms/step, step count
+t4 convert action → xyz/rot</pre>
+    <p>Run 3 warm trials after 1 warmup. Report median. Same clip every time.</p>
+    <p><strong>Done when:</strong> a table like the one below is filled. If any stage is &lt;5% of 110&nbsp;s, do not spend a week on it.</p>
+  </div>
+
+  <div class="task">
+    <header><span class="tid">T1.2</span><span class="tname">Optional Metal capture</span></header>
+    <pre>MTL_CAPTURE_ENABLED=1 python profile_window.py
+# inside:
+mx.metal.start_capture("alpamayo.gputrace")
+mx.eval(pred)
+mx.metal.stop_capture()</pre>
+    <p>Open in Xcode only if T1.1 cannot explain the time (suspected launch overhead or tiny unfused kernels).</p>
+  </div>
+
+  <div class="task gate">
+    <header><span class="tid">G1</span><span class="tname">Gate — do not start quant until this is green</span></header>
+    <table>
+      <thead><tr><th>Field</th><th>Required</th></tr></thead>
+      <tbody>
+        <tr><td>encode_ms, prefill_ms, decode_ms, decode_tok, ms_per_tok, fm_ms, fm_steps, ms_per_fm_step</td><td>filled</td></tr>
+        <tr><td>dtype</td><td>known</td></tr>
+        <tr><td>compiled? (yes/no per stage)</td><td>known</td></tr>
+        <tr><td>num_traj_samples, max_generation_length</td><td>known</td></tr>
+        <tr><td>Dominant stage named</td><td>one of encode / prefill / decode / action / python-overhead</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 id="p2">Phase 2 — Compile, dtype, cut train-time work</h2>
+  <p class="note">Owner: Perf + train agents. Depends on: G1. Expected impact: often 3–10× on a naive first port, before any quant. Timebox: 1–2 days.</p>
+
+  <div class="task">
+    <header><span class="tid">T2.1</span><span class="tname">bf16 everywhere that is still fp32</span></header>
+    <p>Backbone, expert, projections, vision. Leave LayerNorm/RMSNorm as the port already does. <strong>Done when:</strong> no fp32 matmul remains on the hot path; T1.1 rerun.</p>
+  </div>
+
+  <div class="task">
+    <header><span class="tid">T2.2</span><span class="tname">Compile fixed-shape closures</span></header>
+    <pre>@mx.compile
+def diffusion_step(x, t, *kv):
+    return expert(x, t, kv)
+
+@mx.compile
+def backbone_block(h, mask, cache):
+    return block(h, mask, cache)</pre>
+    <p>Capture once. Recapture if batch, cameras, or token length change. Do not compile a Python generation loop that changes shape every token unless you have a decode-step closure with static cache views.</p>
+    <p><strong>Done when:</strong> FM step and at least one backbone block are compiled; T1.1 shows lower launch overhead or lower ms/step.</p>
+  </div>
+
+  <div class="task">
+    <header><span class="tid">T2.3</span><span class="tname">Kill per-step eval and host roundtrips</span></header>
+    <p>One <code>mx.eval</code> at the end of encode, at the end of prefill, after CoT (or per decoded chunk), after the FM loop — not inside the Euler integrator and not after every token unless you are streaming text to a UI.</p>
+  </div>
+
+  <div class="task">
+    <header><span class="tid">T2.4</span><span class="tname">Train-time compute budget</span></header>
+    <p>These switches are for training and cheap eval, not for the final teacher demo:</p>
+    <table>
+      <thead><tr><th>Knob</th><th>Train value</th><th>Quality check</th></tr></thead>
+      <tbody>
+        <tr><td><code>num_traj_samples</code></td><td>1</td><td>always</td></tr>
+        <tr><td>FM steps</td><td>try 6, then 4</td><td>ADE on 50-clip slice vs 10-step</td></tr>
+        <tr><td><code>max_generation_length</code></td><td>32–64 for rollouts; 0 if CoT disabled</td><td>CoT still parseable if used</td></tr>
+        <tr><td>CoT in Stage-1 SFT</td><td>teacher-force or disable (NVIDIA Stage 1 already has a CoC-off path)</td><td>traj loss only</td></tr>
+        <tr><td>Vision</td><td>cache encoder outputs for SFT; do not re-encode identical frames</td><td>bitwise match on cached vs live encode</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Done when:</strong> a train-config YAML exists with these values and a one-window train-forward time is reported next to the infer time.</p>
+  </div>
+
+  <div class="task gate">
+    <header><span class="tid">G2</span><span class="tname">Gate</span></header>
+    <p>If one-window infer is still &gt;30&nbsp;s after T2.1–T2.4, the remaining time must be attributed (still Python? still 256 CoT tokens? vision at full res?). Do not jump to 2-bit. If infer is already in the 5–20&nbsp;s band, Phase 3 is worth it.</p>
+  </div>
+
+  <h2 id="p3">Phase 3 — Mixed-precision PTQ</h2>
+  <p class="note">Owner: Quant agent. Depends on: G2. Timebox: 1 day for affine mix, +1 day if ParoQuant loads.</p>
+
+  <div class="task">
+    <header><span class="tid">T3.1</span><span class="tname">Recipe A — mixed affine (must ship first)</span></header>
+    <pre>import mlx.nn as nn
+
+KEEP_DENSE = ("vision", "visual", "vit", "action", "expert",
+              "lm_head", "embed", "embed_tokens")
+
+def pred(path, m):
+    if not hasattr(m, "to_quantized"):
+        return False
+    pl = path.lower()
+    if any(s in pl for s in KEEP_DENSE):
+        return {"bits": 8, "group_size": 64}   # or False for bf16
+    return {"bits": 4, "group_size": 64}
+
+nn.quantize(model, group_size=64, bits=4, mode="affine", class_predicate=pred)</pre>
+    <p>Adjust path substrings to the real module names from T0.1. Default group size 64. Do not start at group 32 unless quality fails — gs32 is slower on Metal because of scale traffic.</p>
+    <p><strong>Done when:</strong> checkpoint saved; T1.1 rerun; 50-clip ADE and a CoT exact-match or token-level agreement vs bf16 recorded.</p>
+  </div>
+
+  <div class="task">
+    <header><span class="tid">T3.2</span><span class="tname">Recipe B — ParoQuant language tower</span></header>
+    <p>Preferred 4-bit for CoT. Naive affine 4-bit is known to drift on multi-token reasoning traces.</p>
+    <ol class="tight">
+      <li><code>pip install "paroquant[mlx]"</code></li>
+      <li>Attempt to load <code>z-lab/Alpamayo-R1-10B-PARO</code> language weights into the MLX backbone. Expert stays Recipe A or bf16.</li>
+      <li>If the companion does not map 1:1 onto the port’s parameter names, run ParoQuant conversion on the port’s own backbone weights.</li>
+    </ol>
+    <p><strong>Done when:</strong> either PARO loads and beats Recipe A on CoT agreement, or a written reason it cannot (name mismatch, missing kernel, license) is in the handoff.</p>
+  </div>
+
+  <div class="task">
+    <header><span class="tid">T3.3</span><span class="tname">Quality slice</span></header>
+    <p>Freeze 50 PhysicalAI-AV clips. Report minADE@6.4s, ADE@6.4s, off-road if you have it, and whether CoT still contains the expected causal structure (not just perplexity). Fail Recipe A if ADE regresses &gt;0.2&nbsp;m or CoT becomes garbage. Then bump last N layers + head to 6/8-bit, or run T4.2 DWQ.</p>
+  </div>
+
+  <div class="task gate">
+    <header><span class="tid">G3</span><span class="tname">Gate</span></header>
+    <p>Quantized infer is faster than G2 on decode and/or prefill. ADE within 0.2&nbsp;m of the Phase 2 bf16 port. Action expert still not 4-bit unless T3.3 explicitly says it survived.</p>
+  </div>
+
+  <h2 id="p4">Phase 4 — Train in low precision the MLX way</h2>
+  <p class="note">Owner: Train agent. Depends on: G3 (or G2 if staying bf16 LoRA). Timebox: 2–4 days including a short SFT smoke.</p>
+
+  <div class="card">
+    <p>NVIDIA’s own SFT is two stages on 8×H100: Stage 1 backbone (CoC can be off), Stage 2 expert. Reproduce that split on one Mac, at much smaller batch.</p>
+  </div>
+
+  <div class="task">
+    <header><span class="tid">T4.1</span><span class="tname">QLoRA backbone, denser expert</span></header>
+    <ul class="tight">
+      <li>Freeze W4/PARO language weights.</li>
+      <li>Inject LoRA on q, k, v, o, gate, up, down of the backbone. Rank 8–16 to start.</li>
+      <li>Leave the 2.3B expert in bf16 or W8. LoRA it in Stage 2, or train it dense — 128&nbsp;GB can hold that.</li>
+      <li>Do not update packed ints.</li>
+    </ul>
+    <p><strong>Done when:</strong> one Stage-1 smoke (e.g. 50–100 steps, batch 1) completes without OOM; loss trends down; peak memory logged.</p>
+  </div>
+
+  <div class="task">
+    <header><span class="tid">T4.2</span><span class="tname">DWQ if Recipe A CoT is weak</span></header>
+    <p>Use the MLX DWQ path: freeze packed weights, train <code>scales</code>/<code>biases</code> with KL to a bf16 or W8 teacher on driving CoT + hidden states. Calibrate on AV clips, not WikiText. DWQ pays off at 2–4 bits; skip it at 8-bit.</p>
+    <p><strong>Done when:</strong> student-teacher KL dropped and T3.3 CoT metric improved, or DWQ is marked skip with a reason.</p>
+  </div>
+
+  <div class="task">
+    <header><span class="tid">T4.3</span><span class="tname">Train step that does not generate</span></header>
+    <p>For SFT, teacher-force CoT tokens and run a single FM training forward (the flow-matching train loss already samples a timestep — it does not need 10 Euler steps). The 110&nbsp;s number is an <em>inference</em> window. A correct train step should be encode + one backbone forward + one expert forward, not a full rollout.</p>
+    <p>If the current “training” code calls <code>sample_trajectories_from_data_with_vlm_rollout</code> every step, that is the bug. Replace it with the official SFT graphs (stage1 VLM CE / stage2 CFM loss).</p>
+    <p><strong>Done when:</strong> train-step timer does not include autoregressive CoT or a 10-step Euler loop unless the run is RL rollout.</p>
+  </div>
+
+  <div class="task gate">
+    <header><span class="tid">G4</span><span class="tname">Gate</span></header>
+    <p>SFT smoke works. Train step time is in a different regime from 110&nbsp;s infer. Checkpoint can be fused (LoRA→dense) or served as base+adapter.</p>
+  </div>
+
+  <h2 id="p5">Phase 5 — Pipeline: stream, speculate, skip FM steps</h2>
+  <p class="note">Owner: Systems agent. Depends on: G3. Do in parallel with Phase 4 if people allow. This is how you leave the multi-second infer regime.</p>
+
+  <div class="task">
+    <header><span class="tid">T5.1</span><span class="tname">Streaming vision KV</span></header>
+    <p>Windows overlap ~75%. Encode only new frames. Keep a persistent KV. Evict the oldest vision span. FlashDrive: encode 88→12.5&nbsp;ms on NVIDIA after this. On MLX, even a coarse “reuse last 12 of 16 frame embeddings” is a win for closed-loop training.</p>
+    <p>If streaming hurts ADE, finetune <em>only the action expert</em> (FlashDrive result: full-VLM stream-FT made ADE worse; expert-only recovered).</p>
+  </div>
+
+  <div class="task">
+    <header><span class="tid">T5.2</span><span class="tname">Speculative CoT</span></header>
+    <p>Domain CoT is short and low-entropy (~16 tokens). Worth doing only if T1.1 says decode is a large slice.</p>
+    <ul class="tight">
+      <li>Draft weights: <code>z-lab/Alpamayo-R1-10B-DFlash</code> (2-layer, block size 8).</li>
+      <li>Runtime reference: <code>dflash-mlx</code> (community MLX speculative loop). FlashDrive itself will not run.</li>
+      <li>Acceptance must be exact (verify with the target). Do not ship approximate drafts into a planner.</li>
+    </ul>
+  </div>
+
+  <div class="task">
+    <header><span class="tid">T5.3</span><span class="tname">Adaptive flow matching</span></header>
+    <p>FlashDrive caches mid-schedule velocities when relative change is small (they cited cosine &gt;0.99). Implement a cheap version: run steps {0,1,2,N-2,N-1,N} live, reuse mid. Compare ADE to full 10-step on the 50-clip slice. Keep the setting that wins.</p>
+  </div>
+
+  <div class="task gate">
+    <header><span class="tid">G5</span><span class="tname">Gate</span></header>
+    <p>Infer window is a few seconds or better. ADE still inside the 0.2&nbsp;m band. Document which of T5.1–T5.3 actually moved the needle on M4 Max — do not keep dead code.</p>
+  </div>
+
+  <h2 id="p6">Phase 6 — Distill a student</h2>
+  <p class="note">Owner: Distill agent. Trigger: after G4, teacher rollout is still too slow for RL. This is NVIDIA’s intended product path.</p>
+
+  <div class="task">
+    <header><span class="tid">T6.1</span><span class="tname">Teacher dump</span></header>
+    <p>Run the best teacher (Phase 3/5) offline over the train split. Store CoT text + future xyz/rot. No need for this to be real-time.</p>
+  </div>
+
+  <div class="task">
+    <header><span class="tid">T6.2</span><span class="tname">Student</span></header>
+    <p>1–3B VLM + small FM head, 4-bit MLX, LoRA. Train on the dump. The policy you RL is the student. Keep the 10B as labeler / critic.</p>
+    <p><strong>Done when:</strong> student train step is comfortable on M4 Max and closed-loop or ADE is measured against the teacher, not against hope.</p>
+  </div>
+
+  <h2 id="metrics">7. Metrics, gates, handoff</h2>
+  <h3>Always log</h3>
+  <table>
+    <thead><tr><th>Metric</th><th>Where</th></tr></thead>
+    <tbody>
+      <tr><td>encode / prefill / decode / fm ms</td><td>every phase gate</td></tr>
+      <tr><td>CoT tokens, ms/token</td><td>every infer change</td></tr>
+      <tr><td>FM steps, ms/step</td><td>every infer change</td></tr>
+      <tr><td>peak unified memory</td><td>infer + train</td></tr>
+      <tr><td>minADE@6.4s, ADE@6.4s on 50-clip slice</td><td>every quality-affecting change</td></tr>
+      <tr><td>CoT valid rate (parseable causal trace)</td><td>after quant / DWQ / speculative</td></tr>
+      <tr><td>train step ms, samples/s</td><td>Phase 4+</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Suggested order if only one agent is working</h3>
+  <p>T0.1 → T0.2 → T1.1 → T2.3 → T2.1 → T2.4 → T2.2 → T4.3 → T3.1 → T4.1 → T3.2 → T5.1 → T5.3 → T5.2 → T6.x if needed.</p>
+  <p>T4.3 (stop generating inside SFT) may be a bigger win than 4-bit. Check it early.</p>
+
+  <h3>Handoff format</h3>
+  <pre>phase: G2
+window_ms: {encode, prefill, decode, fm, total}
+config: {dtype, compiled, traj_samples, fm_steps, max_gen}
+quality_50: {minADE, ADE, cot_valid}
+train_step_ms: null | number
+next: T3.1
+blockers: []</pre>
+
+  <h3>Reference links for agents</h3>
+  <ul class="tight">
+    <li>Model: <code>nvidia/Alpamayo-R1-10B</code> · code: <code>NVlabs/alpamayo</code> · SFT: <code>NVlabs/alpamayo-recipes</code></li>
+    <li>Paper: Alpamayo-R1 arXiv 2511.00088</li>
+    <li>FlashDrive numbers and techniques: z-lab FlashDrive project / <code>z-lab/Alpamayo-R1-10B</code> card (704→155&nbsp;ms)</li>
+    <li>MLX quant: <code>mlx.nn.quantize</code>, DWQ in mlx-lm, QLoRA via <code>mlx_lm.lora</code> on a quantized base</li>
+    <li>ParoQuant MLX: <code>pip install "paroquant[mlx]"</code> · weights <code>z-lab/Alpamayo-R1-10B-PARO</code></li>
+    <li>DFlash weights: <code>z-lab/Alpamayo-R1-10B-DFlash</code> · MLX loop reference: <code>aryagm/dflash-mlx</code></li>
+  </ul>
+
+  <footer>
+    Plan double-checked 2026-08-29 against Alpamayo 1 docs (10 FM steps, 4×4 frames, 256 CoT cap),
+    MLX 0.32 quant docs (frozen QuantizedLinear, affine / mxfp / nvfp4),
+    and FlashDrive Alpamayo 1 card (704→155&nbsp;ms, CUDA-only runtime).
+    Work the gates. Do not 4-bit the expert first.
+  </footer>
+</div>
+</body>
+</html>

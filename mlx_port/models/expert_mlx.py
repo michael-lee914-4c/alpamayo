@@ -122,8 +122,54 @@ def expert_attention_mask(
     for i in range(batch):
         start = int(off[i])
         if 0 <= start < prefix_len:
+            # NVIDIA: attention_mask[..., offset : -n_diffusion] = -inf
+            # with last dim prefix+T, that slice is [offset, prefix_len).
             mask[i, :, :, start:prefix_len] = hide
     return mx.array(mask)
+
+
+def expert_rope_mask_contract(
+    full_sequence: np.ndarray,
+    traj_future_start_id: int,
+    rope_deltas: Any,
+    prefix_len: int,
+    n_diffusion: int,
+) -> dict[str, Any]:
+    """NVIDIA step_fn numbers for one sequence. Used to log mute-vs-prior.
+
+    ``offset`` is index of ``<|traj_future_start|>`` + 1 in prompt+generated.
+    ``prefix_len`` is VLM KV length (often one token shorter than the sequence
+    because StopAfterEOS leaves the extra token out of cache).
+    Position 0 of the expert is ``offset + rope_deltas``.
+    """
+    arr = np.asarray(full_sequence)
+    if arr.ndim == 1:
+        arr = arr[None, :]
+    offsets = traj_future_start_offsets(arr, traj_future_start_id)
+    pos = np.asarray(expert_position_ids(n_diffusion, arr.shape[0], rope_deltas, offsets))
+    mask = np.asarray(expert_attention_mask(arr.shape[0], n_diffusion, prefix_len, offsets))
+    hits = np.flatnonzero(arr[0] == int(traj_future_start_id))
+    tfs_idx = int(hits[0]) if hits.size else -1
+    offset = int(offsets[0])
+    rd = int(np.asarray(rope_deltas).reshape(-1)[0])
+    hide = mask[0, 0, 0, :prefix_len] < 0
+    hide_idx = np.flatnonzero(hide)
+    diff_block = mask[0, 0, :, prefix_len:]
+    return {
+        "full_seq_len": int(arr.shape[1]),
+        "prefix_len": int(prefix_len),
+        "tfs_idx": tfs_idx,
+        "offset": offset,
+        "rope_deltas": rd,
+        "pos0": int(pos[0, 0, 0]),
+        "pos_last": int(pos[0, 0, -1]),
+        "hide_start": int(hide_idx[0]) if hide_idx.size else None,
+        "hide_end": int(hide_idx[-1] + 1) if hide_idx.size else None,
+        "n_hidden": int(hide_idx.size),
+        "diffusion_block_max_abs": float(np.max(np.abs(diff_block))),
+        "cache_vs_seq": int(prefix_len) - int(arr.shape[1]),
+        "pos0_matches_offset_plus_delta": int(pos[0, 0, 0]) == offset + rd,
+    }
 
 
 class _ExpertLanguageModel(nn.Module):

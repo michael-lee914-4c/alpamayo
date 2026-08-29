@@ -115,7 +115,7 @@ def _report_memory():
     return peak
 
 
-def _print_traj(pred_xyz, pred_rot, data):
+def _print_traj(pred_xyz, pred_rot, data, extra=None):
     print("\nFuture Trajectory (from action expert):")
     if pred_xyz is not None:
         xyz_np = np.asarray(pred_xyz)
@@ -144,6 +144,26 @@ def _print_traj(pred_xyz, pred_rot, data):
             f"  gt xy start=({gt_flat[0, 0]:.3f}, {gt_flat[0, 1]:.3f}) "
             f"end=({gt_flat[-1, 0]:.3f}, {gt_flat[-1, 1]:.3f})"
         )
+    expert = (extra or {}).get("expert") if extra else None
+    if expert:
+        d0 = expert[0]
+        print(
+            f"  expert contract: offset={d0.get('offset')} prefix={d0.get('prefix_len')} "
+            f"tfs={d0.get('tfs_idx')} rope_deltas={d0.get('rope_deltas')} "
+            f"pos0={d0.get('pos0')} hide={d0.get('hide_start')}:{d0.get('hide_end')} "
+            f"cache_vs_seq={d0.get('cache_vs_seq')} "
+            f"pos0_ok={d0.get('pos0_matches_offset_plus_delta')} "
+            f"diff_block_abs={d0.get('diffusion_block_max_abs')}"
+        )
+        t0_v = d0.get("t0_v")
+        print(
+            f"  t0_v={t0_v if t0_v is None else f'{t0_v:.3f}'} m/s  "
+            f"accel mean={d0.get('accel_mean')} "
+            f"min={d0.get('accel_min')} max={d0.get('accel_max')}  "
+            f"kappa mean={d0.get('kappa_mean')} |max|={d0.get('kappa_abs_max')}"
+        )
+        print("  action first5 (accel, kappa):", d0.get("action_first5"))
+        print("  action last5  (accel, kappa):", d0.get("action_last5"))
 
 
 def _cleanup(*objs):
@@ -211,7 +231,7 @@ def test_end_to_end_inference_prints_coc_vlm_only(max_gen_len):
             ego_future_xyz=data.get("ego_future_xyz"),
         )
     )
-    _print_traj(pred_xyz, pred_rot, data)
+    _print_traj(pred_xyz, pred_rot, data, extra)
     assert pred_xyz is not None and pred_rot is not None, "greedy rollout returned no trajectory"
     print("[End-to-End Test] Inference completed successfully.")
     _cleanup(model, data, model_inputs, extra)
@@ -274,7 +294,7 @@ def test_end_to_end_inference_temperature_coc_and_traj(max_gen_len):
             ego_future_xyz=data.get("ego_future_xyz"),
         )
     )
-    _print_traj(pred_xyz, pred_rot, data)
+    _print_traj(pred_xyz, pred_rot, data, extra)
     print("[End-to-End Test] Temperature sample completed successfully.")
     if peak["total"] > 0:
         print(

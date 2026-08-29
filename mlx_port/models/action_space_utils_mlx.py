@@ -193,6 +193,40 @@ def solve_xs_eq_y(
     return x
 
 
+def _unicycle_velocity_design(
+    dxy: mx.array, theta: mx.array, dt: float
+) -> tuple[mx.array, mx.array, tuple, int]:
+    """Trapezoidal unicycle design matrix shared by both t0 solvers.
+
+    Returns ``(Aw_data, b_data, lead, N)`` with ``Aw_data`` shape ``(..., 2N, N+1)``.
+    """
+    *lead, N, _ = dxy.shape
+    g = (2.0 / dt) * dxy
+    cos_theta = mx.cos(theta)
+    sin_theta = mx.sin(theta)
+    c0 = cos_theta[..., :-1]
+    c1 = cos_theta[..., 1:]
+    s0 = sin_theta[..., :-1]
+    s1 = sin_theta[..., 1:]
+    rows_list = []
+    for i in range(N):
+        left = mx.zeros((*lead, i), dtype=dxy.dtype)
+        right = mx.zeros((*lead, N - i - 1), dtype=dxy.dtype)
+        rows_list.append(
+            mx.concatenate([left, c0[..., i : i + 1], c1[..., i : i + 1], right], axis=-1)
+        )
+        left = mx.zeros((*lead, i), dtype=dxy.dtype)
+        right = mx.zeros((*lead, N - i - 1), dtype=dxy.dtype)
+        rows_list.append(
+            mx.concatenate([left, s0[..., i : i + 1], s1[..., i : i + 1], right], axis=-1)
+        )
+    A_data = mx.stack(rows_list, axis=-2)
+    w = mx.ones_like(dxy[..., 0])
+    Aw_data = A_data * mx.repeat(w, 2, axis=-1)[..., None]
+    b_data = g.reshape(*lead, 2 * N)
+    return Aw_data, b_data, tuple(lead), N
+
+
 def dxy_theta_to_v(
     dxy: mx.array,
     theta: mx.array,
@@ -207,39 +241,8 @@ def dxy_theta_to_v(
     using Cholesky decomposition + 3rd-order (jerk) smoothing, exactly
     matching alpamayo_r1/action_space/utils.py.
     """
-    *lead, N, _ = dxy.shape
-    g = (2.0 / dt) * dxy  # (..., N, 2)
-
-    cos_theta = mx.cos(theta)
-    sin_theta = mx.sin(theta)
-
-    # Build A_data (2N, N+1) using robust row construction
-    c0 = cos_theta[..., :-1]  # (..., N)
-    c1 = cos_theta[..., 1:]
-    s0 = sin_theta[..., :-1]
-    s1 = sin_theta[..., 1:]
-
-    rows_list = []
-    for i in range(N):
-        # Even row (2*i): coefficients for cos on columns i and i+1
-        left = mx.zeros((*lead, i), dtype=dxy.dtype)
-        right = mx.zeros((*lead, N - i - 1), dtype=dxy.dtype)
-        even_row = mx.concatenate([left, c0[..., i : i + 1], c1[..., i : i + 1], right], axis=-1)
-        rows_list.append(even_row)
-
-        # Odd row (2*i+1): coefficients for sin on columns i and i+1
-        left = mx.zeros((*lead, i), dtype=dxy.dtype)
-        right = mx.zeros((*lead, N - i - 1), dtype=dxy.dtype)
-        odd_row = mx.concatenate([left, s0[..., i : i + 1], s1[..., i : i + 1], right], axis=-1)
-        rows_list.append(odd_row)
-
-    A_data = mx.stack(rows_list, axis=-2)  # (..., 2N, N+1)
-
-    w = mx.ones_like(dxy[..., 0])
-    Aw_data = A_data * mx.repeat(w, 2, axis=-1)[..., None]
-
-    ATA = mx.einsum("...ij,...ik->...jk", Aw_data, A_data)
-    b_data = g.reshape(*lead, 2 * N)
+    Aw_data, b_data, lead, N = _unicycle_velocity_design(dxy, theta, dt)
+    ATA = mx.einsum("...ij,...ik->...jk", Aw_data, Aw_data)
 
     # NVIDIA logic: Slice Aw_data BEFORE einsum to exclude v0 column (col 0)
     # Aw_data[..., :, 1:] has shape (..., 2N, N)
@@ -279,6 +282,29 @@ def dxy_theta_to_v(
     x = mx.array(x_np, dtype=dxy.dtype)
     v = mx.concatenate([v0[..., None], x], axis=-1)
     return v
+
+
+def dxy_theta_to_v_without_v0(
+    dxy: mx.array,
+    theta: mx.array,
+    dt: float = 0.1,
+    v_lambda: float = 1e-4,
+    v_ridge: float = 1e-4,
+) -> mx.array:
+    """MLX port of NVIDIA ``dxy_theta_to_v_without_v0``.
+
+    Solves for ``v_0 ... v_N`` jointly (no pinned start speed). Used by
+    ``UnicycleAccelCurvatureActionSpace.estimate_t0_states``.
+    """
+    Aw_data, b_data, lead, N = _unicycle_velocity_design(dxy, theta, dt)
+    ATA = mx.einsum("...ij,...ik->...jk", Aw_data, Aw_data)
+    rhs = mx.einsum("...ij,...i->...j", Aw_data, b_data)
+    DTD = construct_DTD(
+        N + 1, lead, w_smooth3=1.0, lam=v_lambda, dt=dt, dtype=dxy.dtype
+    )
+    ridge_term = v_ridge * mx.eye(N + 1, dtype=dxy.dtype)
+    lhs = ATA + DTD + ridge_term
+    return _chol_solve(lhs, rhs)
 
 
 def _chol_solve(lhs: mx.array, rhs: mx.array) -> mx.array:
