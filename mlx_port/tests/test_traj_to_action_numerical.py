@@ -96,3 +96,80 @@ def test_theta_smooth_regularizes_noisy_heading():
         return float(np.mean(d3**2))
 
     assert third_energy(smoothed[1:]) < third_energy(unwrapped)
+
+
+def test_without_v0_recovers_constant_speed():
+    from mlx_port.models.action_space_utils_mlx import dxy_theta_to_v_without_v0
+
+    dt, v_true, n = 0.1, 8.0, 8
+    dxy = np.zeros((n, 2), dtype=np.float32)
+    dxy[:, 0] = v_true * dt
+    v = np.asarray(dxy_theta_to_v_without_v0(mx.array(dxy), mx.zeros((n + 1,)), dt=dt))
+    assert v.shape == (n + 1,)
+    assert abs(float(v.mean()) - v_true) < 5e-2
+    assert float(np.max(np.abs(v - v_true))) < 0.15
+
+
+def test_without_v0_differs_from_pinned_v0_on_braking():
+    from mlx_port.models.action_space_utils_mlx import dxy_theta_to_v, dxy_theta_to_v_without_v0
+
+    dt = 0.1
+    xy = np.array([0.0, 1.0, 1.8, 2.4, 2.8, 3.0], dtype=np.float32)
+    dxy = np.stack([np.diff(xy), np.zeros(len(xy) - 1, dtype=np.float32)], axis=-1)
+    theta = mx.zeros((len(xy),))
+    v_joint = np.asarray(dxy_theta_to_v_without_v0(mx.array(dxy), theta, dt=dt))
+    v_pin = np.asarray(dxy_theta_to_v(mx.array(dxy), theta, mx.array(0.0), dt=dt))
+    assert v_joint.shape == (len(xy),)
+    assert abs(float(v_joint[-1]) - float(v_pin[-1])) > 0.4
+    assert float(v_joint[0]) > 4.0
+    assert float(v_pin[0]) == pytest.approx(0.0, abs=1e-5)
+    assert float(v_joint[-1]) > float(v_pin[-1])
+
+
+def test_estimate_t0_uses_without_v0_not_pinned_zero():
+    aspace = MLXActionSpace(dt=0.1, n_waypoints=8)
+    dt, v_true, t = 0.1, 5.0, 5
+    xyz = np.zeros((1, t, 3), dtype=np.float32)
+    xyz[0, :, 0] = v_true * np.arange(t) * dt
+    eye = np.eye(3, dtype=np.float32)
+    rot = np.broadcast_to(eye, (1, t, 3, 3)).copy()
+    t0 = aspace.estimate_t0_states(mx.array(xyz), mx.array(rot))
+    assert abs(float(np.asarray(t0["v"]).reshape(-1)[0]) - v_true) < 0.2
+
+
+def test_action_to_traj_estimates_t0_from_moving_history():
+    """NVIDIA action_to_traj calls estimate_t0 when t0 is omitted."""
+    aspace = MLXActionSpace(dt=0.1, n_waypoints=8)
+    v_true = 8.0
+    dt = 0.1
+    hist_xyz = mx.array(
+        [[[-2 * v_true * dt, 0.0, 0.0], [-v_true * dt, 0.0, 0.0], [0.0, 0.0, 0.0]]]
+    )
+    eye = mx.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+    hist_rot = mx.broadcast_to(eye[None, None, :, :], (1, 3, 3, 3))
+    zero_action = mx.zeros((1, 8, 2))
+    fut_xyz, _ = aspace.action_to_traj(zero_action, hist_xyz, hist_rot)
+    end_x = float(np.asarray(fut_xyz)[0, -1, 0])
+    assert end_x > 4.0, f"keep-rolling t0 should integrate ~6.4 m, got {end_x:.3f}"
+
+
+def test_without_v0_matches_nvidia_torch():
+    torch = pytest.importorskip("torch")
+    try:
+        from alpamayo_r1.action_space.utils import (
+            dxy_theta_to_v_without_v0 as torch_without_v0,
+        )
+    except ImportError:
+        pytest.skip("NVIDIA alpamayo_r1 not importable")
+
+    from mlx_port.models.action_space_utils_mlx import dxy_theta_to_v_without_v0
+
+    rng = np.random.default_rng(0)
+    dxy = rng.normal(scale=0.4, size=(2, 6, 2)).astype(np.float32)
+    theta = rng.normal(scale=0.05, size=(2, 7)).astype(np.float32)
+    mlx_v = np.asarray(dxy_theta_to_v_without_v0(mx.array(dxy), mx.array(theta), dt=0.1))
+    with torch.no_grad():
+        torch_v = torch_without_v0(
+            torch.tensor(dxy), torch.tensor(theta), dt=0.1
+        ).numpy()
+    np.testing.assert_allclose(mlx_v, torch_v, rtol=1e-4, atol=1e-4)

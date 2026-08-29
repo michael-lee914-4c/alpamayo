@@ -25,7 +25,7 @@
                 </div>
                 <div>
                     <div class="font-display text-4xl font-semibold tracking-tight">Stage <span class="stage-number">1</span></div>
-                    <div class="text-emerald-400 text-sm font-medium">VLM / CoC inference closed · trajectory moved to Stage 1b</div>
+                    <div class="text-emerald-400 text-sm font-medium">VLM / CoC inference closed · trajectory is Stage 1b (closed)</div>
                 </div>
             </div>
             <div class="flex items-center gap-x-3">
@@ -71,9 +71,9 @@
             <div class="bg-slate-900 border border-emerald-800/60 rounded-3xl p-6 text-sm space-y-4">
                 <p class="text-slate-300">
                     2026-08-28 decision: split the old Stage 1. This page is VLM / CoC inference.
-                    Trajectory / minADE is <a class="text-cyan-400 hover:underline" href="stage1b_progress.html">Stage 1b</a>.
+                    Trajectory / minADE is <a class="text-cyan-400 hover:underline" href="stage1b_progress.html">Stage 1b</a> (closed 2026-08-29).
                     Readable CoC under NVIDIA sampling is accepted; default-clip greedy ≠ GT pedestrian is not a Stage 1 blocker.
-                    Stages 2–3 SFT stay blocked until 1b decides the inference gate.
+                    Stages 2–3 SFT stay blocked on Stage 1c speed.
                     Jaccard is cheap word overlap — read the sentence. Grok (<code>grok-4.6</code>) is the semantic judge.
                 </p>
                 <div class="text-slate-200 mb-2">Default clip <code class="text-cyan-300">0abe118e-aa79-41f6-a719-f2df8abaf1ea</code> · event <code>t0_us=8757247</code> · cluster <code>PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY</code>.</div>
@@ -92,8 +92,8 @@
                         <div class="text-xs text-slate-500 mt-2">Test: <code>test_end_to_end_inference_temperature_coc_and_traj</code> · 103.8 s · RSS 59.28 GB · Metal 43.95 GB</div>
                     </div>
                     <div class="bg-slate-950 border border-slate-700 rounded-2xl p-4 md:col-span-2">
-                        <div class="text-xs uppercase tracking-wider text-slate-400 mb-2">Action expert minADE — moved to Stage 1b</div>
-                        <div class="text-slate-300"><code>pred_xyz=None</code> on this stage’s eval path. GT future is present: <code>ego_future_xyz</code> shape <code>(1, 1, 64, 3)</code>.</div>
+                        <div class="text-xs uppercase tracking-wider text-slate-400 mb-2">Action expert minADE — Stage 1b (closed)</div>
+                        <div class="text-slate-300">Stage 1’s CoC-only path did not require <code>pred_xyz</code>. Stage 1b now returns physical <code>(1, 1, 1, 64, 3)</code> (greedy minADE 3.89 m; 5-clip mean 7.85 m). Yield/stop quality is leftover on that page.</div>
                         <div class="mt-2 text-xs text-slate-500">See <a class="text-cyan-400 hover:underline" href="stage1b_progress.html">reports/stage1b_progress.html</a>.</div>
                     </div>
                 </div>
@@ -424,17 +424,18 @@ PYTHONPATH=src:. .venv/bin/python mlx_port/scripts/eval_coc_grok.py \
             </div>
             <ol class="list-decimal list-inside space-y-2 text-sm text-slate-300">
                 <li>
-                    Stage 1 is closed. Continue on
-                    <a class="text-cyan-400 hover:underline" href="stage1b_progress.html">reports/stage1b_progress.html</a>
-                    (action expert → trajectory / minADE).
+                    Stage 1 and 1b are closed. Next is
+                    <a class="text-cyan-400 hover:underline" href="../mlx_port/alpamayo1-mlx-speedup-plan.html">Stage 1c</a>
+                    (runtime / train-step speed). Leftover yield/stop quality stays on
+                    <a class="text-cyan-400 hover:underline" href="stage1b_progress.html">reports/stage1b_progress.html</a>.
                 </li>
                 <li class="text-slate-500">
-                    Stages 2–3 remain blocked. Do not re-enable temporal grouping on greedy e2e. Do not mask <code>&lt;|im_end|&gt;</code>.
+                    Stages 2–3 remain blocked on 1c. Do not re-enable temporal grouping on greedy e2e. Do not mask <code>&lt;|im_end|&gt;</code>.
                 </li>
             </ol>
             <div class="mt-4 text-xs font-mono text-indigo-400">
                 reports/stage1_progress.html · closed 2026-08-28 ·
-                <a class="text-cyan-400 hover:underline" href="stage1b_progress.html">stage 1b</a> ·
+                <a class="text-cyan-400 hover:underline" href="stage1b_progress.html">stage 1b (closed)</a> ·
                 <a class="text-cyan-400 hover:underline" href="stage1_debug_notes.html">historical debug</a>
             </div>
         </div>

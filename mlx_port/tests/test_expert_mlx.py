@@ -10,6 +10,7 @@ from mlx_port.models.expert_mlx import (
     cache_seq_len,
     expert_attention_mask,
     expert_position_ids,
+    expert_rope_mask_contract,
     text_config_from_vlm_and_overrides,
     traj_future_start_offsets,
     trim_cache,
@@ -75,6 +76,33 @@ def test_expert_position_ids_adds_delta_and_offset():
     assert pos.shape == (3, 2, 4)
     np.testing.assert_array_equal(pos[0, 0], [13, 14, 15, 16])
     np.testing.assert_array_equal(pos[2, 1], [25, 26, 27, 28])
+
+
+def test_expert_rope_mask_contract_matches_nvidia():
+    """pos0 = offset + rope_deltas; hide [offset, prefix); diffusion block is 0."""
+    tfs = 155681
+    prompt = [1, 2, 3]
+    generated = [10, 11, tfs, 99]
+    seq = np.array(prompt + generated, dtype=np.int32)
+    offset = seq.tolist().index(tfs) + 1
+    rope_deltas = np.array([[-31680]])
+    prefix_len = offset + 3
+    n_diff = 64
+    c = expert_rope_mask_contract(seq, tfs, rope_deltas, prefix_len, n_diff)
+    assert c["tfs_idx"] == seq.tolist().index(tfs)
+    assert c["offset"] == offset
+    assert c["pos0"] == offset + int(rope_deltas[0, 0])
+    assert c["pos0_matches_offset_plus_delta"]
+    assert c["hide_start"] == offset
+    assert c["hide_end"] == prefix_len
+    assert c["n_hidden"] == prefix_len - offset
+    assert c["diffusion_block_max_abs"] == 0.0
+    assert c["pos_last"] == c["pos0"] + n_diff - 1
+
+    empty = expert_rope_mask_contract(seq, tfs, rope_deltas, offset, n_diff)
+    assert empty["n_hidden"] == 0
+    assert empty["hide_start"] is None
+    assert empty["diffusion_block_max_abs"] == 0.0
 
 
 def test_tiny_expert_forward_hidden_shape():

@@ -68,6 +68,7 @@ from mlx_port.models.action_in_proj_mlx import PerWaypointActionInProjV2
 from mlx_port.models.action_space_utils_mlx import (
     solve_xs_eq_y,
     dxy_theta_to_v,
+    dxy_theta_to_v_without_v0,
     theta_smooth,
     unwrap_angle,
 )
@@ -271,18 +272,14 @@ class ActionSpace:
         traj_history_xyz: mx.array,
         traj_history_rot: mx.array,
     ) -> dict[str, mx.array]:
-        """Estimate last-history speed for ``action_to_traj`` (NVIDIA t0 ``v``)."""
+        """NVIDIA ``estimate_t0_states``: last-history speed via ``without_v0``."""
         xyz = mx.array(traj_history_xyz)
         rot = mx.array(traj_history_rot)
         dxy = xyz[..., 1:, :2] - xyz[..., :-1, :2]
-        yaw = unwrap_angle(
-            mx.arctan2(rot[..., 1, 0], rot[..., 0, 0])
-        )
-        v0 = mx.zeros(xyz.shape[:-2], dtype=xyz.dtype)
-        v = dxy_theta_to_v(
+        yaw = unwrap_angle(mx.arctan2(rot[..., 1, 0], rot[..., 0, 0]))
+        v = dxy_theta_to_v_without_v0(
             dxy,
             yaw,
-            v0,
             dt=self.dt,
             v_lambda=self.v_lambda,
             v_ridge=self.v_ridge,
@@ -312,13 +309,10 @@ class ActionSpace:
         accel = accel * self.accel_std + self.accel_mean
         kappa = kappa * self.curvature_std + self.curvature_mean
 
-        # Initial velocity: from t0_states if provided, else default to 0
-        if t0_states is not None and "v" in t0_states:
-            v0 = mx.array(t0_states["v"])
-            # Broadcast to match batch shape of accel
-            v0 = mx.broadcast_to(v0, accel.shape[:-1])
-        else:
-            v0 = mx.zeros_like(accel[..., 0])
+        if t0_states is None or "v" not in t0_states:
+            t0_states = self.estimate_t0_states(traj_history_xyz, traj_history_rot)
+        v0 = mx.array(t0_states["v"])
+        v0 = mx.broadcast_to(v0, accel.shape[:-1])
 
         # Simple Euler integration (velocity, theta, position)
         dt_2 = 0.5 * dt**2
@@ -405,10 +399,9 @@ class ActionSpace:
         traj_future_xyz = mx.array(traj_future_xyz)
         traj_future_rot = mx.array(traj_future_rot)
 
-        if t0_states is None:
-            v0 = mx.zeros(traj_history_xyz.shape[:-2])
-        else:
-            v0 = t0_states.get("v", mx.zeros(traj_history_xyz.shape[:-2]))
+        if t0_states is None or "v" not in t0_states:
+            t0_states = self.estimate_t0_states(traj_history_xyz, traj_history_rot)
+        v0 = t0_states["v"]
 
         # 1. Build full path and differences
         full_xy = mx.concatenate(

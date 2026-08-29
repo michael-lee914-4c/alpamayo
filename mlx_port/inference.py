@@ -36,6 +36,7 @@ from mlx_port.models.expert_mlx import (
     cache_seq_len,
     expert_attention_mask,
     expert_position_ids,
+    expert_rope_mask_contract,
     sync_cache_idx,
     traj_future_start_offsets,
     trim_cache,
@@ -506,7 +507,7 @@ def _sample_one_trajectory(
     rope_deltas: np.ndarray,
     hist_xyz: mx.array,
     hist_rot: mx.array,
-) -> tuple[mx.array, mx.array]:
+) -> tuple[mx.array, mx.array, dict]:
     """NVIDIA ``step_fn`` + ``diffusion.sample`` + ``action_to_traj`` for one cache."""
     n_diffusion = int(model.action_space.get_action_space_dims()[0])
     sync_cache_idx(cache)
@@ -535,9 +536,32 @@ def _sample_one_trajectory(
 
     sampled = model.diffusion.sample(batch_size=1, step_fn=step_fn)
     t0 = model.action_space.estimate_t0_states(hist_xyz, hist_rot)
-    return model.action_space.action_to_traj(
+    xyz, rot = model.action_space.action_to_traj(
         sampled, hist_xyz, hist_rot, t0_states=t0
     )
+    action = np.asarray(sampled)
+    accel = action[..., 0].reshape(-1)
+    kappa = action[..., 1].reshape(-1)
+    debug = {
+        **expert_rope_mask_contract(
+            full_sequence,
+            traj_future_start_id,
+            rope_deltas,
+            prefix_len,
+            n_diffusion,
+        ),
+        "t0_v": float(np.asarray(t0["v"]).reshape(-1)[-1]),
+        "accel_mean": float(accel.mean()),
+        "accel_min": float(accel.min()),
+        "accel_max": float(accel.max()),
+        "kappa_mean": float(kappa.mean()),
+        "kappa_abs_max": float(np.max(np.abs(kappa))),
+        "action_first5": np.round(action.reshape(-1, 2)[:5], 4).tolist(),
+        "action_last5": np.round(action.reshape(-1, 2)[-5:], 4).tolist(),
+    }
+    if _DEBUG:
+        print("[EXPERT_CONTRACT]", debug)
+    return xyz, rot, debug
 
 
 def sample_trajectories_from_data_with_vlm_rollout(
@@ -756,12 +780,13 @@ def sample_trajectories_from_data_with_vlm_rollout(
 
     pred_xyz_list = []
     pred_rot_list = []
+    expert_debug = []
     for gen, sample_cache in zip(seq_list, cache_list):
         gen_np = np.asarray(gen)
         if gen_np.ndim == 1:
             gen_np = gen_np[None, :]
         full_seq = np.concatenate([prompt_np, gen_np], axis=1)
-        xyz, rot = _sample_one_trajectory(
+        xyz, rot, dbg = _sample_one_trajectory(
             model,
             sample_cache,
             full_seq,
@@ -772,6 +797,7 @@ def sample_trajectories_from_data_with_vlm_rollout(
         )
         pred_xyz_list.append(xyz)
         pred_rot_list.append(rot)
+        expert_debug.append(dbg)
 
     def _stack_traj(parts: list[mx.array]) -> np.ndarray:
         arr = np.stack([np.asarray(p) for p in parts], axis=0)
@@ -784,6 +810,10 @@ def sample_trajectories_from_data_with_vlm_rollout(
 
     pred_xyz = mx.array(_stack_traj(pred_xyz_list))
     pred_rot = mx.array(_stack_traj(pred_rot_list))
+    if extra is None and want_extra:
+        extra = {}
+    if extra is not None:
+        extra["expert"] = expert_debug
     return pred_xyz, pred_rot, extra
 
 
