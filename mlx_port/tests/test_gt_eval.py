@@ -1,9 +1,11 @@
 """Unit tests for Stage 1 GT comparison (no model load)."""
 
 import numpy as np
+import pytest
 
 from mlx_port.gt_eval import (
     DEFAULT_EVAL_CLIP_ID,
+    REASONING_PATH,
     _pred_xy_for_ade,
     clean_pred_coc,
     format_gt_report,
@@ -13,13 +15,17 @@ from mlx_port.gt_eval import (
     score_coc,
 )
 
+_HAS_PAI_COC = REASONING_PATH.exists()
 
+
+@pytest.mark.skipif(not _HAS_PAI_COC, reason="PAI-CoC labels not on this machine")
 def test_local_coc_subset_has_labeled_clips():
     clips = list_local_coc_clips()
     assert len(clips) >= 1
     assert DEFAULT_EVAL_CLIP_ID in clips.index
 
 
+@pytest.mark.skipif(not _HAS_PAI_COC, reason="PAI-CoC labels not on this machine")
 def test_default_clip_has_human_coc():
     gt = load_clip_gt(DEFAULT_EVAL_CLIP_ID)
     assert gt["gt_coc_texts"]
