@@ -64,6 +64,7 @@ class AlpamayoPatchEmbed(nn.Module):
         hidden_states = hidden_states.reshape(-1, self.hidden_size)
         return hidden_states
 from mlx_port.models.token_utils_mlx import fuse_traj_tokens as fuse_traj_tokens_util
+from mlx_port.models.action_in_proj_mlx import PerWaypointActionInProjV2
 from mlx_port.models.action_space_utils_mlx import (
     solve_xs_eq_y,
     dxy_theta_to_v,
@@ -120,42 +121,19 @@ class ExpertDecoder(nn.Module):
 
 
 # =============================================================================
-# Action Projection Modules (minimal but loadable)
+# Action Projection Modules
 # =============================================================================
 
-class ActionInProj(nn.Module):
-    """Minimal implementation that can accept the loaded action_in_proj weights."""
-
-    def __init__(self, in_dims: int = 5, out_dim: int = 2048):
-        super().__init__()
-        # These will be populated by load_weights
-        self.norm = nn.RMSNorm(out_dim)
-        self.timestep_fourier_encoder = nn.Linear(1, out_dim)
-        # Encoder trunk (simplified)
-        self.encoder = nn.Sequential(
-            nn.Linear(in_dims, out_dim),
-            nn.GELU(),
-            nn.Linear(out_dim, out_dim),
-        )
-
-    def __call__(self, x, t):
-        # x: (B, action_dim), t: (B, 1)
-        t_emb = self.timestep_fourier_encoder(t)
-        x = self.encoder(x)
-        x = x + t_emb
-        x = self.norm(x)
-        return x
+# Real checkpoint module. Old stub was Sequential Linear(in_dims=5) and did
+# not match PerWaypointActionInProjV2 keys (Fourier + MLPEncoder + LayerNorm).
+ActionInProj = PerWaypointActionInProjV2
 
 
-class ActionOutProj(nn.Module):
-    """Simple linear projection from hidden to action dimension."""
+class ActionOutProj(nn.Linear):
+    """NVIDIA ``action_out_proj`` is ``torch.nn.Linear(expert_hidden, action_dim)``.
 
-    def __init__(self, in_features: int = 2048, out_features: int = 5):
-        super().__init__()
-        self.linear = nn.Linear(in_features, out_features)
-
-    def __call__(self, x):
-        return self.linear(x)
+    Checkpoint keys are ``action_out_proj.weight`` / ``.bias`` (no ``.linear``).
+    """
 
 
 # =============================================================================
@@ -285,8 +263,7 @@ class ActionSpace:
         In the NVIDIA implementation this is typically (n_future_tokens, 2)
         for the UnicycleAccelCurvatureActionSpace (accel, curvature).
         """
-        # 8 future waypoints, 2D control (accel, curvature) per step
-        return (8, 2)
+        return (self.n_waypoints, 2)
 
     def action_to_traj(
         self,
@@ -630,18 +607,22 @@ class AlpamayoR1MLX(nn.Module):
         expert_cfg = alpamayo_cfg.get("expert_cfg", {})
         expert_hidden_size = expert_cfg.get("hidden_size", 2048)
 
-        action_in_proj = ActionInProj(in_dims=5, out_dim=expert_hidden_size)
-        action_out_proj = ActionOutProj(in_features=expert_hidden_size, out_features=5)
-
-        # 4. Diffusion and action space (Row 7). Regularizers / stats come from
-        # action_space_cfg; n_waypoints stays at the MLX default until the
-        # expert rollout uses the checkpoint horizon (64).
+        # 4. Diffusion and action space. Checkpoint Unicycle uses n_waypoints=64
+        # so x_dims is (64, 2). Do not pop n_waypoints — that kept diffusion at (8, 2).
         as_cfg = dict(alpamayo_cfg.get("action_space_cfg") or {})
         as_cfg.pop("_target_", None)
-        as_cfg.pop("n_waypoints", None)
         action_space = ActionSpace(**as_cfg)
         x_dims = action_space.get_action_space_dims()
         diffusion = FlowMatching(x_dims=x_dims, num_inference_steps=10)
+
+        proj_cfg = dict(alpamayo_cfg.get("action_in_proj_cfg") or {})
+        proj_cfg.pop("_target_", None)
+        action_in_proj = ActionInProj(
+            in_dims=x_dims,
+            out_dim=expert_hidden_size,
+            **proj_cfg,
+        )
+        action_out_proj = ActionOutProj(expert_hidden_size, x_dims[-1])
 
         # 4.5 History tokenizer (Row 6). NVIDIA hist_traj_tokenizer_cfg is
         # DeltaTrajectoryTokenizer: 16 steps × xyz = 48 tokens. Discrete action
@@ -878,7 +859,7 @@ class AlpamayoR1MLX(nn.Module):
                 new_k = "action_out_proj." + k[len("action_out_proj."):]
                 remapped.append((new_k, v))
 
-        model.load_weights(remapped, strict=False)  # tolerate extra action-projection keys until real ActionIn/OutProj implemented
+        model.load_weights(remapped, strict=False)
         print(f"[AlpamayoR1MLX] Loaded {len(remapped)} weights from Alpamayo-R1-10B checkpoint")
 
     def fuse_traj_tokens(self, input_ids: mx.array, traj_data: dict[str, Any] | None = None) -> mx.array:

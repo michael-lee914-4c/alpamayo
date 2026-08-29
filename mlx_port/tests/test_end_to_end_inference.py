@@ -208,8 +208,8 @@ def test_end_to_end_inference_prints_coc_vlm_only(max_gen_len):
 def test_end_to_end_inference_temperature_coc_and_traj(max_gen_len):
     """NVIDIA test_inference.py draw: T=0.6, top_p=0.98, seed 42, one sample.
 
-    CoC is sampled (not greedy). Trajectory / minADE is printed when the
-    expert step_fn is wired; until then pred_xyz stays None.
+    CoC is sampled (not greedy). Stage 1b wires expert step_fn so this
+    test can print pred_xyz / minADE; until then pred_xyz stays None.
     """
     gt, data = _load_clip()
     print("[End-to-End Test] Loading AlpamayoR1MLX (this may take a while)...")
