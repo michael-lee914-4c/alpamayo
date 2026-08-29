@@ -45,6 +45,22 @@ dev = [
   "ipykernel>=6.29.3",
   "ipywidgets>=8.1.8",
 ]
+# macOS GitHub Actions only. Installed with `uv pip install --group mlx-ci`
+# so the CUDA project dependencies (flash-attn, vllm, …) are not pulled in.
+mlx-ci = [
+  "pytest==9.0.3",
+  "numpy==2.4.4",
+  "scipy==1.17.1",
+  "pandas==3.0.3",
+  "einops==0.8.2",
+  "pillow==12.2.0",
+  "safetensors==0.7.0",
+  "transformers==5.8.0",
+  "torch==2.12.0",
+  "mlx==0.31.2",
+  "mlx-lm==0.31.3",
+  "mlx-vlm==0.5.0",
+]
 
 [tool.uv]
 no-build-isolation-package = ["flash-attn"]
