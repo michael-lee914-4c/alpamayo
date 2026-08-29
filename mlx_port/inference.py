@@ -32,6 +32,13 @@ from mlx_port.models.token_utils_mlx import (
     replace_padding_after_eos,
 )
 from mlx_port.models.alpamayo_qwen3vl import AlpamayoModel, AlpamayoLanguageModel
+from mlx_port.models.expert_mlx import (
+    cache_seq_len,
+    expert_attention_mask,
+    expert_position_ids,
+    traj_future_start_offsets,
+    trim_cache,
+)
 
 
 def apply_top_p(logits: mx.array, top_p: float) -> mx.array:
@@ -463,6 +470,72 @@ def generate_top_k_coc(
     return rows
 
 
+def _as_mx(value: Any) -> mx.array:
+    if isinstance(value, mx.array):
+        return value
+    return mx.array(np.asarray(value))
+
+
+def _history_last_group(hist_xyz: Any, hist_rot: Any) -> tuple[mx.array, mx.array]:
+    """NVIDIA ``ego_history_*[:, -1]`` → ``(B, T, …)``."""
+    xyz = _as_mx(hist_xyz)
+    rot = _as_mx(hist_rot)
+    if xyz.ndim == 4:
+        xyz = xyz[:, -1]
+    if rot.ndim == 5:
+        rot = rot[:, -1]
+    return xyz, rot
+
+
+def _rope_deltas_np(model: AlpamayoR1MLX, batch: int) -> np.ndarray:
+    rd = getattr(model.vlm.language_model, "_rope_deltas", None)
+    if rd is None:
+        return np.zeros((batch, 1), dtype=np.int32)
+    arr = np.asarray(rd).reshape(-1)
+    if arr.size == 1:
+        return np.broadcast_to(arr.reshape(1, 1), (batch, 1)).copy()
+    return arr.reshape(-1, 1)[:batch]
+
+
+def _sample_one_trajectory(
+    model: AlpamayoR1MLX,
+    cache: list,
+    full_sequence: np.ndarray,
+    traj_future_start_id: int,
+    rope_deltas: np.ndarray,
+    hist_xyz: mx.array,
+    hist_rot: mx.array,
+) -> tuple[mx.array, mx.array]:
+    """NVIDIA ``step_fn`` + ``diffusion.sample`` + ``action_to_traj`` for one cache."""
+    n_diffusion = int(model.action_space.get_action_space_dims()[0])
+    prefix_len = cache_seq_len(cache)
+    offsets = traj_future_start_offsets(full_sequence, traj_future_start_id)
+    position_ids = expert_position_ids(n_diffusion, 1, rope_deltas, offsets)
+    attn_mask = expert_attention_mask(1, n_diffusion, prefix_len, offsets)
+    weight_dtype = model.expert.language_model.model.layers[0].self_attn.q_proj.weight.dtype
+
+    def step_fn(x: mx.array, t: mx.array) -> mx.array:
+        embeds = model.action_in_proj(x, t)
+        if embeds.dtype != weight_dtype:
+            embeds = embeds.astype(weight_dtype)
+        hidden = model.expert(
+            inputs_embeds=embeds,
+            position_ids=position_ids,
+            cache=cache,
+            mask=attn_mask,
+        )
+        added = cache_seq_len(cache) - prefix_len
+        trim_cache(cache, added)
+        pred = model.action_out_proj(hidden[:, -n_diffusion:])
+        return pred.reshape(x.shape).astype(x.dtype)
+
+    sampled = model.diffusion.sample(batch_size=1, step_fn=step_fn)
+    t0 = model.action_space.estimate_t0_states(hist_xyz, hist_rot)
+    return model.action_space.action_to_traj(
+        sampled, hist_xyz, hist_rot, t0_states=t0
+    )
+
+
 def sample_trajectories_from_data_with_vlm_rollout(
     model: AlpamayoR1MLX,
     data: Dict[str, Any],
@@ -620,15 +693,16 @@ def sample_trajectories_from_data_with_vlm_rollout(
         record_memory_sample("after_vlm_generation_complete")
         return generated, cache
 
+    seq_list = []
+    cache_list = []
     if n_vlm_samples <= 1:
         generated, cache = _run_single_vlm_generation(
             model, input_ids, image_kwargs, logits_processor,
             max_new_tokens, temperature, top_p
         )
-        rope_deltas = 0
+        seq_list = [generated]
+        cache_list = [cache]
     else:
-        seq_list = []
-        cache_list = []
         for _ in range(n_vlm_samples):
             gen, c = _run_single_vlm_generation(
                 model, input_ids, image_kwargs, logits_processor,
@@ -638,7 +712,8 @@ def sample_trajectories_from_data_with_vlm_rollout(
             cache_list.append(c)
         generated = mx.concatenate(seq_list, axis=0)
         cache = cache_list[-1]
-        rope_deltas = 0
+
+    rope_deltas = _rope_deltas_np(model, 1)
 
     class VLMOutputs:
         def __init__(self, sequences, cache, rope_deltas):
@@ -661,9 +736,51 @@ def sample_trajectories_from_data_with_vlm_rollout(
     if vlm_only:
         return None, None, extra
 
-    # Stage 1b: NVIDIA step_fn (action_in_proj → expert + VLM KV prefix →
-    # action_out_proj → diffusion.sample → action_to_traj) is not wired yet.
-    return None, None, extra
+    if (
+        model.expert is None
+        or model.action_in_proj is None
+        or model.action_out_proj is None
+        or model.diffusion is None
+        or model.action_space is None
+    ):
+        return None, None, extra
+
+    prompt_np = np.asarray(input_ids)
+    if prompt_np.ndim == 1:
+        prompt_np = prompt_np[None, :]
+    hist_xyz, hist_rot = _history_last_group(ego_history_xyz, ego_history_rot)
+
+    pred_xyz_list = []
+    pred_rot_list = []
+    for gen, sample_cache in zip(seq_list, cache_list):
+        gen_np = np.asarray(gen)
+        if gen_np.ndim == 1:
+            gen_np = gen_np[None, :]
+        full_seq = np.concatenate([prompt_np, gen_np], axis=1)
+        xyz, rot = _sample_one_trajectory(
+            model,
+            sample_cache,
+            full_seq,
+            int(eos_token_id),
+            rope_deltas,
+            hist_xyz,
+            hist_rot,
+        )
+        pred_xyz_list.append(xyz)
+        pred_rot_list.append(rot)
+
+    def _stack_traj(parts: list[mx.array]) -> np.ndarray:
+        arr = np.stack([np.asarray(p) for p in parts], axis=0)
+        # each part is (B, T, …); stacked (n, B, T, …) → (B, n, T, …)
+        if arr.ndim < 3:
+            raise RuntimeError(f"unexpected trajectory rank {arr.ndim}")
+        arr = np.transpose(arr, (1, 0) + tuple(range(2, arr.ndim)))
+        tail = arr.shape[2:]
+        return arr.reshape((arr.shape[0], num_traj_sets, num_traj_samples) + tail)
+
+    pred_xyz = mx.array(_stack_traj(pred_xyz_list))
+    pred_rot = mx.array(_stack_traj(pred_rot_list))
+    return pred_xyz, pred_rot, extra
 
 
 # ------------------------------------------------------------------

@@ -265,6 +265,29 @@ class ActionSpace:
         """
         return (self.n_waypoints, 2)
 
+    def estimate_t0_states(
+        self,
+        traj_history_xyz: mx.array,
+        traj_history_rot: mx.array,
+    ) -> dict[str, mx.array]:
+        """Estimate last-history speed for ``action_to_traj`` (NVIDIA t0 ``v``)."""
+        xyz = mx.array(traj_history_xyz)
+        rot = mx.array(traj_history_rot)
+        dxy = xyz[..., 1:, :2] - xyz[..., :-1, :2]
+        yaw = unwrap_angle(
+            mx.arctan2(rot[..., 1, 0], rot[..., 0, 0])
+        )
+        v0 = mx.zeros(xyz.shape[:-2], dtype=xyz.dtype)
+        v = dxy_theta_to_v(
+            dxy,
+            yaw,
+            v0,
+            dt=self.dt,
+            v_lambda=self.v_lambda,
+            v_ridge=self.v_ridge,
+        )
+        return {"v": v[..., -1]}
+
     def action_to_traj(
         self,
         action: mx.array,
@@ -561,20 +584,19 @@ class AlpamayoR1MLX(nn.Module):
         # checkpoint being in the correct dtype (bfloat16). The final model.astype(dtype)
         # below will cast the expert/action modules we own.
 
-        # 2. Create real expert using mlx_lm's Qwen3-VL language model (matches NVIDIA's approach)
+        # 2. Expert is mlx_vlm Qwen3-VL attention (mRoPE + explicit position_ids / mask).
+        # Do not use mlx_lm Qwen3 here — it RoPEs at cache.offset and ignores NVIDIA's ids.
         expert = None
         if load_expert:
-            from mlx_lm.models.qwen3_vl import Model as Qwen3VLModel, ModelArgs as Qwen3VLModelArgs
+            from mlx_port.models.expert_mlx import (
+                AlpamayoExpert,
+                text_config_from_vlm_and_overrides,
+            )
 
-            # Build expert config from the loaded VLM's text_config + overrides from Alpamayo checkpoint.
-            # This avoids hardcoding architecture numbers in source code.
             if not hasattr(vlm, "config") or not hasattr(vlm.config, "text_config"):
                 raise RuntimeError(
                     "Loaded VLM does not expose config.text_config. Cannot derive expert architecture."
                 )
-
-            # Start from the VLM text_config (the expert is the language-model portion of Qwen3-VL)
-            base_text_cfg = vlm.config.text_config.to_dict() if hasattr(vlm.config.text_config, "to_dict") else dict(vlm.config.text_config)
 
             expert_overrides = alpamayo_cfg.get("expert_cfg", {})
             if not expert_overrides:
@@ -583,24 +605,10 @@ class AlpamayoR1MLX(nn.Module):
                     "Cannot determine expert architecture."
                 )
 
-            # Apply overrides (expert_cfg only contains a subset of fields)
-            expert_text_cfg = dict(base_text_cfg)  # shallow copy
-            for k, v in expert_overrides.items():
-                if k == "dtype":
-                    continue  # dtype is handled separately
-                expert_text_cfg[k] = v
-
-            # Force vocab_size=1 because the expert never uses token embeddings
-            # (it receives action embeddings directly via input_embeddings).
-            expert_text_cfg["vocab_size"] = 1
-
-            expert_args = Qwen3VLModelArgs(
-                model_type="qwen3_vl",
-                text_config=expert_text_cfg,
+            expert_text = text_config_from_vlm_and_overrides(
+                vlm.config.text_config, expert_overrides
             )
-            expert = Qwen3VLModel(expert_args)
-            # The qwen3_vl wrapper already routes through language_model and supports input_embeddings;
-            # no manual embed_tokens deletion is required.
+            expert = AlpamayoExpert(expert_text)
 
         # 3. Create action projections using dimensions from the Alpamayo checkpoint config
         # (expert_cfg.hidden_size is the authoritative source, matching the expert we just built)
