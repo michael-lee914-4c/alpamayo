@@ -11,7 +11,7 @@ Do not start Phase 3 quant until Gate G1 in
 | Stage | What runs | Primary files |
 |---|---|---|
 | Encode | Qwen3-VL vision tower over 16 RGB frames | `mlx_port/models/alpamayo_qwen3vl.py` (`AlpamayoModel.get_input_embeddings`), `mlx_port/models/alpamayo_r1_mlx.py` (`AlpamayoPatchEmbed`), `mlx_port/vlm_loader.py` |
-| Prefill | Backbone over vision + ego traj tokens + prompt | `mlx_port/inference.py` (`_run_single_vlm_generation` first `vlm(...)`), `mlx_port/models/alpamayo_qwen3vl.py` (`AlpamayoLanguageModel`) |
+| Prefill | First language-model forward on the prompt (`seq_len > 1`) + `mx.eval(logits)` | `mlx_port/models/alpamayo_qwen3vl.py` (`AlpamayoModel.__call__`), `mlx_port/models/alpamayo_qwen3vl.py` (`AlpamayoLanguageModel`) |
 | Decode | Autoregressive CoC, one token per VLM call | `mlx_port/inference.py` (decode loop + `sample_next_token`), `mlx_port/models/token_utils_mlx.py` (`ExpertLogitsProcessor`, `StopAfterEOS`) |
 | Action | 10× expert Euler steps on VLM KV, then unicycle | `mlx_port/inference.py` (`_sample_one_trajectory`), `mlx_port/models/expert_mlx.py`, `mlx_port/models/action_in_proj_mlx.py`, `mlx_port/models/alpamayo_r1_mlx.py` (`FlowMatching`, `ActionSpace`) |
 
@@ -84,18 +84,23 @@ Counted for `num_traj_samples=1`, CoC length `N` tokens, FM steps 10.
 | After every decode forward (`mx.eval(outputs.logits)`) | **N** | Dominant if CoC is long |
 | `int(next_token.item())` per token | **N** | Forces the step |
 | `sample_next_token` NumPy softmax / top-p | **N** | Host sample |
-| `FlowMatching.sample` `mx.eval(x)` per Euler step | **10** | Plan: one eval after the FM loop |
-| `mx.clear_cache()` every 3 FM steps | 3–4 | Extra sync / allocator churn |
+| `FlowMatching.sample` `mx.eval(x)` after the Euler loop | **1** | P2a (was 10 per-step evals) |
+| `mx.clear_cache()` inside FM | **0** | Removed with the per-step barrier; was every 3 steps |
 | `np.asarray(sampled)` after FM | 1 | Debug / extra dict |
 
 **None of encode / prefill / decode / FM is `mx.compile`d.**
 
 Stage wall-clock (T1.1): set `ALPAMAYO_STAGE_TIMERS=1`. Prints a `[STAGE]` line and
 puts `extra["stage_times"]` with G1 fields. Off by default so the e2e path is
-unchanged. When on, vision encode ends with one extra `mx.eval` so encode time
-is not lazy-attributed to prefill. Warm protocol: load once, discard the first
-window, record three, `median_stage_times` in `mlx_port/stage_timers.py`.
-Slow test: `mlx_port/tests/test_stage_timer_window.py`.
+unchanged.
+
+**Prefill is the first token.** Time `language_model(...)` on the prompt
+(`seq_len > 1`) plus one `mx.eval` of logits, inside `AlpamayoModel.__call__`.
+After token 1, each one-token LM call is decode (warm KV). `decode_tok` is
+tokens after the first. Encode is still `vision_tower` only.
+
+Measure with greedy e2e: `test_end_to_end_inference_prints_coc_vlm_only` and
+`ALPAMAYO_STAGE_TIMERS=1`. Do not use a separate multi-window warmup test.
 
 Likely 110 s split (unmeasured — Phase 1): prefill over ~32k tokens + per-token decode eval + 10 uncompiled expert forwards. Do not spend a week on ego history.
 

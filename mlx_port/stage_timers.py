@@ -30,6 +30,20 @@ def is_stage_timers_enabled() -> bool:
     return os.environ.get(STAGE_TIMER_ENV, "0").lower() in ("1", "true", "yes", "on")
 
 
+def vlm_step_stage(input_ids) -> str:
+    """Prefill is the first token: language-model forward over the prompt.
+
+    ``seq_len > 1`` is that first VLM step. After the first token, each
+    one-token call (``seq_len == 1``, KV already filled) is decode.
+    """
+    if input_ids is None:
+        raise ValueError("vlm_step_stage requires input_ids")
+    seq = int(input_ids.shape[-1])
+    if seq < 1:
+        raise ValueError(f"vlm_step_stage got seq_len={seq}")
+    return "prefill" if seq > 1 else "decode"
+
+
 @dataclass
 class StageClock:
     encode_ms: float = 0.0

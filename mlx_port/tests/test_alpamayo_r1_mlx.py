@@ -58,6 +58,28 @@ def test_flow_matching_and_action_space():
     print("FlowMatching and ActionSpace stubs created (raise NotImplementedError on call)")
 
 
+def test_flow_matching_evals_once_after_euler_loop(monkeypatch):
+    """P2a: one mx.eval after the integrator, not one per Euler step."""
+    import mlx.core as mx
+
+    calls = {"n": 0}
+    real_eval = mx.eval
+
+    def counting_eval(*args, **kwargs):
+        calls["n"] += 1
+        return real_eval(*args, **kwargs)
+
+    monkeypatch.setattr(mx, "eval", counting_eval)
+    fm = FlowMatching(x_dims=(4, 2), num_inference_steps=10)
+
+    def step_fn(x, t):
+        return mx.zeros_like(x)
+
+    out = fm.sample(batch_size=1, step_fn=step_fn)
+    assert tuple(out.shape) == (1, 4, 2)
+    assert calls["n"] == 1, f"expected 1 mx.eval after FM, got {calls['n']}"
+
+
 def test_from_pretrained_stub():
     """Smoke test that from_pretrained can be called (full weight loading tested elsewhere)."""
     # We only check that the method exists and has the right signature.

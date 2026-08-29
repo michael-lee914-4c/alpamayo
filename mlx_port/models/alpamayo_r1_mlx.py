@@ -212,17 +212,18 @@ class FlowMatching(nn.Module):
             t_start = mx.full(shape, float(time_steps[i]))
             v = step_fn(x=x, t=t_start)
             x = x + dt * v
-            mx.eval(x)
-            if i % 3 == 0:          # every 3 diffusion steps
-                mx.clear_cache()
             diffusion_profiler.step_end()
             if return_all_steps:
                 all_steps.append(x)
 
+        # T2.3 / P2a: one host barrier after the Euler loop, not per step.
+        mx.eval(x)
         diffusion_profiler.summary()
 
         if return_all_steps:
-            return mx.stack(all_steps, axis=1), time_steps
+            stacked = mx.stack(all_steps, axis=1)
+            mx.eval(stacked)
+            return stacked, time_steps
         return x
 
 
