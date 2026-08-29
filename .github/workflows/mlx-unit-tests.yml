@@ -27,11 +27,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install mlx-ci dependency group
-        run: |
-          uv venv
-          uv pip install --group mlx-ci
+        run: uv pip install --group mlx-ci
 
       - name: Run unit tests (no weight load)
-        run: |
-          source .venv/bin/activate
-          python -m pytest mlx_port/tests -m "not slow" -q --tb=short
+        run: python -m pytest mlx_port/tests -m "not slow" -q --tb=short
