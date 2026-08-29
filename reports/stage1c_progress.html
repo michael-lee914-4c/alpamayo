@@ -134,7 +134,7 @@
                     <li>mlx_port/stage_timers.py — median_stage_times</li>
                     <li>G1 timer is greedy e2e</li>
                 </ul>
-                <div class="text-[11px] uppercase tracking-wider text-slate-500">P2a (this PR)</div>
+                <div class="text-[11px] uppercase tracking-wider text-slate-500">P2a #9 (FM eval + first-step timer)</div>
                 <ul class="text-xs space-y-1 font-mono">
                     <li>mlx_port/models/alpamayo_r1_mlx.py — one mx.eval after Euler; no mid-loop clear_cache</li>
                     <li>mlx_port/tests/test_alpamayo_r1_mlx.py — assert exactly one mx.eval on a 10-step dummy sample</li>
@@ -371,7 +371,7 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                                 <td class="px-2 py-2 font-mono text-sky-300">P2a</td>
                                 <td class="px-2 py-2 font-mono">stage1c-p2-kill-per-step-eval</td>
                                 <td class="px-2 py-2">Drop <code>mx.eval</code> inside the Euler loop; keep one barrier after FM. Re-time.</td>
-                                <td class="px-2 py-2 text-sky-400">this PR</td>
+                                <td class="px-2 py-2 text-emerald-400">merged (#9)</td>
                             </tr>
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono text-sky-300">P2b</td>
@@ -457,7 +457,8 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                 <span>Next</span>
             </div>
             <p class="text-sm text-slate-300">
-                Wait for user verification. Do not merge another PR until then.
+                P2a landed in
+                <a class="text-cyan-400 hover:underline" href="https://github.com/michael-lee914-4c/alpamayo/pull/9">#9</a>.
                 G1 fields are filled from greedy e2e (first-step LM timer).
                 Dominant is prefill. Do not spend a week on decode or FM. Do not
                 start Phase 3 quant until you sign off. First cut after sign-off
