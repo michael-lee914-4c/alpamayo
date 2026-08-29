@@ -238,6 +238,7 @@ t2 CoT decode   # also tokens generated, ms/token
 t3 FM loop      # also ms/step, step count
 t4 convert action → xyz/rot</pre>
     <p>Run 3 warm trials after 1 warmup. Report median. Same clip every time.</p>
+    <p>Instrumented (P1a): <code>ALPAMAYO_STAGE_TIMERS=1</code> → <code>extra["stage_times"]</code> and a <code>[STAGE]</code> line. Table fill is P1b.</p>
     <p><strong>Done when:</strong> a table like the one below is filled. If any stage is &lt;5% of 110&nbsp;s, do not spend a week on it.</p>
   </div>
 

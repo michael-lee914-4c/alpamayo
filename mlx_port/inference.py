@@ -41,6 +41,13 @@ from mlx_port.models.expert_mlx import (
     traj_future_start_offsets,
     trim_cache,
 )
+from mlx_port.stage_timers import (
+    StageClock,
+    bind_clock,
+    current_clock,
+    is_stage_timers_enabled,
+    print_stage_table,
+)
 
 
 def apply_top_p(logits: mx.array, top_p: float) -> mx.array:
@@ -534,11 +541,19 @@ def _sample_one_trajectory(
         pred = model.action_out_proj(hidden[:, -n_diffusion:])
         return pred.reshape(x.shape).astype(x.dtype)
 
+    clock = current_clock()
+    t_fm = time.perf_counter()
     sampled = model.diffusion.sample(batch_size=1, step_fn=step_fn)
+    if clock is not None:
+        clock.add_seconds("fm", time.perf_counter() - t_fm)
+        clock.fm_steps += int(model.diffusion.num_inference_steps)
     t0 = model.action_space.estimate_t0_states(hist_xyz, hist_rot)
+    t_convert = time.perf_counter()
     xyz, rot = model.action_space.action_to_traj(
         sampled, hist_xyz, hist_rot, t0_states=t0
     )
+    if clock is not None:
+        clock.add_seconds("convert", time.perf_counter() - t_convert)
     action = np.asarray(sampled)
     accel = action[..., 0].reshape(-1)
     kappa = action[..., 1].reshape(-1)
@@ -564,6 +579,18 @@ def _sample_one_trajectory(
     return xyz, rot, debug
 
 
+def _finish_stage_times(extra: Any) -> Any:
+    clock = current_clock()
+    if clock is None:
+        return extra
+    times = clock.as_dict()
+    print_stage_table(times)
+    if extra is None:
+        extra = {}
+    extra["stage_times"] = times
+    return extra
+
+
 def sample_trajectories_from_data_with_vlm_rollout(
     model: AlpamayoR1MLX,
     data: Dict[str, Any],
@@ -581,6 +608,33 @@ def sample_trajectories_from_data_with_vlm_rollout(
     and position_ids has been removed. The fixes now live inside
     AlpamayoLanguageModel.get_rope_index and AlpamayoModel.get_input_embeddings.
     """
+    clock = StageClock() if is_stage_timers_enabled() else None
+    with bind_clock(clock):
+        pred_xyz, pred_rot, extra = _sample_trajectories_from_data_with_vlm_rollout_impl(
+            model,
+            data,
+            num_traj_samples=num_traj_samples,
+            num_traj_sets=num_traj_sets,
+            temperature=temperature,
+            top_p=top_p,
+            vlm_only=vlm_only,
+            return_extra=return_extra,
+            **kwargs,
+        )
+        return pred_xyz, pred_rot, _finish_stage_times(extra)
+
+
+def _sample_trajectories_from_data_with_vlm_rollout_impl(
+    model: AlpamayoR1MLX,
+    data: Dict[str, Any],
+    num_traj_samples: int = 1,
+    num_traj_sets: int = 1,
+    temperature: float = 0.6,
+    top_p: float = 0.98,
+    vlm_only: bool = False,
+    return_extra: bool = False,
+    **kwargs,
+) -> Tuple[Any, Any, Any]:
     n_samples_total = num_traj_samples * num_traj_sets
 
     ego_history_xyz = data["ego_history_xyz"]
@@ -649,6 +703,9 @@ def sample_trajectories_from_data_with_vlm_rollout(
         cache = [KVCache() for _ in range(n_layers)]
 
         # --- Prefill (memory peaks captured by MemoryMonitor) ---
+        clock = current_clock()
+        t_prefill = time.perf_counter()
+        encode_before = clock.encode_ms if clock is not None else 0.0
         with MemoryMonitor(poll_interval=0.05, label="vlm_prefill"):
             outputs = vlm(
                 input_ids=input_ids,
@@ -656,6 +713,10 @@ def sample_trajectories_from_data_with_vlm_rollout(
                 cache=cache,
             )
         mx.eval(outputs.logits)
+        if clock is not None:
+            elapsed_ms = (time.perf_counter() - t_prefill) * 1000.0
+            encode_delta = clock.encode_ms - encode_before
+            clock.add_ms("prefill", elapsed_ms - encode_delta)
         record_memory_sample("after_vlm_prefill")
 
         raw_last = outputs.logits[:, -1, :].astype(mx.float32)
@@ -671,6 +732,7 @@ def sample_trajectories_from_data_with_vlm_rollout(
             )
 
         decode_profiler = StepProfiler(enabled=is_profiling_enabled(), name="Decode")
+        t_decode = time.perf_counter()
         for step in range(max_new_tokens):
             decode_profiler.step_start(step)
 
@@ -716,6 +778,9 @@ def sample_trajectories_from_data_with_vlm_rollout(
             decode_profiler.step_end()
 
         decode_profiler.summary()
+        if clock is not None:
+            clock.add_seconds("decode", time.perf_counter() - t_decode)
+            clock.decode_tok += len(generated_tokens)
 
         generated = mx.array([generated_tokens])
         record_memory_sample("after_vlm_generation_complete")

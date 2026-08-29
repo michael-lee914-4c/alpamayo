@@ -28,6 +28,7 @@ def _dbg(msg: str) -> None:
 
 from mlx_vlm.models.qwen3_vl.language import Attention, LanguageModel
 from mlx_vlm.models.qwen3_vl.qwen3_vl import Model, InputEmbeddingsFeatures
+from mlx_port.stage_timers import current_clock, time_stage
 from mlx_lm.models.base import create_causal_mask
 
 from mlx_port.models.rope_index_mlx import compute_hf_rope_index_mx
@@ -367,13 +368,20 @@ class AlpamayoModel(Model):
         inputs_embeds = self.language_model.model.embed_tokens(input_ids)
 
         cached = kwargs.get("cached_image_features", None)
-        if cached is not None:
-            hidden_states = cached
-            deepstack_visual_embeds = None
-        else:
-            hidden_states, deepstack_visual_embeds = self.vision_tower(
-                pixel_values, grid_thw
-            )
+        with time_stage("encode"):
+            if cached is not None:
+                hidden_states = cached
+                deepstack_visual_embeds = None
+            else:
+                hidden_states, deepstack_visual_embeds = self.vision_tower(
+                    pixel_values, grid_thw
+                )
+            # Barrier only when T1.1 is on so encode_ms is not lazy-attributed
+            # to prefill. Token graph is unchanged.
+            if current_clock() is not None:
+                mx.eval(hidden_states)
+                if deepstack_visual_embeds is not None:
+                    mx.eval(deepstack_visual_embeds)
 
         visual_pos_masks = None
         inputs_embeds, image_mask = self.merge_input_ids_with_image_features(
