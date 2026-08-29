@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stage 1 Progress • Alpamayo MLX Port</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&amp;family=Space+Grotesk:wght@500;600&amp;display=swap');
+        body { font-family: 'Inter', system-ui, sans-serif; }
+        .font-display { font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif; font-weight: 600; }
+        .metric-card { transition: all 0.2s cubic-bezier(0.4, 0.0, 0.2, 1); }
+        .metric-card:hover { transform: translateY(-1px); }
+        pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+        .section-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200">
+    <div class="max-w-5xl mx-auto px-6 py-10">
+        <div class="flex items-center justify-between mb-8">
+            <div class="flex items-center gap-x-4">
+                <div class="w-12 h-12 bg-amber-600 rounded-2xl flex items-center justify-center">
+                    <i class="fa-solid fa-tools text-white text-3xl"></i>
+                </div>
+                <div>
+                    <div class="font-display text-4xl font-semibold tracking-tight">Stage <span class="stage-number">1</span></div>
+                    <div class="text-amber-400 text-sm font-medium">CoC readable · GT match not closed · expert not scored</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-x-3">
+                <div class="px-4 py-1.5 bg-amber-900/40 border border-amber-700 rounded-3xl text-amber-400 text-sm flex items-center gap-x-2">
+                    <i class="fa-solid fa-clock"></i>
+                    <span class="font-semibold">IN PROGRESS</span>
+                </div>
+                <div class="text-xs text-slate-500">Aug 28, 2026 • M4 Pro Max 128 GiB</div>
+            </div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl p-8 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div>
+                    <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Stage Status</div>
+                    <div class="text-3xl font-semibold text-white">In Progress</div>
+                </div>
+                <div>
+                    <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Key Focus</div>
+                    <div class="font-semibold text-xl text-cyan-400">VLM CoC vs human GT</div>
+                </div>
+                <div>
+                    <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Unit Tests</div>
+                    <div class="text-3xl font-semibold text-emerald-400">59 / 59</div>
+                    <div class="text-xs text-slate-500 mt-1">non-slow · 4 slow deselected</div>
+                </div>
+                <div>
+                    <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">MLX Device</div>
+                    <div class="inline-flex items-center gap-x-2 px-3 py-1 bg-emerald-950 border border-emerald-800 rounded-2xl">
+                        <i class="fa-solid fa-microchip text-emerald-400"></i>
+                        <span class="font-semibold text-emerald-400">GPU (Apple Silicon)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stage 1 gate -->
+        <div class="mb-8">
+            <div class="section-header">
+                <i class="fa-solid fa-flag-checkered text-amber-400"></i>
+                <div class="font-semibold text-xl">Stage 1 Gate (locked)</div>
+            </div>
+            <div class="bg-slate-900 border border-amber-800/60 rounded-3xl p-6 text-sm space-y-4">
+                <p class="text-slate-300">
+                    Stay on Stage 1 until both pass on the local PAI-CoC subset
+                    (<code>/Volumes/MicronSSD/pai_coc</code>, 370 labeled clips in chunks 0–249).
+                    Stages 2–3 SFT stay blocked. Jaccard is cheap word overlap — read the sentence.
+                    Grok (<code>grok-4.6</code>) is the semantic judge.
+                </p>
+                <div class="text-slate-200 mb-2">Default clip <code class="text-cyan-300">0abe118e-aa79-41f6-a719-f2df8abaf1ea</code> · event <code>t0_us=8757247</code> · cluster <code>PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY</code>.</div>
+                <div class="text-xs text-slate-400 mb-1">GT CoC</div>
+                <div class="text-emerald-300 mb-3">Strong deceleration to yield to the pedestrian crossing the crosswalk.</div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div class="bg-slate-950 border border-amber-800 rounded-2xl p-4">
+                        <div class="text-xs uppercase tracking-wider text-amber-400 mb-2">Greedy e2e (T=0, pinned)</div>
+                        <div class="text-amber-200 font-mono mb-2">Stop for the stop sign at the intersection.</div>
+                        <div class="text-xs text-slate-400">Readable: yes · label match: no (stop sign vs pedestrian)</div>
+                    </div>
+                    <div class="bg-slate-950 border border-cyan-800 rounded-2xl p-4">
+                        <div class="text-xs uppercase tracking-wider text-cyan-400 mb-2">NVIDIA draw (T=0.6 / top_p=0.98 / seed=42)</div>
+                        <div class="text-cyan-100 font-mono mb-2">Stop for the stop sign ahead.</div>
+                        <div class="text-xs text-slate-400">Readable: yes · Jaccard 0.083 · GT coverage 0.125 · label match: no</div>
+                        <div class="text-xs text-slate-500 mt-2">Test: <code>test_end_to_end_inference_temperature_coc_and_traj</code> · 103.8 s · RSS 59.28 GB · Metal 43.95 GB</div>
+                    </div>
+                    <div class="bg-slate-950 border border-slate-700 rounded-2xl p-4 md:col-span-2">
+                        <div class="text-xs uppercase tracking-wider text-slate-400 mb-2">2. Action expert minADE</div>
+                        <div class="text-slate-300">Not scored. <code>pred_xyz=None</code>. GT future is present: <code>ego_future_xyz</code> shape <code>(1, 1, 64, 3)</code> (64 waypoints @ 0.1 s).</div>
+                        <div class="mt-2 text-xs text-slate-500">Temperature e2e calls the same NVIDIA entry point (<code>vlm_only=False</code>, <code>num_traj_samples=1</code>). Expert <code>step_fn</code> (VLM KV prefix → action_in_proj → diffusion → <code>action_to_traj</code>) is not wired. Action-space solvers are ported; <code>ActionInProj</code> is still a stub vs <code>PerWaypointActionInProjV2</code>.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Decisions -->
+        <div class="mb-8">
+            <div class="section-header">
+                <i class="fa-solid fa-lightbulb text-amber-400"></i>
+                <div class="font-semibold text-xl">Live Decisions (do not regress)</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 text-sm">
+                <ul class="space-y-2 text-slate-300">
+                    <li><span class="text-emerald-400 font-semibold">Tokenizer IDs</span> — add 4000 <code>&lt;iN&gt;</code> tokens, then specials. Assert against <code>config.json</code> (<code>cot_start=155677</code>, <code>traj_future_start=155681</code>, vocab=155697).</li>
+                    <li><span class="text-emerald-400 font-semibold">History fusion</span> — <code>DeltaTrajectoryTokenizerMLX</code>: 16 × xyz = 48 tokens. Fuse <code>pads 48→0</code>, <code>&lt;iN&gt; 0→48</code>.</li>
+                    <li><span class="text-emerald-400 font-semibold">Vision grid</span> — NVIDIA processor emits <strong>16 × [1,H,W]</strong>. <code>enforce_alpamayo_temporal_grouping</code> is a port-only experiment; <strong>leave it off</strong> for greedy e2e and sample evals.</li>
+                    <li><span class="text-emerald-400 font-semibold">Conv3D</span> — processor flats are C×T×H×W, <code>1536=3*2*16*16</code>. <code>AlpamayoPatchEmbed</code> keeps NCHW + raw PT weight. Do not unflatten as <code>(N, 2, 16, 16, 3)</code>.</li>
+                    <li><span class="text-emerald-400 font-semibold">RoPE</span> — HF Qwen3-VL <code>get_rope_index</code>. Do not forward <code>pixel_values</code> into the stock LM after embeddings (wipes cached 3-row ids). Decode: <code>arange(L)+cache_offset+rope_deltas</code>. Sync <code>cache._idx</code>.</li>
+                    <li><span class="text-emerald-400 font-semibold">Generate stop</span> — <code>AlpamayoGenerateStop</code>: immediate stop on Qwen EOS <code>[151645, 151643]</code> (<code>&lt;|im_end|&gt;</code>, <code>&lt;|endoftext|&gt;</code>); delayed stop-after-one on <code>&lt;|traj_future_start|&gt;</code>. Do not mask <code>&lt;|im_end|&gt;</code>. Fresh stopper per sample.</li>
+                    <li><span class="text-emerald-400 font-semibold">Sampling</span> — NVIDIA <code>test_inference.py</code> is <code>temperature=0.6</code>, <code>top_p=0.98</code>, <code>do_sample=True</code>. Greedy e2e pins <code>T=0</code> / <code>top_p=1</code>. “Top-k CoC” is first-token rank + greedy complete (diagnostic). Temperature eval is <em>N independent full rollouts</em>, not a ranked top-3.</li>
+                    <li><span class="text-emerald-400 font-semibold">Loader</span> — <code>maybe_stream=True</code> even for the local SSD. <code>physical_ai_av</code> <code>open_file</code> only reads the HF cache, not the flat <code>/Volumes/MicronSSD/pai_coc</code> snapshot. Do not download NVIDIA’s example clip <code>030c760c-…</code> (chunk 3119, not in CoC).</li>
+                    <li><span class="text-slate-400 font-semibold">Diagnostics</span> — verbose prefill / RoPE / step dumps only when <code>ALPAMAYO_DEBUG=1</code>.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Parity -->
+        <div class="mb-8">
+            <div class="section-header">
+                <i class="fa-solid fa-table text-cyan-400"></i>
+                <div class="font-semibold text-xl">NVIDIA → MLX Parity</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-3xl overflow-hidden">
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-950 text-slate-400">
+                        <tr>
+                            <th class="px-4 py-3 text-left">#</th>
+                            <th class="px-4 py-3 text-left">NVIDIA</th>
+                            <th class="px-4 py-3 text-left">MLX</th>
+                            <th class="px-4 py-3 text-center">Status</th>
+                            <th class="px-4 py-3 text-left">Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800 text-slate-300">
+                        <tr>
+                            <td class="px-4 py-3 font-mono text-xs text-slate-500">1</td>
+                            <td class="px-4 py-3">load_physical_aiavdataset</td>
+                            <td class="px-4 py-3 font-mono text-xs">src/alpamayo_r1 + maybe_stream</td>
+                            <td class="px-4 py-3 text-center"><span class="px-2 py-0.5 bg-emerald-900 text-emerald-400 text-xs rounded-full">Done</span></td>
+                            <td class="px-4 py-3 text-xs">Local PAI-CoC; stream flag required for flat SSD snapshot.</td>
+                        </tr>
+                        <tr>
+                            <td class="px-4 py-3 font-mono text-xs text-slate-500">2–4</td>
+                            <td class="px-4 py-3">create_message · processor · tokenizer</td>
+                            <td class="px-4 py-3 font-mono text-xs">mlx_port/processor.py · vlm_loader.py</td>
+                            <td class="px-4 py-3 text-center"><span class="px-2 py-0.5 bg-emerald-900 text-emerald-400 text-xs rounded-full">Done</span></td>
+                            <td class="px-4 py-3 text-xs">Alpamayo tokenizer injected; IDs match checkpoint.</td>
+                        </tr>
+                        <tr>
+                            <td class="px-4 py-3 font-mono text-xs text-slate-500">5</td>
+                            <td class="px-4 py-3">AlpamayoR1.from_pretrained</td>
+                            <td class="px-4 py-3 font-mono text-xs">AlpamayoR1MLX.from_pretrained</td>
+                            <td class="px-4 py-3 text-center"><span class="px-2 py-0.5 bg-emerald-900 text-emerald-400 text-xs rounded-full">Done</span></td>
+                            <td class="px-4 py-3 text-xs">750/750 VLM weights, bfloat16. Expert load works; CoC eval does not load it.</td>
+                        </tr>
+                        <tr>
+                            <td class="px-4 py-3 font-mono text-xs text-slate-500">6</td>
+                            <td class="px-4 py-3">fuse_traj_tokens + Delta history</td>
+                            <td class="px-4 py-3 font-mono text-xs">DeltaTrajectoryTokenizerMLX</td>
+                            <td class="px-4 py-3 text-center"><span class="px-2 py-0.5 bg-emerald-900 text-emerald-400 text-xs rounded-full">Done</span></td>
+                            <td class="px-4 py-3 text-xs">48 history pads replaced. Discrete tokenizer is the future-traj path, not history.</td>
+                        </tr>
+                        <tr>
+                            <td class="px-4 py-3 font-mono text-xs text-slate-500">7</td>
+                            <td class="px-4 py-3">vlm.generate + ExpertLogitsProcessor + HF EOS + StopAfterEOS</td>
+                            <td class="px-4 py-3 font-mono text-xs">mlx_port/inference.py manual loop</td>
+                            <td class="px-4 py-3 text-center"><span class="px-2 py-0.5 bg-emerald-900 text-emerald-400 text-xs rounded-full">Done (CoC)</span></td>
+                            <td class="px-4 py-3 text-xs">Not <code>mlx_vlm.generate</code>. Prefill once, decode with KV cache. Diffusion <code>step_fn</code> not called on the CoC eval path.</td>
+                        </tr>
+                        <tr>
+                            <td class="px-4 py-3 font-mono text-xs text-slate-500">8</td>
+                            <td class="px-4 py-3">extract_text_tokens + minADE</td>
+                            <td class="px-4 py-3 font-mono text-xs">gt_eval.py · eval_coc_grok.py</td>
+                            <td class="px-4 py-3 text-center"><span class="px-2 py-0.5 bg-amber-900 text-amber-400 text-xs rounded-full">CoC only</span></td>
+                            <td class="px-4 py-3 text-xs">CoC extract + Grok judge live. minADE helpers exist; no expert XY yet.</td>
+                        </tr>
+                        <tr>
+                            <td class="px-4 py-3 font-mono text-xs text-slate-500">9</td>
+                            <td class="px-4 py-3">flash_attention_2</td>
+                            <td class="px-4 py-3 font-mono text-xs">stock mlx SDPA</td>
+                            <td class="px-4 py-3 text-center"><span class="px-2 py-0.5 bg-slate-800 text-slate-400 text-xs rounded-full">Not required</span></td>
+                            <td class="px-4 py-3 text-xs">mlx-mfa is optional speed. CoC quality bugs were IDs / RoPE / EOS, not the kernel.</td>
+                        </tr>
+                        <tr>
+                            <td class="px-4 py-3 font-mono text-xs text-slate-500">10–11</td>
+                            <td class="px-4 py-3">bfloat16 · expert decoder · action space</td>
+                            <td class="px-4 py-3 font-mono text-xs">alpamayo_r1_mlx.py · action_space_utils_mlx.py</td>
+                            <td class="px-4 py-3 text-center"><span class="px-2 py-0.5 bg-emerald-900 text-emerald-400 text-xs rounded-full">Done (struct)</span></td>
+                            <td class="px-4 py-3 text-xs">Qwen3-VL expert + FlowMatching + Unicycle. <code>theta</code> via <code>solve_single_constraint</code> (T+1, x0=0). Lambdas match NVIDIA defaults. <code>from_pretrained</code> does <em>not</em> override <code>n_waypoints=64</code> (keeps diffusion dims (8, 2)).</td>
+                        </tr>
+                        <tr>
+                            <td class="px-4 py-3 font-mono text-xs text-slate-500">12</td>
+                            <td class="px-4 py-3">Runtime / memory</td>
+                            <td class="px-4 py-3 font-mono text-xs">MemoryMonitor + mx.eval</td>
+                            <td class="px-4 py-3 text-center"><span class="px-2 py-0.5 bg-emerald-900 text-emerald-400 text-xs rounded-full">Acceptable</span></td>
+                            <td class="px-4 py-3 text-xs">E2E greedy ~110 s, ~60 GB RSS, Metal ~44 GB. 5-clip T=0.6 × 3 samples ~497 s.</td>
+                        </tr>
+                        <tr>
+                            <td class="px-4 py-3 font-mono text-xs text-slate-500">13–16</td>
+                            <td class="px-4 py-3">mlx_vlm.generate patch (processors, cache, rope_deltas, multi-seq)</td>
+                            <td class="px-4 py-3 font-mono text-xs">superseded by manual loop</td>
+                            <td class="px-4 py-3 text-center"><span class="px-2 py-0.5 bg-slate-800 text-slate-400 text-xs rounded-full">Superseded</span></td>
+                            <td class="px-4 py-3 text-xs">Live path does not call <code>mlx_vlm.generate</code>. Historical notes: <a class="text-cyan-400 hover:underline" href="stage1_debug_notes.html">stage1_debug_notes.html</a>.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Closed bugs -->
+        <div class="mb-8">
+            <div class="section-header">
+                <i class="fa-solid fa-check text-emerald-400"></i>
+                <div class="font-semibold text-xl">Closed Root Causes</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 text-sm">
+                <div class="overflow-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="text-slate-500 uppercase tracking-wider border-b border-slate-800">
+                            <tr>
+                                <th class="px-2 py-2">Symptom</th>
+                                <th class="px-2 py-2">Cause</th>
+                                <th class="px-2 py-2">Fix</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800 text-slate-300">
+                            <tr>
+                                <td class="px-2 py-2 text-rose-300">&lt;|prompt_start|&gt; / &lt;|image_pre_tkn|&gt; CoC</td>
+                                <td class="px-2 py-2">Specials added before the 4000 traj bins; IDs collided with checkpoint <code>&lt;i768&gt;…</code></td>
+                                <td class="px-2 py-2"><code>test_tokenizer_id_parity.py</code></td>
+                            </tr>
+                            <tr>
+                                <td class="px-2 py-2 text-rose-300">Only 16/48 history pads fused</td>
+                                <td class="px-2 py-2">Discrete action tokenizer used for history</td>
+                                <td class="px-2 py-2"><code>DeltaTrajectoryTokenizerMLX</code></td>
+                            </tr>
+                            <tr>
+                                <td class="px-2 py-2 text-rose-300">Incoherent CoC after vision</td>
+                                <td class="px-2 py-2">RoPE wiped when <code>pixel_values</code> re-entered the LM; Conv3D unflatten as T,H,W,C</td>
+                                <td class="px-2 py-2">HF <code>get_rope_index</code> + NCHW pack. Tests: <code>test_hf_rope_index.py</code>, <code>test_conv3d_layout.py</code></td>
+                            </tr>
+                            <tr>
+                                <td class="px-2 py-2 text-rose-300">Keep 9 / cones屎 / Y&lt;|im_end|&gt;Slow…</td>
+                                <td class="px-2 py-2">Decode ignored Qwen EOS; kept sampling after <code>&lt;|im_end|&gt;</code></td>
+                                <td class="px-2 py-2"><code>AlpamayoGenerateStop</code>. Side effect: greedy can now be a single letter (<code>Y</code>) if EOS follows immediately.</td>
+                            </tr>
+                            <tr>
+                                <td class="px-2 py-2 text-rose-300">“…crosswalk. experience”</td>
+                                <td class="px-2 py-2">Extra token after <code>traj_future_start</code> leaked into displayed CoC</td>
+                                <td class="px-2 py-2"><code>clean_pred_coc</code> cuts at <code>cot_end</code> / <code>traj_future_start</code></td>
+                            </tr>
+                            <tr>
+                                <td class="px-2 py-2 text-rose-300">Bugbot: minADE / yaw / stopper latch / return_extra</td>
+                                <td class="px-2 py-2">Layout slice, unwrap-only theta, reused <code>StopAfterEOS</code>, named-arg miss</td>
+                                <td class="px-2 py-2">All four fixed. Fresh stopper per sample.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="mt-3 text-xs text-slate-500">
+                    4×4 temporal grouping is <em>not</em> a NVIDIA requirement (processor is 16 independent frames).
+                    Diagram kept for the experiment only:
+                    <img src="alpamayo_4x4_temporal_grouping_diagram.png" alt="4×4 grouping experiment (not used in eval)" class="mt-2 w-full max-w-2xl rounded-2xl border border-slate-700">
+                </p>
+            </div>
+        </div>
+
+        <!-- CoC evals -->
+        <div class="mb-8">
+            <div class="section-header">
+                <i class="fa-solid fa-scale-balanced text-cyan-400"></i>
+                <div class="font-semibold text-xl">CoC Eval — 5 Random Local Clips (seed 42)</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 text-sm space-y-4">
+                <p class="text-slate-300">
+                    Same five clips, skip <code>t0 &lt; 1_600_001</code>.
+                    <a class="text-cyan-400 hover:underline" href="coc_sample_5/index.html">Greedy top-5 report</a>
+                    · <a class="text-cyan-400 hover:underline" href="coc_sample_5/eval_grok.html">Grok (greedy)</a>
+                    · <a class="text-cyan-400 hover:underline" href="coc_sample_5_t06/index.html">T=0.6 × 3 samples</a>
+                    · <a class="text-cyan-400 hover:underline" href="coc_sample_5_t06/eval_grok.html">Grok (T=0.6)</a>
+                </p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                    <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+                        <div class="font-semibold text-slate-200 mb-1">Greedy top-5</div>
+                        <div class="text-slate-400 mb-2">Prefill once. Take the 5 most likely first tokens (after traj-bin mask). Greedy-complete each. Rank 1 = true greedy. Diagnostic, not NVIDIA policy.</div>
+                        <div class="text-amber-200">Grok on greedy: <strong>1 match · 2 related · 1 mismatch · 1 unreadable</strong></div>
+                    </div>
+                    <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+                        <div class="font-semibold text-slate-200 mb-1">Temperature 0.6 / top_p 0.98</div>
+                        <div class="text-slate-400 mb-2">Prefill once. Three independent full rollouts (NVIDIA <code>num_traj_samples</code>). Sample 1 is the first draw, not the best. “Top 3” is not a ranking.</div>
+                        <div class="text-emerald-300">Grok on sample 1: <strong>3 match · 1 related · 1 mismatch</strong></div>
+                    </div>
+                </div>
+                <div class="overflow-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="text-slate-500 uppercase tracking-wider border-b border-slate-800">
+                            <tr>
+                                <th class="px-2 py-2">#</th>
+                                <th class="px-2 py-2">Clip</th>
+                                <th class="px-2 py-2">GT</th>
+                                <th class="px-2 py-2">Greedy #1 → Grok</th>
+                                <th class="px-2 py-2">T=0.6 sample 1 → Grok</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800 text-slate-300">
+                            <tr>
+                                <td class="px-2 py-2 text-slate-500">0</td>
+                                <td class="px-2 py-2 font-mono text-[11px]">faff17c7 work zone</td>
+                                <td class="px-2 py-2">Turn left, clear of cones</td>
+                                <td class="px-2 py-2">Stop/yield flagger · <span class="text-amber-300">related</span></td>
+                                <td class="px-2 py-2">Slow for road worker · <span class="text-amber-300">related</span></td>
+                            </tr>
+                            <tr>
+                                <td class="px-2 py-2 text-slate-500">1</td>
+                                <td class="px-2 py-2 font-mono text-[11px]">8e83f069 night peds</td>
+                                <td class="px-2 py-2">Decelerate for pedestrians</td>
+                                <td class="px-2 py-2"><code>Y</code> (EOS cut) · <span class="text-slate-400">unreadable</span> · top-5 #4 yields ped</td>
+                                <td class="px-2 py-2">Stop/yield pedestrian · <span class="text-emerald-400">match</span></td>
+                            </tr>
+                            <tr>
+                                <td class="px-2 py-2 text-slate-500">2</td>
+                                <td class="px-2 py-2 font-mono text-[11px]">1946f1c3 snow</td>
+                                <td class="px-2 py-2">Yield to pedestrian</td>
+                                <td class="px-2 py-2">Yield to vehicle · <span class="text-rose-400">mismatch</span></td>
+                                <td class="px-2 py-2">Yield to far cross-traffic · <span class="text-rose-400">mismatch</span></td>
+                            </tr>
+                            <tr>
+                                <td class="px-2 py-2 text-slate-500">3</td>
+                                <td class="px-2 py-2 font-mono text-[11px]">8e06f83c residential</td>
+                                <td class="px-2 py-2">Yield to pedestrians</td>
+                                <td class="px-2 py-2">Nudge left · <span class="text-amber-300">related</span> · top-5 #2 matches</td>
+                                <td class="px-2 py-2">Stop/yield pedestrian · <span class="text-emerald-400">match</span></td>
+                            </tr>
+                            <tr>
+                                <td class="px-2 py-2 text-slate-500">4</td>
+                                <td class="px-2 py-2 font-mono text-[11px]">36cb5485 fog + STOP</td>
+                                <td class="px-2 py-2">Stop sign + pedestrians</td>
+                                <td class="px-2 py-2">Yield to pedestrian · <span class="text-emerald-400">match</span></td>
+                                <td class="px-2 py-2">Yield to pedestrian · <span class="text-emerald-400">match</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-xs text-slate-400">
+                    Clip 2 is <strong>wrong priority, not a hallucination</strong>: front-tele shows a real far cross-traffic car;
+                    front-wide shows the closer pedestrian already in the lane. GT and cluster
+                    (<code>PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY</code>) pick the pedestrian. None of the three T=0.6 samples named the ped.
+                </p>
+            </div>
+        </div>
+
+        <!-- Tests -->
+        <div class="mb-8">
+            <div class="section-header">
+                <i class="fa-solid fa-vial text-emerald-400"></i>
+                <div class="font-semibold text-xl">Tests</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 text-sm space-y-3">
+                <div class="flex flex-wrap gap-3">
+                    <div class="px-4 py-2 bg-slate-950 border border-emerald-800 rounded-2xl">
+                        <span class="text-emerald-400">Non-slow:</span> <span class="font-semibold text-white">59 / 59</span>
+                    </div>
+                    <div class="px-4 py-2 bg-slate-950 border border-emerald-800 rounded-2xl">
+                        <span class="text-emerald-400">E2E greedy:</span> <span class="font-semibold text-white">pinned</span>
+                        <span class="text-xs text-slate-400 ml-1">“Stop for the stop sign at the intersection.”</span>
+                    </div>
+                    <div class="px-4 py-2 bg-slate-950 border border-cyan-800 rounded-2xl">
+                        <span class="text-cyan-400">E2E T=0.6 seed=42:</span> <span class="font-semibold text-white">passed</span>
+                        <span class="text-xs text-slate-400 ml-1">“Stop for the stop sign ahead.” · minADE n/a</span>
+                    </div>
+                </div>
+                <pre class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-xs text-cyan-300 overflow-auto">PYTHONPATH=src:. .venv/bin/python -m pytest mlx_port/tests -q -m "not slow"
+PYTHONPATH=src:. .venv/bin/python -m pytest mlx_port/tests/test_end_to_end_inference.py::test_end_to_end_inference_prints_coc_vlm_only -s --tb=short
+PYTHONPATH=src:. .venv/bin/python -m pytest mlx_port/tests/test_end_to_end_inference.py::test_end_to_end_inference_temperature_coc_and_traj -s --tb=short
+PYTHONPATH=src:. .venv/bin/python mlx_port/scripts/run_local_coc_sample.py
+PYTHONPATH=src:. .venv/bin/python mlx_port/scripts/run_local_coc_sample.py \
+  --mode samples --k 3 --temperature 0.6 --top-p 0.98 \
+  --report-dir reports/coc_sample_5_t06 --no-reuse
+PYTHONPATH=src:. .venv/bin/python mlx_port/scripts/eval_coc_grok.py \
+  --results reports/coc_sample_5_t06/results.json</pre>
+                <div class="text-xs text-slate-400 space-y-1">
+                    <div>Parity: <code>test_tokenizer_id_parity</code> · <code>test_delta_tokenizer</code> · <code>test_hf_rope_index</code> · <code>test_conv3d_layout</code> · <code>test_nucleus_sampling</code> · <code>test_inference_row7</code> (HF EOS + traj delay)</div>
+                    <div>GT: <code>test_gt_eval</code> (Jaccard is not the quality metric; cleanup + ADE layout only)</div>
+                    <div>Slow: greedy e2e (pinned) · temperature e2e (readable, not pinned) · <code>test_single_image_coc</code> · weight-load tests</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Compute -->
+        <div class="mb-8">
+            <div class="section-header">
+                <i class="fa-solid fa-microchip text-amber-400"></i>
+                <div class="font-semibold text-xl">Compute Footprint</div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="metric-card bg-slate-900 border border-slate-700 rounded-3xl p-6">
+                    <div class="text-xs text-slate-500">Peak RSS / Metal (prefill)</div>
+                    <div class="text-4xl font-semibold text-white mt-2">~60 <span class="text-2xl text-slate-400">/ 44 GiB</span></div>
+                </div>
+                <div class="metric-card bg-slate-900 border border-slate-700 rounded-3xl p-6">
+                    <div class="text-xs text-slate-500">T=0.6 e2e (1 clip, seed 42)</div>
+                    <div class="text-4xl font-semibold text-white mt-2">104 <span class="text-2xl text-slate-400">s</span></div>
+                </div>
+                <div class="metric-card bg-slate-900 border border-slate-700 rounded-3xl p-6">
+                    <div class="text-xs text-slate-500">5 clips × 3 samples T=0.6</div>
+                    <div class="text-4xl font-semibold text-white mt-2">~497 <span class="text-2xl text-slate-400">s</span></div>
+                </div>
+            </div>
+            <p class="mt-3 text-xs text-slate-500">Prefill (~32k tokens) dominates memory. Verbose dumps off unless <code>ALPAMAYO_DEBUG=1</code>.</p>
+        </div>
+
+        <!-- Next -->
+        <div class="bg-indigo-950/50 border border-indigo-800 rounded-3xl p-8">
+            <div class="font-semibold text-indigo-400 mb-3 flex items-center gap-x-2">
+                <i class="fa-solid fa-arrow-right"></i>
+                <span>Next Steps</span>
+            </div>
+            <ol class="list-decimal list-inside space-y-2 text-sm text-slate-300">
+                <li>
+                    <span class="text-amber-400 font-semibold">Decide the CoC quality bar.</span>
+                    Default-clip greedy is readable but names a stop sign, not the GT pedestrian.
+                    T=0.6 on 5 clips is 3/5 Grok match on sample 1. Options: require greedy = GT, or accept “related + samples contain GT,” or treat NVIDIA sampling as the policy and score a sample set.
+                </li>
+                <li>
+                    <span class="text-amber-400 font-semibold">Wire expert <code>step_fn</code></span>
+                    so the temperature e2e can return <code>pred_xyz</code> / minADE.
+                    Needed: real <code>PerWaypointActionInProjV2</code>, <code>n_waypoints=64</code>, VLM KV prefix into the 2048-d expert, then <code>action_to_traj</code>.
+                    Default-clip GT future is already loaded: <code>(1, 1, 64, 3)</code>.
+                </li>
+                <li>
+                    Optional Thor dump: one <code>vlm(…)</code> prefill, raw top-15 at last token <code>&lt;|cot_start|&gt;</code>, before <code>ExpertLogitsProcessor</code>, vs MLX.
+                </li>
+                <li class="text-slate-500">
+                    Stages 2–3 remain blocked. Do not re-enable temporal grouping on greedy e2e. Do not mask <code>&lt;|im_end|&gt;</code>.
+                </li>
+            </ol>
+            <div class="mt-4 text-xs font-mono text-indigo-400">
+                reports/stage1_progress.html · updated 2026-08-28 ·
+                <a class="text-cyan-400 hover:underline" href="stage1_debug_notes.html">historical debug</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

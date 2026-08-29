@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Local CoC sample · 5 clips</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@600&amp;display=swap');
+    body { font-family: Inter, system-ui, sans-serif; }
+    .font-display { font-family: 'Space Grotesk', Inter, sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-200">
+  <div class="max-w-6xl mx-auto px-6 py-10">
+    <h1 class="font-display text-3xl text-white mb-2">Local PAI-CoC sample</h1>
+    <p class="text-sm text-slate-400 mb-6">
+      5 random clips from the on-disk CoC subset (chunks 0–249, seed=42).
+      NVIDIA sampling: 3 independent CoCs from one prefill (temperature=0.6, top_p=0.98). Not first-token top-k.
+      t0 is the CoC event timestamp, not NVIDIA’s 5.1 s default.
+      Jaccard is cheap word overlap — read the sentences.
+      Generated 2026-08-28 20:27 UTC. Readable CoC: 5/5.
+    </p>
+    <div class="overflow-auto bg-slate-900 border border-slate-700 rounded-2xl mb-10">
+      <table class="w-full text-left text-sm">
+        <thead class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
+          <tr>
+            <th class="px-3 py-2">#</th><th class="px-3 py-2">Clip</th><th class="px-3 py-2">Cluster</th>
+            <th class="px-3 py-2">Readable</th><th class="px-3 py-2">Jaccard</th>
+            <th class="px-3 py-2">GT</th><th class="px-3 py-2">Pred</th>
+          </tr>
+        </thead>
+        <tbody><tr>
+              <td class="px-3 py-2 text-slate-400">0</td>
+              <td class="px-3 py-2 font-mono text-[11px]"><a class="text-cyan-400 hover:underline" href="#clip-0">faff17c7…</a></td>
+              <td class="px-3 py-2 text-xs">WORK_ZONES_TEMP_TRAFFIC_CONTROL</td>
+              <td class="px-3 py-2 text-xs text-emerald-400">True</td>
+              <td class="px-3 py-2 text-xs tabular-nums">0.048</td>
+              <td class="px-3 py-2 text-xs text-slate-300">Turn left while keeping a safe distance from the construction cones on the right.</td>
+              <td class="px-3 py-2 text-xs text-amber-200">Slow down due to a road worker directing traffic.</td>
+            </tr><tr>
+              <td class="px-3 py-2 text-slate-400">1</td>
+              <td class="px-3 py-2 font-mono text-[11px]"><a class="text-cyan-400 hover:underline" href="#clip-1">8e83f069…</a></td>
+              <td class="px-3 py-2 text-xs">PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY</td>
+              <td class="px-3 py-2 text-xs text-emerald-400">True</td>
+              <td class="px-3 py-2 text-xs tabular-nums">0.118</td>
+              <td class="px-3 py-2 text-xs text-slate-300">Decelerate to maintain a safe distance from the pedestrians crossing the street.</td>
+              <td class="px-3 py-2 text-xs text-amber-200">Stop to yield to the pedestrian in the crosswalk ahead.</td>
+            </tr><tr>
+              <td class="px-3 py-2 text-slate-400">2</td>
+              <td class="px-3 py-2 font-mono text-[11px]"><a class="text-cyan-400 hover:underline" href="#clip-2">1946f1c3…</a></td>
+              <td class="px-3 py-2 text-xs">PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY</td>
+              <td class="px-3 py-2 text-xs text-emerald-400">True</td>
+              <td class="px-3 py-2 text-xs tabular-nums">0.273</td>
+              <td class="px-3 py-2 text-xs text-slate-300">Yield to the pedestrian crossing the road.</td>
+              <td class="px-3 py-2 text-xs text-amber-200">Stop to yield to the cross-traffic vehicle ahead.</td>
+            </tr><tr>
+              <td class="px-3 py-2 text-slate-400">3</td>
+              <td class="px-3 py-2 font-mono text-[11px]"><a class="text-cyan-400 hover:underline" href="#clip-3">8e06f83c…</a></td>
+              <td class="px-3 py-2 text-xs">PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY</td>
+              <td class="px-3 py-2 text-xs text-emerald-400">True</td>
+              <td class="px-3 py-2 text-xs tabular-nums">0.444</td>
+              <td class="px-3 py-2 text-xs text-slate-300">Yield to the pedestrians crossing the road.</td>
+              <td class="px-3 py-2 text-xs text-amber-200">Stop to yield to the pedestrian crossing ahead</td>
+            </tr><tr>
+              <td class="px-3 py-2 text-slate-400">4</td>
+              <td class="px-3 py-2 font-mono text-[11px]"><a class="text-cyan-400 hover:underline" href="#clip-4">36cb5485…</a></td>
+              <td class="px-3 py-2 text-xs">ANIMALS_BIRDS_ROADKILL</td>
+              <td class="px-3 py-2 text-xs text-emerald-400">True</td>
+              <td class="px-3 py-2 text-xs tabular-nums">0.214</td>
+              <td class="px-3 py-2 text-xs text-slate-300">Stop for the stop sign while waiting for pedestrians to cross the street.</td>
+              <td class="px-3 py-2 text-xs text-amber-200">Stop to yield to the pedestrian in the crosswalk.</td>
+            </tr></tbody>
+      </table>
+    </div>
+    <section id="clip-0" class="bg-slate-900 border border-slate-700 rounded-3xl p-6 mb-8">
+              <div class="flex flex-wrap items-baseline justify-between gap-3 mb-4">
+                <div>
+                  <div class="font-display text-xl text-white">Clip 0 · <span class="font-mono text-sm text-cyan-300">faff17c7-4572-472a-be28-0f035bb88a37</span></div>
+                  <div class="text-xs text-slate-400 mt-1">chunk=4 · train · WORK_ZONES_TEMP_TRAFFIC_CONTROL · t0_us=5627325 · path 9.7 m</div>
+                </div>
+                <div class="text-xs text-slate-400">readable=<span class="text-emerald-400">True</span> · jaccard=0.048 · gt_coverage=0.077</div>
+              </div>
+              <div class="grid md:grid-cols-2 gap-4 mb-5">
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+                  <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-2">GT CoC</div>
+                  <ul class="text-sm text-slate-200 list-disc pl-5"><li class='mb-1'>Turn left while keeping a safe distance from the construction cones on the right.</li></ul>
+                </div>
+                <div class="bg-slate-950 border border-amber-900/50 rounded-2xl p-4">
+                  <div class="text-[11px] uppercase tracking-wider text-amber-500 mb-2">Generated CoC (sample 1)</div>
+                  <p class="text-sm text-amber-100">Slow down due to a road worker directing traffic.</p>
+                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Slow down due to a road worker directing traffic.&lt;|cot_end|&gt;&lt;|traj_future_start|&gt;&lt;|im_end|&gt;</p>
+                </div>
+              </div>
+              <div class="mb-5 overflow-auto bg-slate-950 border border-slate-800 rounded-2xl">
+              <div class="px-4 pt-3 text-[11px] uppercase tracking-wider text-amber-500">3 independent samples (T=0.6, top_p=0.98)</div>
+              <table class="w-full text-left text-sm mt-2">
+                <thead class="text-[11px] text-slate-500 border-b border-slate-800">
+                  <tr><th class="px-2 py-1">#</th><th class="px-2 py-1">P(first)</th><th class="px-2 py-1">First</th><th class="px-2 py-1">CoC</th><th class="px-2 py-1">Readable</th></tr>
+                </thead>
+                <tbody><tr><td class='px-2 py-1 text-slate-400'>1</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.271</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Slow</td><td class='px-2 py-1 text-amber-100'>Slow down due to a road worker directing traffic.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>2</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.446</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Stop</td><td class='px-2 py-1 text-amber-100'>Stop due to</td><td class='px-2 py-1 text-xs text-rose-400'>False</td></tr><tr><td class='px-2 py-1 text-slate-400'>3</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.446</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Stop</td><td class='px-2 py-1 text-amber-100'>Stop due to the construction flagger holding a stop sign.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr></tbody>
+              </table>
+            </div>
+              <div class="text-sm font-semibold text-slate-300 mb-2">16-image history (4 cameras × 4 frames)</div>
+              <div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="00_faff17c7/00_cross_left_120_t-0.3s.jpg" alt="cross_left_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="00_faff17c7/00_cross_left_120_t-0.2s.jpg" alt="cross_left_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="00_faff17c7/00_cross_left_120_t-0.1s.jpg" alt="cross_left_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="00_faff17c7/00_cross_left_120_tp0.0s.jpg" alt="cross_left_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="00_faff17c7/01_front_wide_120_t-0.3s.jpg" alt="front_wide_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="00_faff17c7/01_front_wide_120_t-0.2s.jpg" alt="front_wide_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="00_faff17c7/01_front_wide_120_t-0.1s.jpg" alt="front_wide_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="00_faff17c7/01_front_wide_120_tp0.0s.jpg" alt="front_wide_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="00_faff17c7/02_cross_right_120_t-0.3s.jpg" alt="cross_right_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="00_faff17c7/02_cross_right_120_t-0.2s.jpg" alt="cross_right_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="00_faff17c7/02_cross_right_120_t-0.1s.jpg" alt="cross_right_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="00_faff17c7/02_cross_right_120_tp0.0s.jpg" alt="cross_right_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="00_faff17c7/03_front_tele_30_t-0.3s.jpg" alt="front_tele_30 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="00_faff17c7/03_front_tele_30_t-0.2s.jpg" alt="front_tele_30 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="00_faff17c7/03_front_tele_30_t-0.1s.jpg" alt="front_tele_30 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="00_faff17c7/03_front_tele_30_tp0.0s.jpg" alt="front_tele_30 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t+0.0s</figcaption>
+                    </figure></div>
+              <div class="grid md:grid-cols-[minmax(0,1fr)_280px] gap-4 mt-4">
+                <div>
+                  <div class="text-sm font-semibold text-slate-300 mb-2">Ego-motion history (16 steps @ 10 Hz, ego frame at t0)</div>
+                  <img src="00_faff17c7/ego_history.png" alt="ego history" class="rounded-xl border border-slate-700 bg-slate-950 max-w-md">
+                </div>
+                <div class="overflow-auto max-h-80">
+                  <table class="w-full text-[11px] tabular-nums text-slate-300">
+                    <thead class="text-slate-500"><tr><th class="px-2 text-left">i</th><th class="px-2 text-left">s</th><th class="px-2 text-left">x</th><th class="px-2 text-left">y</th><th class="px-2 text-left">z</th><th class="px-2 text-left">yaw°</th></tr></thead>
+                    <tbody><tr><td class='px-2 py-0.5'>0</td><td class='px-2 py-0.5'>-1.5</td><td class='px-2 py-0.5'>-9.387</td><td class='px-2 py-0.5'>2.560</td><td class='px-2 py-0.5'>-0.127</td><td class='px-2 py-0.5'>-30.62</td></tr><tr><td class='px-2 py-0.5'>1</td><td class='px-2 py-0.5'>-1.4</td><td class='px-2 py-0.5'>-8.860</td><td class='px-2 py-0.5'>2.257</td><td class='px-2 py-0.5'>-0.116</td><td class='px-2 py-0.5'>-28.70</td></tr><tr><td class='px-2 py-0.5'>2</td><td class='px-2 py-0.5'>-1.3</td><td class='px-2 py-0.5'>-8.317</td><td class='px-2 py-0.5'>1.969</td><td class='px-2 py-0.5'>-0.104</td><td class='px-2 py-0.5'>-26.72</td></tr><tr><td class='px-2 py-0.5'>3</td><td class='px-2 py-0.5'>-1.2</td><td class='px-2 py-0.5'>-7.759</td><td class='px-2 py-0.5'>1.696</td><td class='px-2 py-0.5'>-0.091</td><td class='px-2 py-0.5'>-24.70</td></tr><tr><td class='px-2 py-0.5'>4</td><td class='px-2 py-0.5'>-1.1</td><td class='px-2 py-0.5'>-7.185</td><td class='px-2 py-0.5'>1.441</td><td class='px-2 py-0.5'>-0.077</td><td class='px-2 py-0.5'>-22.68</td></tr><tr><td class='px-2 py-0.5'>5</td><td class='px-2 py-0.5'>-1.0</td><td class='px-2 py-0.5'>-6.596</td><td class='px-2 py-0.5'>1.204</td><td class='px-2 py-0.5'>-0.061</td><td class='px-2 py-0.5'>-20.67</td></tr><tr><td class='px-2 py-0.5'>6</td><td class='px-2 py-0.5'>-0.9</td><td class='px-2 py-0.5'>-5.994</td><td class='px-2 py-0.5'>0.987</td><td class='px-2 py-0.5'>-0.046</td><td class='px-2 py-0.5'>-18.62</td></tr><tr><td class='px-2 py-0.5'>7</td><td class='px-2 py-0.5'>-0.8</td><td class='px-2 py-0.5'>-5.379</td><td class='px-2 py-0.5'>0.789</td><td class='px-2 py-0.5'>-0.031</td><td class='px-2 py-0.5'>-16.53</td></tr><tr><td class='px-2 py-0.5'>8</td><td class='px-2 py-0.5'>-0.7</td><td class='px-2 py-0.5'>-4.751</td><td class='px-2 py-0.5'>0.610</td><td class='px-2 py-0.5'>-0.017</td><td class='px-2 py-0.5'>-14.40</td></tr><tr><td class='px-2 py-0.5'>9</td><td class='px-2 py-0.5'>-0.6</td><td class='px-2 py-0.5'>-4.109</td><td class='px-2 py-0.5'>0.455</td><td class='px-2 py-0.5'>-0.007</td><td class='px-2 py-0.5'>-12.31</td></tr><tr><td class='px-2 py-0.5'>10</td><td class='px-2 py-0.5'>-0.5</td><td class='px-2 py-0.5'>-3.454</td><td class='px-2 py-0.5'>0.320</td><td class='px-2 py-0.5'>-0.002</td><td class='px-2 py-0.5'>-10.19</td></tr><tr><td class='px-2 py-0.5'>11</td><td class='px-2 py-0.5'>-0.4</td><td class='px-2 py-0.5'>-2.787</td><td class='px-2 py-0.5'>0.209</td><td class='px-2 py-0.5'>-0.000</td><td class='px-2 py-0.5'>-8.07</td></tr><tr><td class='px-2 py-0.5'>12</td><td class='px-2 py-0.5'>-0.3</td><td class='px-2 py-0.5'>-2.107</td><td class='px-2 py-0.5'>0.122</td><td class='px-2 py-0.5'>0.002</td><td class='px-2 py-0.5'>-5.99</td></tr><tr><td class='px-2 py-0.5'>13</td><td class='px-2 py-0.5'>-0.2</td><td class='px-2 py-0.5'>-1.417</td><td class='px-2 py-0.5'>0.058</td><td class='px-2 py-0.5'>0.003</td><td class='px-2 py-0.5'>-3.97</td></tr><tr><td class='px-2 py-0.5'>14</td><td class='px-2 py-0.5'>-0.1</td><td class='px-2 py-0.5'>-0.714</td><td class='px-2 py-0.5'>0.017</td><td class='px-2 py-0.5'>0.002</td><td class='px-2 py-0.5'>-1.98</td></tr><tr><td class='px-2 py-0.5'>15</td><td class='px-2 py-0.5'>-0.0</td><td class='px-2 py-0.5'>0.000</td><td class='px-2 py-0.5'>0.000</td><td class='px-2 py-0.5'>0.000</td><td class='px-2 py-0.5'>-0.00</td></tr></tbody>
+                  </table>
+                </div>
+              </div>
+            </section><section id="clip-1" class="bg-slate-900 border border-slate-700 rounded-3xl p-6 mb-8">
+              <div class="flex flex-wrap items-baseline justify-between gap-3 mb-4">
+                <div>
+                  <div class="font-display text-xl text-white">Clip 1 · <span class="font-mono text-sm text-cyan-300">8e83f069-5fc5-4329-8589-4527de19d03e</span></div>
+                  <div class="text-xs text-slate-400 mt-1">chunk=176 · train · PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY · t0_us=1733299 · path 12.4 m</div>
+                </div>
+                <div class="text-xs text-slate-400">readable=<span class="text-emerald-400">True</span> · jaccard=0.118 · gt_coverage=0.182</div>
+              </div>
+              <div class="grid md:grid-cols-2 gap-4 mb-5">
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+                  <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-2">GT CoC</div>
+                  <ul class="text-sm text-slate-200 list-disc pl-5"><li class='mb-1'>Decelerate to maintain a safe distance from the pedestrians crossing the street.</li><li class='mb-1'>Decelerate to maintain a safe distance from the pedestrians crossing the street.</li></ul>
+                </div>
+                <div class="bg-slate-950 border border-amber-900/50 rounded-2xl p-4">
+                  <div class="text-[11px] uppercase tracking-wider text-amber-500 mb-2">Generated CoC (sample 1)</div>
+                  <p class="text-sm text-amber-100">Stop to yield to the pedestrian in the crosswalk ahead.</p>
+                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Stop to yield to the pedestrian in the crosswalk ahead.&lt;|cot_end|&gt;&lt;|traj_future_start|&gt; experience</p>
+                </div>
+              </div>
+              <div class="mb-5 overflow-auto bg-slate-950 border border-slate-800 rounded-2xl">
+              <div class="px-4 pt-3 text-[11px] uppercase tracking-wider text-amber-500">3 independent samples (T=0.6, top_p=0.98)</div>
+              <table class="w-full text-left text-sm mt-2">
+                <thead class="text-[11px] text-slate-500 border-b border-slate-800">
+                  <tr><th class="px-2 py-1">#</th><th class="px-2 py-1">P(first)</th><th class="px-2 py-1">First</th><th class="px-2 py-1">CoC</th><th class="px-2 py-1">Readable</th></tr>
+                </thead>
+                <tbody><tr><td class='px-2 py-1 text-slate-400'>1</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.247</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Stop</td><td class='px-2 py-1 text-amber-100'>Stop to yield to the pedestrian in the crosswalk ahead.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>2</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.247</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Stop</td><td class='px-2 py-1 text-amber-100'>Stop to yield to the pedestrian in the crosswalk.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>3</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.491</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Y</td><td class='px-2 py-1 text-amber-100'>Yield to the pedestrian in the crosswalk</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr></tbody>
+              </table>
+            </div>
+              <div class="text-sm font-semibold text-slate-300 mb-2">16-image history (4 cameras × 4 frames)</div>
+              <div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="01_8e83f069/00_cross_left_120_t-0.3s.jpg" alt="cross_left_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="01_8e83f069/00_cross_left_120_t-0.2s.jpg" alt="cross_left_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="01_8e83f069/00_cross_left_120_t-0.1s.jpg" alt="cross_left_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="01_8e83f069/00_cross_left_120_tp0.0s.jpg" alt="cross_left_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="01_8e83f069/01_front_wide_120_t-0.3s.jpg" alt="front_wide_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="01_8e83f069/01_front_wide_120_t-0.2s.jpg" alt="front_wide_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="01_8e83f069/01_front_wide_120_t-0.1s.jpg" alt="front_wide_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="01_8e83f069/01_front_wide_120_tp0.0s.jpg" alt="front_wide_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="01_8e83f069/02_cross_right_120_t-0.3s.jpg" alt="cross_right_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="01_8e83f069/02_cross_right_120_t-0.2s.jpg" alt="cross_right_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="01_8e83f069/02_cross_right_120_t-0.1s.jpg" alt="cross_right_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="01_8e83f069/02_cross_right_120_tp0.0s.jpg" alt="cross_right_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="01_8e83f069/03_front_tele_30_t-0.3s.jpg" alt="front_tele_30 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="01_8e83f069/03_front_tele_30_t-0.2s.jpg" alt="front_tele_30 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="01_8e83f069/03_front_tele_30_t-0.1s.jpg" alt="front_tele_30 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="01_8e83f069/03_front_tele_30_tp0.0s.jpg" alt="front_tele_30 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t+0.0s</figcaption>
+                    </figure></div>
+              <div class="grid md:grid-cols-[minmax(0,1fr)_280px] gap-4 mt-4">
+                <div>
+                  <div class="text-sm font-semibold text-slate-300 mb-2">Ego-motion history (16 steps @ 10 Hz, ego frame at t0)</div>
+                  <img src="01_8e83f069/ego_history.png" alt="ego history" class="rounded-xl border border-slate-700 bg-slate-950 max-w-md">
+                </div>
+                <div class="overflow-auto max-h-80">
+                  <table class="w-full text-[11px] tabular-nums text-slate-300">
+                    <thead class="text-slate-500"><tr><th class="px-2 text-left">i</th><th class="px-2 text-left">s</th><th class="px-2 text-left">x</th><th class="px-2 text-left">y</th><th class="px-2 text-left">z</th><th class="px-2 text-left">yaw°</th></tr></thead>
+                    <tbody><tr><td class='px-2 py-0.5'>0</td><td class='px-2 py-0.5'>-1.5</td><td class='px-2 py-0.5'>-12.390</td><td class='px-2 py-0.5'>0.006</td><td class='px-2 py-0.5'>-0.050</td><td class='px-2 py-0.5'>-0.17</td></tr><tr><td class='px-2 py-0.5'>1</td><td class='px-2 py-0.5'>-1.4</td><td class='px-2 py-0.5'>-11.505</td><td class='px-2 py-0.5'>0.004</td><td class='px-2 py-0.5'>-0.045</td><td class='px-2 py-0.5'>-0.14</td></tr><tr><td class='px-2 py-0.5'>2</td><td class='px-2 py-0.5'>-1.3</td><td class='px-2 py-0.5'>-10.624</td><td class='px-2 py-0.5'>0.003</td><td class='px-2 py-0.5'>-0.040</td><td class='px-2 py-0.5'>-0.11</td></tr><tr><td class='px-2 py-0.5'>3</td><td class='px-2 py-0.5'>-1.2</td><td class='px-2 py-0.5'>-9.751</td><td class='px-2 py-0.5'>0.000</td><td class='px-2 py-0.5'>-0.037</td><td class='px-2 py-0.5'>-0.09</td></tr><tr><td class='px-2 py-0.5'>4</td><td class='px-2 py-0.5'>-1.1</td><td class='px-2 py-0.5'>-8.886</td><td class='px-2 py-0.5'>-0.002</td><td class='px-2 py-0.5'>-0.034</td><td class='px-2 py-0.5'>-0.07</td></tr><tr><td class='px-2 py-0.5'>5</td><td class='px-2 py-0.5'>-1.0</td><td class='px-2 py-0.5'>-8.031</td><td class='px-2 py-0.5'>-0.003</td><td class='px-2 py-0.5'>-0.033</td><td class='px-2 py-0.5'>-0.05</td></tr><tr><td class='px-2 py-0.5'>6</td><td class='px-2 py-0.5'>-0.9</td><td class='px-2 py-0.5'>-7.183</td><td class='px-2 py-0.5'>-0.004</td><td class='px-2 py-0.5'>-0.034</td><td class='px-2 py-0.5'>-0.00</td></tr><tr><td class='px-2 py-0.5'>7</td><td class='px-2 py-0.5'>-0.8</td><td class='px-2 py-0.5'>-6.345</td><td class='px-2 py-0.5'>-0.004</td><td class='px-2 py-0.5'>-0.033</td><td class='px-2 py-0.5'>0.03</td></tr><tr><td class='px-2 py-0.5'>8</td><td class='px-2 py-0.5'>-0.7</td><td class='px-2 py-0.5'>-5.518</td><td class='px-2 py-0.5'>-0.004</td><td class='px-2 py-0.5'>-0.027</td><td class='px-2 py-0.5'>0.03</td></tr><tr><td class='px-2 py-0.5'>9</td><td class='px-2 py-0.5'>-0.6</td><td class='px-2 py-0.5'>-4.700</td><td class='px-2 py-0.5'>-0.003</td><td class='px-2 py-0.5'>-0.021</td><td class='px-2 py-0.5'>0.05</td></tr><tr><td class='px-2 py-0.5'>10</td><td class='px-2 py-0.5'>-0.5</td><td class='px-2 py-0.5'>-3.892</td><td class='px-2 py-0.5'>-0.002</td><td class='px-2 py-0.5'>-0.014</td><td class='px-2 py-0.5'>0.06</td></tr><tr><td class='px-2 py-0.5'>11</td><td class='px-2 py-0.5'>-0.4</td><td class='px-2 py-0.5'>-3.094</td><td class='px-2 py-0.5'>-0.002</td><td class='px-2 py-0.5'>-0.010</td><td class='px-2 py-0.5'>0.05</td></tr><tr><td class='px-2 py-0.5'>12</td><td class='px-2 py-0.5'>-0.3</td><td class='px-2 py-0.5'>-2.305</td><td class='px-2 py-0.5'>-0.001</td><td class='px-2 py-0.5'>-0.008</td><td class='px-2 py-0.5'>0.04</td></tr><tr><td class='px-2 py-0.5'>13</td><td class='px-2 py-0.5'>-0.2</td><td class='px-2 py-0.5'>-1.527</td><td class='px-2 py-0.5'>-0.001</td><td class='px-2 py-0.5'>-0.006</td><td class='px-2 py-0.5'>0.03</td></tr><tr><td class='px-2 py-0.5'>14</td><td class='px-2 py-0.5'>-0.1</td><td class='px-2 py-0.5'>-0.758</td><td class='px-2 py-0.5'>0.000</td><td class='px-2 py-0.5'>-0.004</td><td class='px-2 py-0.5'>0.01</td></tr><tr><td class='px-2 py-0.5'>15</td><td class='px-2 py-0.5'>-0.0</td><td class='px-2 py-0.5'>0.000</td><td class='px-2 py-0.5'>0.000</td><td class='px-2 py-0.5'>0.000</td><td class='px-2 py-0.5'>0.00</td></tr></tbody>
+                  </table>
+                </div>
+              </div>
+            </section><section id="clip-2" class="bg-slate-900 border border-slate-700 rounded-3xl p-6 mb-8">
+              <div class="flex flex-wrap items-baseline justify-between gap-3 mb-4">
+                <div>
+                  <div class="font-display text-xl text-white">Clip 2 · <span class="font-mono text-sm text-cyan-300">1946f1c3-8638-4648-8944-506e6bffc4df</span></div>
+                  <div class="text-xs text-slate-400 mt-1">chunk=177 · train · PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY · t0_us=5699907 · path 6.7 m</div>
+                </div>
+                <div class="text-xs text-slate-400">readable=<span class="text-emerald-400">True</span> · jaccard=0.273 · gt_coverage=0.500</div>
+              </div>
+              <div class="grid md:grid-cols-2 gap-4 mb-5">
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+                  <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-2">GT CoC</div>
+                  <ul class="text-sm text-slate-200 list-disc pl-5"><li class='mb-1'>Yield to the pedestrian crossing the road.</li></ul>
+                </div>
+                <div class="bg-slate-950 border border-amber-900/50 rounded-2xl p-4">
+                  <div class="text-[11px] uppercase tracking-wider text-amber-500 mb-2">Generated CoC (sample 1)</div>
+                  <p class="text-sm text-amber-100">Stop to yield to the cross-traffic vehicle ahead.</p>
+                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Stop to yield to the cross-traffic vehicle ahead.&lt;|cot_end|&gt;&lt;|traj_future_start|&gt;located</p>
+                </div>
+              </div>
+              <div class="mb-5 overflow-auto bg-slate-950 border border-slate-800 rounded-2xl">
+              <div class="px-4 pt-3 text-[11px] uppercase tracking-wider text-amber-500">3 independent samples (T=0.6, top_p=0.98)</div>
+              <table class="w-full text-left text-sm mt-2">
+                <thead class="text-[11px] text-slate-500 border-b border-slate-800">
+                  <tr><th class="px-2 py-1">#</th><th class="px-2 py-1">P(first)</th><th class="px-2 py-1">First</th><th class="px-2 py-1">CoC</th><th class="px-2 py-1">Readable</th></tr>
+                </thead>
+                <tbody><tr><td class='px-2 py-1 text-slate-400'>1</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.439</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Stop</td><td class='px-2 py-1 text-amber-100'>Stop to yield to the cross-traffic vehicle ahead.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>2</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.387</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Y</td><td class='px-2 py-1 text-amber-100'>control to keep a safe gap to thewan economist area.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>3</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.439</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Stop</td><td class='px-2 py-1 text-amber-100'>Stop to keep distance to the lead LibertN</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr></tbody>
+              </table>
+            </div>
+              <div class="text-sm font-semibold text-slate-300 mb-2">16-image history (4 cameras × 4 frames)</div>
+              <div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="02_1946f1c3/00_cross_left_120_t-0.3s.jpg" alt="cross_left_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="02_1946f1c3/00_cross_left_120_t-0.2s.jpg" alt="cross_left_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="02_1946f1c3/00_cross_left_120_t-0.1s.jpg" alt="cross_left_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="02_1946f1c3/00_cross_left_120_tp0.0s.jpg" alt="cross_left_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="02_1946f1c3/01_front_wide_120_t-0.3s.jpg" alt="front_wide_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="02_1946f1c3/01_front_wide_120_t-0.2s.jpg" alt="front_wide_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="02_1946f1c3/01_front_wide_120_t-0.1s.jpg" alt="front_wide_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="02_1946f1c3/01_front_wide_120_tp0.0s.jpg" alt="front_wide_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="02_1946f1c3/02_cross_right_120_t-0.3s.jpg" alt="cross_right_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="02_1946f1c3/02_cross_right_120_t-0.2s.jpg" alt="cross_right_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="02_1946f1c3/02_cross_right_120_t-0.1s.jpg" alt="cross_right_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="02_1946f1c3/02_cross_right_120_tp0.0s.jpg" alt="cross_right_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="02_1946f1c3/03_front_tele_30_t-0.3s.jpg" alt="front_tele_30 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="02_1946f1c3/03_front_tele_30_t-0.2s.jpg" alt="front_tele_30 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="02_1946f1c3/03_front_tele_30_t-0.1s.jpg" alt="front_tele_30 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="02_1946f1c3/03_front_tele_30_tp0.0s.jpg" alt="front_tele_30 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t+0.0s</figcaption>
+                    </figure></div>
+              <div class="grid md:grid-cols-[minmax(0,1fr)_280px] gap-4 mt-4">
+                <div>
+                  <div class="text-sm font-semibold text-slate-300 mb-2">Ego-motion history (16 steps @ 10 Hz, ego frame at t0)</div>
+                  <img src="02_1946f1c3/ego_history.png" alt="ego history" class="rounded-xl border border-slate-700 bg-slate-950 max-w-md">
+                </div>
+                <div class="overflow-auto max-h-80">
+                  <table class="w-full text-[11px] tabular-nums text-slate-300">
+                    <thead class="text-slate-500"><tr><th class="px-2 text-left">i</th><th class="px-2 text-left">s</th><th class="px-2 text-left">x</th><th class="px-2 text-left">y</th><th class="px-2 text-left">z</th><th class="px-2 text-left">yaw°</th></tr></thead>
+                    <tbody><tr><td class='px-2 py-0.5'>0</td><td class='px-2 py-0.5'>-1.5</td><td class='px-2 py-0.5'>-6.708</td><td class='px-2 py-0.5'>0.007</td><td class='px-2 py-0.5'>-0.037</td><td class='px-2 py-0.5'>0.06</td></tr><tr><td class='px-2 py-0.5'>1</td><td class='px-2 py-0.5'>-1.4</td><td class='px-2 py-0.5'>-6.242</td><td class='px-2 py-0.5'>0.008</td><td class='px-2 py-0.5'>-0.035</td><td class='px-2 py-0.5'>0.04</td></tr><tr><td class='px-2 py-0.5'>2</td><td class='px-2 py-0.5'>-1.3</td><td class='px-2 py-0.5'>-5.777</td><td class='px-2 py-0.5'>0.008</td><td class='px-2 py-0.5'>-0.032</td><td class='px-2 py-0.5'>-0.00</td></tr><tr><td class='px-2 py-0.5'>3</td><td class='px-2 py-0.5'>-1.2</td><td class='px-2 py-0.5'>-5.315</td><td class='px-2 py-0.5'>0.007</td><td class='px-2 py-0.5'>-0.028</td><td class='px-2 py-0.5'>-0.01</td></tr><tr><td class='px-2 py-0.5'>4</td><td class='px-2 py-0.5'>-1.1</td><td class='px-2 py-0.5'>-4.854</td><td class='px-2 py-0.5'>0.007</td><td class='px-2 py-0.5'>-0.024</td><td class='px-2 py-0.5'>0.01</td></tr><tr><td class='px-2 py-0.5'>5</td><td class='px-2 py-0.5'>-1.0</td><td class='px-2 py-0.5'>-4.393</td><td class='px-2 py-0.5'>0.006</td><td class='px-2 py-0.5'>-0.023</td><td class='px-2 py-0.5'>0.01</td></tr><tr><td class='px-2 py-0.5'>6</td><td class='px-2 py-0.5'>-0.9</td><td class='px-2 py-0.5'>-3.933</td><td class='px-2 py-0.5'>0.006</td><td class='px-2 py-0.5'>-0.021</td><td class='px-2 py-0.5'>0.00</td></tr><tr><td class='px-2 py-0.5'>7</td><td class='px-2 py-0.5'>-0.8</td><td class='px-2 py-0.5'>-3.476</td><td class='px-2 py-0.5'>0.005</td><td class='px-2 py-0.5'>-0.019</td><td class='px-2 py-0.5'>-0.01</td></tr><tr><td class='px-2 py-0.5'>8</td><td class='px-2 py-0.5'>-0.7</td><td class='px-2 py-0.5'>-3.021</td><td class='px-2 py-0.5'>0.004</td><td class='px-2 py-0.5'>-0.016</td><td class='px-2 py-0.5'>-0.02</td></tr><tr><td class='px-2 py-0.5'>9</td><td class='px-2 py-0.5'>-0.6</td><td class='px-2 py-0.5'>-2.569</td><td class='px-2 py-0.5'>0.004</td><td class='px-2 py-0.5'>-0.014</td><td class='px-2 py-0.5'>-0.04</td></tr><tr><td class='px-2 py-0.5'>10</td><td class='px-2 py-0.5'>-0.5</td><td class='px-2 py-0.5'>-2.121</td><td class='px-2 py-0.5'>0.004</td><td class='px-2 py-0.5'>-0.012</td><td class='px-2 py-0.5'>-0.05</td></tr><tr><td class='px-2 py-0.5'>11</td><td class='px-2 py-0.5'>-0.4</td><td class='px-2 py-0.5'>-1.682</td><td class='px-2 py-0.5'>0.003</td><td class='px-2 py-0.5'>-0.007</td><td class='px-2 py-0.5'>-0.05</td></tr><tr><td class='px-2 py-0.5'>12</td><td class='px-2 py-0.5'>-0.3</td><td class='px-2 py-0.5'>-1.251</td><td class='px-2 py-0.5'>0.002</td><td class='px-2 py-0.5'>-0.003</td><td class='px-2 py-0.5'>-0.04</td></tr><tr><td class='px-2 py-0.5'>13</td><td class='px-2 py-0.5'>-0.2</td><td class='px-2 py-0.5'>-0.826</td><td class='px-2 py-0.5'>0.001</td><td class='px-2 py-0.5'>-0.001</td><td class='px-2 py-0.5'>-0.03</td></tr><tr><td class='px-2 py-0.5'>14</td><td class='px-2 py-0.5'>-0.1</td><td class='px-2 py-0.5'>-0.409</td><td class='px-2 py-0.5'>0.000</td><td class='px-2 py-0.5'>-0.001</td><td class='px-2 py-0.5'>-0.01</td></tr><tr><td class='px-2 py-0.5'>15</td><td class='px-2 py-0.5'>-0.0</td><td class='px-2 py-0.5'>0.000</td><td class='px-2 py-0.5'>0.000</td><td class='px-2 py-0.5'>0.000</td><td class='px-2 py-0.5'>-0.00</td></tr></tbody>
+                  </table>
+                </div>
+              </div>
+            </section><section id="clip-3" class="bg-slate-900 border border-slate-700 rounded-3xl p-6 mb-8">
+              <div class="flex flex-wrap items-baseline justify-between gap-3 mb-4">
+                <div>
+                  <div class="font-display text-xl text-white">Clip 3 · <span class="font-mono text-sm text-cyan-300">8e06f83c-4de6-4cde-82ab-4a747645f80a</span></div>
+                  <div class="text-xs text-slate-400 mt-1">chunk=26 · train · PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY · t0_us=8461666 · path 12.0 m</div>
+                </div>
+                <div class="text-xs text-slate-400">readable=<span class="text-emerald-400">True</span> · jaccard=0.444 · gt_coverage=0.667</div>
+              </div>
+              <div class="grid md:grid-cols-2 gap-4 mb-5">
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+                  <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-2">GT CoC</div>
+                  <ul class="text-sm text-slate-200 list-disc pl-5"><li class='mb-1'>Yield to the pedestrians crossing the road.</li></ul>
+                </div>
+                <div class="bg-slate-950 border border-amber-900/50 rounded-2xl p-4">
+                  <div class="text-[11px] uppercase tracking-wider text-amber-500 mb-2">Generated CoC (sample 1)</div>
+                  <p class="text-sm text-amber-100">Stop to yield to the pedestrian crossing ahead</p>
+                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Stop to yield to the pedestrian crossing ahead&lt;|cot_end|&gt;&lt;|traj_future_start|&gt;&lt;|im_end|&gt;</p>
+                </div>
+              </div>
+              <div class="mb-5 overflow-auto bg-slate-950 border border-slate-800 rounded-2xl">
+              <div class="px-4 pt-3 text-[11px] uppercase tracking-wider text-amber-500">3 independent samples (T=0.6, top_p=0.98)</div>
+              <table class="w-full text-left text-sm mt-2">
+                <thead class="text-[11px] text-slate-500 border-b border-slate-800">
+                  <tr><th class="px-2 py-1">#</th><th class="px-2 py-1">P(first)</th><th class="px-2 py-1">First</th><th class="px-2 py-1">CoC</th><th class="px-2 py-1">Readable</th></tr>
+                </thead>
+                <tbody><tr><td class='px-2 py-1 text-slate-400'>1</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.141</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Stop</td><td class='px-2 py-1 text-amber-100'>Stop to yield to the pedestrian crossing ahead</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>2</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.557</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>N</td><td class='px-2 py-1 text-amber-100'>Nudge to the left to avoid the parked car with an open door on the right.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>3</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.557</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>N</td><td class='px-2 py-1 text-amber-100'>Nudge to the left to give space to the pedestrian near the parked car</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr></tbody>
+              </table>
+            </div>
+              <div class="text-sm font-semibold text-slate-300 mb-2">16-image history (4 cameras × 4 frames)</div>
+              <div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="03_8e06f83c/00_cross_left_120_t-0.3s.jpg" alt="cross_left_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="03_8e06f83c/00_cross_left_120_t-0.2s.jpg" alt="cross_left_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="03_8e06f83c/00_cross_left_120_t-0.1s.jpg" alt="cross_left_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="03_8e06f83c/00_cross_left_120_tp0.0s.jpg" alt="cross_left_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="03_8e06f83c/01_front_wide_120_t-0.3s.jpg" alt="front_wide_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="03_8e06f83c/01_front_wide_120_t-0.2s.jpg" alt="front_wide_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="03_8e06f83c/01_front_wide_120_t-0.1s.jpg" alt="front_wide_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="03_8e06f83c/01_front_wide_120_tp0.0s.jpg" alt="front_wide_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="03_8e06f83c/02_cross_right_120_t-0.3s.jpg" alt="cross_right_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="03_8e06f83c/02_cross_right_120_t-0.2s.jpg" alt="cross_right_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="03_8e06f83c/02_cross_right_120_t-0.1s.jpg" alt="cross_right_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="03_8e06f83c/02_cross_right_120_tp0.0s.jpg" alt="cross_right_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="03_8e06f83c/03_front_tele_30_t-0.3s.jpg" alt="front_tele_30 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="03_8e06f83c/03_front_tele_30_t-0.2s.jpg" alt="front_tele_30 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="03_8e06f83c/03_front_tele_30_t-0.1s.jpg" alt="front_tele_30 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="03_8e06f83c/03_front_tele_30_tp0.0s.jpg" alt="front_tele_30 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t+0.0s</figcaption>
+                    </figure></div>
+              <div class="grid md:grid-cols-[minmax(0,1fr)_280px] gap-4 mt-4">
+                <div>
+                  <div class="text-sm font-semibold text-slate-300 mb-2">Ego-motion history (16 steps @ 10 Hz, ego frame at t0)</div>
+                  <img src="03_8e06f83c/ego_history.png" alt="ego history" class="rounded-xl border border-slate-700 bg-slate-950 max-w-md">
+                </div>
+                <div class="overflow-auto max-h-80">
+                  <table class="w-full text-[11px] tabular-nums text-slate-300">
+                    <thead class="text-slate-500"><tr><th class="px-2 text-left">i</th><th class="px-2 text-left">s</th><th class="px-2 text-left">x</th><th class="px-2 text-left">y</th><th class="px-2 text-left">z</th><th class="px-2 text-left">yaw°</th></tr></thead>
+                    <tbody><tr><td class='px-2 py-0.5'>0</td><td class='px-2 py-0.5'>-1.5</td><td class='px-2 py-0.5'>-11.993</td><td class='px-2 py-0.5'>-0.018</td><td class='px-2 py-0.5'>-0.016</td><td class='px-2 py-0.5'>0.25</td></tr><tr><td class='px-2 py-0.5'>1</td><td class='px-2 py-0.5'>-1.4</td><td class='px-2 py-0.5'>-11.195</td><td class='px-2 py-0.5'>-0.015</td><td class='px-2 py-0.5'>-0.019</td><td class='px-2 py-0.5'>0.22</td></tr><tr><td class='px-2 py-0.5'>2</td><td class='px-2 py-0.5'>-1.3</td><td class='px-2 py-0.5'>-10.391</td><td class='px-2 py-0.5'>-0.012</td><td class='px-2 py-0.5'>-0.022</td><td class='px-2 py-0.5'>0.20</td></tr><tr><td class='px-2 py-0.5'>3</td><td class='px-2 py-0.5'>-1.2</td><td class='px-2 py-0.5'>-9.580</td><td class='px-2 py-0.5'>-0.010</td><td class='px-2 py-0.5'>-0.025</td><td class='px-2 py-0.5'>0.17</td></tr><tr><td class='px-2 py-0.5'>4</td><td class='px-2 py-0.5'>-1.1</td><td class='px-2 py-0.5'>-8.763</td><td class='px-2 py-0.5'>-0.009</td><td class='px-2 py-0.5'>-0.027</td><td class='px-2 py-0.5'>0.16</td></tr><tr><td class='px-2 py-0.5'>5</td><td class='px-2 py-0.5'>-1.0</td><td class='px-2 py-0.5'>-7.944</td><td class='px-2 py-0.5'>-0.007</td><td class='px-2 py-0.5'>-0.027</td><td class='px-2 py-0.5'>0.14</td></tr><tr><td class='px-2 py-0.5'>6</td><td class='px-2 py-0.5'>-0.9</td><td class='px-2 py-0.5'>-7.125</td><td class='px-2 py-0.5'>-0.006</td><td class='px-2 py-0.5'>-0.025</td><td class='px-2 py-0.5'>0.12</td></tr><tr><td class='px-2 py-0.5'>7</td><td class='px-2 py-0.5'>-0.8</td><td class='px-2 py-0.5'>-6.309</td><td class='px-2 py-0.5'>-0.005</td><td class='px-2 py-0.5'>-0.022</td><td class='px-2 py-0.5'>0.11</td></tr><tr><td class='px-2 py-0.5'>8</td><td class='px-2 py-0.5'>-0.7</td><td class='px-2 py-0.5'>-5.495</td><td class='px-2 py-0.5'>-0.003</td><td class='px-2 py-0.5'>-0.020</td><td class='px-2 py-0.5'>0.10</td></tr><tr><td class='px-2 py-0.5'>9</td><td class='px-2 py-0.5'>-0.6</td><td class='px-2 py-0.5'>-4.685</td><td class='px-2 py-0.5'>-0.003</td><td class='px-2 py-0.5'>-0.019</td><td class='px-2 py-0.5'>0.09</td></tr><tr><td class='px-2 py-0.5'>10</td><td class='px-2 py-0.5'>-0.5</td><td class='px-2 py-0.5'>-3.879</td><td class='px-2 py-0.5'>-0.002</td><td class='px-2 py-0.5'>-0.017</td><td class='px-2 py-0.5'>0.09</td></tr><tr><td class='px-2 py-0.5'>11</td><td class='px-2 py-0.5'>-0.4</td><td class='px-2 py-0.5'>-3.079</td><td class='px-2 py-0.5'>-0.001</td><td class='px-2 py-0.5'>-0.015</td><td class='px-2 py-0.5'>0.07</td></tr><tr><td class='px-2 py-0.5'>12</td><td class='px-2 py-0.5'>-0.3</td><td class='px-2 py-0.5'>-2.287</td><td class='px-2 py-0.5'>-0.000</td><td class='px-2 py-0.5'>-0.012</td><td class='px-2 py-0.5'>0.06</td></tr><tr><td class='px-2 py-0.5'>13</td><td class='px-2 py-0.5'>-0.2</td><td class='px-2 py-0.5'>-1.508</td><td class='px-2 py-0.5'>0.001</td><td class='px-2 py-0.5'>-0.009</td><td class='px-2 py-0.5'>0.04</td></tr><tr><td class='px-2 py-0.5'>14</td><td class='px-2 py-0.5'>-0.1</td><td class='px-2 py-0.5'>-0.746</td><td class='px-2 py-0.5'>0.001</td><td class='px-2 py-0.5'>-0.005</td><td class='px-2 py-0.5'>0.02</td></tr><tr><td class='px-2 py-0.5'>15</td><td class='px-2 py-0.5'>-0.0</td><td class='px-2 py-0.5'>0.000</td><td class='px-2 py-0.5'>0.000</td><td class='px-2 py-0.5'>0.000</td><td class='px-2 py-0.5'>0.00</td></tr></tbody>
+                  </table>
+                </div>
+              </div>
+            </section><section id="clip-4" class="bg-slate-900 border border-slate-700 rounded-3xl p-6 mb-8">
+              <div class="flex flex-wrap items-baseline justify-between gap-3 mb-4">
+                <div>
+                  <div class="font-display text-xl text-white">Clip 4 · <span class="font-mono text-sm text-cyan-300">36cb5485-5c56-48c5-8219-90095851d627</span></div>
+                  <div class="text-xs text-slate-400 mt-1">chunk=57 · train · ANIMALS_BIRDS_ROADKILL · t0_us=9746740 · path 15.5 m</div>
+                </div>
+                <div class="text-xs text-slate-400">readable=<span class="text-emerald-400">True</span> · jaccard=0.214 · gt_coverage=0.300</div>
+              </div>
+              <div class="grid md:grid-cols-2 gap-4 mb-5">
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+                  <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-2">GT CoC</div>
+                  <ul class="text-sm text-slate-200 list-disc pl-5"><li class='mb-1'>Stop for the stop sign while waiting for pedestrians to cross the street.</li></ul>
+                </div>
+                <div class="bg-slate-950 border border-amber-900/50 rounded-2xl p-4">
+                  <div class="text-[11px] uppercase tracking-wider text-amber-500 mb-2">Generated CoC (sample 1)</div>
+                  <p class="text-sm text-amber-100">Stop to yield to the pedestrian in the crosswalk.</p>
+                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Stop to yield to the pedestrian in the crosswalk.&lt;|cot_end|&gt;&lt;|traj_future_start|&gt;&lt;|traj_future_start|&gt;</p>
+                </div>
+              </div>
+              <div class="mb-5 overflow-auto bg-slate-950 border border-slate-800 rounded-2xl">
+              <div class="px-4 pt-3 text-[11px] uppercase tracking-wider text-amber-500">3 independent samples (T=0.6, top_p=0.98)</div>
+              <table class="w-full text-left text-sm mt-2">
+                <thead class="text-[11px] text-slate-500 border-b border-slate-800">
+                  <tr><th class="px-2 py-1">#</th><th class="px-2 py-1">P(first)</th><th class="px-2 py-1">First</th><th class="px-2 py-1">CoC</th><th class="px-2 py-1">Readable</th></tr>
+                </thead>
+                <tbody><tr><td class='px-2 py-1 text-slate-400'>1</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.642</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Stop</td><td class='px-2 py-1 text-amber-100'>Stop to yield to the pedestrian in the crosswalk.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>2</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.642</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Stop</td><td class='px-2 py-1 text-amber-100'>Stop to yield to the pedestrian in the crosswalk.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr><tr><td class='px-2 py-1 text-slate-400'>3</td><td class='px-2 py-1 tabular-nums text-cyan-300'>0.222</td><td class='px-2 py-1 font-mono text-[11px] text-slate-300'>Y</td><td class='px-2 py-1 text-amber-100'>at the stop sign due to a pedestrian because of bag NullPointerException and a pedestrian in the lane.</td><td class='px-2 py-1 text-xs text-emerald-400'>True</td></tr></tbody>
+              </table>
+            </div>
+              <div class="text-sm font-semibold text-slate-300 mb-2">16-image history (4 cameras × 4 frames)</div>
+              <div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="04_36cb5485/00_cross_left_120_t-0.3s.jpg" alt="cross_left_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="04_36cb5485/00_cross_left_120_t-0.2s.jpg" alt="cross_left_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="04_36cb5485/00_cross_left_120_t-0.1s.jpg" alt="cross_left_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="04_36cb5485/00_cross_left_120_tp0.0s.jpg" alt="cross_left_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="04_36cb5485/01_front_wide_120_t-0.3s.jpg" alt="front_wide_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="04_36cb5485/01_front_wide_120_t-0.2s.jpg" alt="front_wide_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="04_36cb5485/01_front_wide_120_t-0.1s.jpg" alt="front_wide_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="04_36cb5485/01_front_wide_120_tp0.0s.jpg" alt="front_wide_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="04_36cb5485/02_cross_right_120_t-0.3s.jpg" alt="cross_right_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="04_36cb5485/02_cross_right_120_t-0.2s.jpg" alt="cross_right_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="04_36cb5485/02_cross_right_120_t-0.1s.jpg" alt="cross_right_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="04_36cb5485/02_cross_right_120_tp0.0s.jpg" alt="cross_right_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="04_36cb5485/03_front_tele_30_t-0.3s.jpg" alt="front_tele_30 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="04_36cb5485/03_front_tele_30_t-0.2s.jpg" alt="front_tele_30 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="04_36cb5485/03_front_tele_30_t-0.1s.jpg" alt="front_tele_30 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="04_36cb5485/03_front_tele_30_tp0.0s.jpg" alt="front_tele_30 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t+0.0s</figcaption>
+                    </figure></div>
+              <div class="grid md:grid-cols-[minmax(0,1fr)_280px] gap-4 mt-4">
+                <div>
+                  <div class="text-sm font-semibold text-slate-300 mb-2">Ego-motion history (16 steps @ 10 Hz, ego frame at t0)</div>
+                  <img src="04_36cb5485/ego_history.png" alt="ego history" class="rounded-xl border border-slate-700 bg-slate-950 max-w-md">
+                </div>
+                <div class="overflow-auto max-h-80">
+                  <table class="w-full text-[11px] tabular-nums text-slate-300">
+                    <thead class="text-slate-500"><tr><th class="px-2 text-left">i</th><th class="px-2 text-left">s</th><th class="px-2 text-left">x</th><th class="px-2 text-left">y</th><th class="px-2 text-left">z</th><th class="px-2 text-left">yaw°</th></tr></thead>
+                    <tbody><tr><td class='px-2 py-0.5'>0</td><td class='px-2 py-0.5'>-1.5</td><td class='px-2 py-0.5'>-15.549</td><td class='px-2 py-0.5'>-0.023</td><td class='px-2 py-0.5'>-0.128</td><td class='px-2 py-0.5'>0.15</td></tr><tr><td class='px-2 py-0.5'>1</td><td class='px-2 py-0.5'>-1.4</td><td class='px-2 py-0.5'>-14.471</td><td class='px-2 py-0.5'>-0.020</td><td class='px-2 py-0.5'>-0.117</td><td class='px-2 py-0.5'>0.11</td></tr><tr><td class='px-2 py-0.5'>2</td><td class='px-2 py-0.5'>-1.3</td><td class='px-2 py-0.5'>-13.398</td><td class='px-2 py-0.5'>-0.019</td><td class='px-2 py-0.5'>-0.107</td><td class='px-2 py-0.5'>0.12</td></tr><tr><td class='px-2 py-0.5'>3</td><td class='px-2 py-0.5'>-1.2</td><td class='px-2 py-0.5'>-12.331</td><td class='px-2 py-0.5'>-0.017</td><td class='px-2 py-0.5'>-0.098</td><td class='px-2 py-0.5'>0.12</td></tr><tr><td class='px-2 py-0.5'>4</td><td class='px-2 py-0.5'>-1.1</td><td class='px-2 py-0.5'>-11.268</td><td class='px-2 py-0.5'>-0.015</td><td class='px-2 py-0.5'>-0.093</td><td class='px-2 py-0.5'>0.14</td></tr><tr><td class='px-2 py-0.5'>5</td><td class='px-2 py-0.5'>-1.0</td><td class='px-2 py-0.5'>-10.209</td><td class='px-2 py-0.5'>-0.013</td><td class='px-2 py-0.5'>-0.090</td><td class='px-2 py-0.5'>0.13</td></tr><tr><td class='px-2 py-0.5'>6</td><td class='px-2 py-0.5'>-0.9</td><td class='px-2 py-0.5'>-9.155</td><td class='px-2 py-0.5'>-0.011</td><td class='px-2 py-0.5'>-0.085</td><td class='px-2 py-0.5'>0.10</td></tr><tr><td class='px-2 py-0.5'>7</td><td class='px-2 py-0.5'>-0.8</td><td class='px-2 py-0.5'>-8.108</td><td class='px-2 py-0.5'>-0.008</td><td class='px-2 py-0.5'>-0.081</td><td class='px-2 py-0.5'>0.09</td></tr><tr><td class='px-2 py-0.5'>8</td><td class='px-2 py-0.5'>-0.7</td><td class='px-2 py-0.5'>-7.065</td><td class='px-2 py-0.5'>-0.007</td><td class='px-2 py-0.5'>-0.074</td><td class='px-2 py-0.5'>0.09</td></tr><tr><td class='px-2 py-0.5'>9</td><td class='px-2 py-0.5'>-0.6</td><td class='px-2 py-0.5'>-6.026</td><td class='px-2 py-0.5'>-0.005</td><td class='px-2 py-0.5'>-0.071</td><td class='px-2 py-0.5'>0.03</td></tr><tr><td class='px-2 py-0.5'>10</td><td class='px-2 py-0.5'>-0.5</td><td class='px-2 py-0.5'>-4.997</td><td class='px-2 py-0.5'>-0.003</td><td class='px-2 py-0.5'>-0.059</td><td class='px-2 py-0.5'>0.06</td></tr><tr><td class='px-2 py-0.5'>11</td><td class='px-2 py-0.5'>-0.4</td><td class='px-2 py-0.5'>-3.978</td><td class='px-2 py-0.5'>-0.002</td><td class='px-2 py-0.5'>-0.041</td><td class='px-2 py-0.5'>0.06</td></tr><tr><td class='px-2 py-0.5'>12</td><td class='px-2 py-0.5'>-0.3</td><td class='px-2 py-0.5'>-2.968</td><td class='px-2 py-0.5'>-0.001</td><td class='px-2 py-0.5'>-0.024</td><td class='px-2 py-0.5'>0.05</td></tr><tr><td class='px-2 py-0.5'>13</td><td class='px-2 py-0.5'>-0.2</td><td class='px-2 py-0.5'>-1.967</td><td class='px-2 py-0.5'>-0.000</td><td class='px-2 py-0.5'>-0.012</td><td class='px-2 py-0.5'>0.02</td></tr><tr><td class='px-2 py-0.5'>14</td><td class='px-2 py-0.5'>-0.1</td><td class='px-2 py-0.5'>-0.977</td><td class='px-2 py-0.5'>-0.001</td><td class='px-2 py-0.5'>-0.004</td><td class='px-2 py-0.5'>0.03</td></tr><tr><td class='px-2 py-0.5'>15</td><td class='px-2 py-0.5'>-0.0</td><td class='px-2 py-0.5'>0.000</td><td class='px-2 py-0.5'>0.000</td><td class='px-2 py-0.5'>0.000</td><td class='px-2 py-0.5'>-0.00</td></tr></tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+  </div>
+</body>
+</html>

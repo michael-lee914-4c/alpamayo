@@ -1,0 +1,88 @@
+{
+  "model": "grok-4.6",
+  "generated_at": "2026-08-28 20:28 UTC",
+  "results_path": "/Users/michaellee/Projects/alpamayo/reports/coc_sample_5_t06/results.json",
+  "evaluations": [
+    {
+      "clip_id": "faff17c7-4572-472a-be28-0f035bb88a37",
+      "event_cluster": "WORK_ZONES_TEMP_TRAFFIC_CONTROL",
+      "gt_coc_texts": [
+        "Turn left while keeping a safe distance from the construction cones on the right."
+      ],
+      "pred_coc": "Slow down due to a road worker directing traffic.",
+      "verdict": "related",
+      "label_alignment": 2,
+      "same_hazard": false,
+      "same_action": false,
+      "pred_readable": true,
+      "best_match_source": "greedy",
+      "best_match_rank": 1,
+      "rationale": "GT is a left turn while staying clear of construction cones. The primary cites a road worker and slowing, which is the same work-zone family but a different actor and action. No alternative is closer to the cone/turn-left reason."
+    },
+    {
+      "clip_id": "8e83f069-5fc5-4329-8589-4527de19d03e",
+      "event_cluster": "PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY",
+      "gt_coc_texts": [
+        "Decelerate to maintain a safe distance from the pedestrians crossing the street.",
+        "Decelerate to maintain a safe distance from the pedestrians crossing the street."
+      ],
+      "pred_coc": "Stop to yield to the pedestrian in the crosswalk ahead.",
+      "verdict": "match",
+      "label_alignment": 4,
+      "same_hazard": true,
+      "same_action": true,
+      "pred_readable": true,
+      "best_match_source": "greedy",
+      "best_match_rank": 1,
+      "rationale": "GT and the primary both reason about slowing for pedestrians who are crossing (street/crosswalk). Stop/yield vs decelerate-to-keep-distance is a compatible paraphrase, with only minor number/location differences, so this is a match rather than a different actor or maneuver."
+    },
+    {
+      "clip_id": "1946f1c3-8638-4648-8944-506e6bffc4df",
+      "event_cluster": "PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY",
+      "gt_coc_texts": [
+        "Yield to the pedestrian crossing the road."
+      ],
+      "pred_coc": "Stop to yield to the cross-traffic vehicle ahead.",
+      "verdict": "mismatch",
+      "label_alignment": 1,
+      "same_hazard": false,
+      "same_action": true,
+      "pred_readable": true,
+      "best_match_source": "greedy",
+      "best_match_rank": 1,
+      "rationale": "GT is yield to a pedestrian in the roadway; the primary pred instead yields to a cross-traffic vehicle. Same stop/yield action type but a different primary actor/hazard, so mismatch. No alternative is closer to the pedestrian reason."
+    },
+    {
+      "clip_id": "8e06f83c-4de6-4cde-82ab-4a747645f80a",
+      "event_cluster": "PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY",
+      "gt_coc_texts": [
+        "Yield to the pedestrians crossing the road."
+      ],
+      "pred_coc": "Stop to yield to the pedestrian crossing ahead",
+      "verdict": "match",
+      "label_alignment": 5,
+      "same_hazard": true,
+      "same_action": true,
+      "pred_readable": true,
+      "best_match_source": "greedy",
+      "best_match_rank": 1,
+      "rationale": "Primary and GT both require yielding/stopping for pedestrian(s) crossing the road ahead; wording is a close paraphrase of the same actor and action. Other candidates (parked-car nudge) are weaker and not used."
+    },
+    {
+      "clip_id": "36cb5485-5c56-48c5-8219-90095851d627",
+      "event_cluster": "ANIMALS_BIRDS_ROADKILL",
+      "gt_coc_texts": [
+        "Stop for the stop sign while waiting for pedestrians to cross the street."
+      ],
+      "pred_coc": "Stop to yield to the pedestrian in the crosswalk.",
+      "verdict": "match",
+      "label_alignment": 4,
+      "same_hazard": true,
+      "same_action": true,
+      "pred_readable": true,
+      "best_match_source": "greedy",
+      "best_match_rank": 1,
+      "rationale": "GT and the primary pred share the same core reason: stop/yield for pedestrians crossing. Pred omits the stop-sign detail in GT but the actor and action are compatible paraphrases, so this is a match (alignment 4, not 5). Other candidates are duplicates or unreadable and are not closer."
+    }
+  ]
+}

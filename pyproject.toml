@@ -54,3 +54,8 @@ cosmos-rl = { git = "https://github.com/nvidia-cosmos/cosmos-rl.git", rev = "747
 
 [tool.ruff]
 line-length = 100
+
+[tool.pytest.ini_options]
+markers = [
+  "slow: needs local weights, Metal, or the PAI-CoC SSD",
+]

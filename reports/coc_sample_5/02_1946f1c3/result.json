@@ -1,0 +1,208 @@
+{
+  "clip_id": "1946f1c3-8638-4648-8944-506e6bffc4df",
+  "chunk": 177,
+  "split": "train",
+  "event_cluster": "PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY",
+  "t0_us": 5699907,
+  "n_events": 1,
+  "gt_coc_texts": [
+    "Yield to the pedestrian crossing the road."
+  ],
+  "pred_coc_raw": "Stop to yield to the cross-traffic vehicle crossing ahead.<|cot_end|><|traj_future_start|>-translate",
+  "pred_coc": "Stop to yield to the cross-traffic vehicle crossing ahead. -translate",
+  "readable": true,
+  "jaccard": 0.3333333333333333,
+  "gt_coverage": 0.6666666666666666,
+  "image_grid": [
+    [
+      "02_1946f1c3/00_cross_left_120_t-0.3s.jpg",
+      "02_1946f1c3/00_cross_left_120_t-0.2s.jpg",
+      "02_1946f1c3/00_cross_left_120_t-0.1s.jpg",
+      "02_1946f1c3/00_cross_left_120_tp0.0s.jpg"
+    ],
+    [
+      "02_1946f1c3/01_front_wide_120_t-0.3s.jpg",
+      "02_1946f1c3/01_front_wide_120_t-0.2s.jpg",
+      "02_1946f1c3/01_front_wide_120_t-0.1s.jpg",
+      "02_1946f1c3/01_front_wide_120_tp0.0s.jpg"
+    ],
+    [
+      "02_1946f1c3/02_cross_right_120_t-0.3s.jpg",
+      "02_1946f1c3/02_cross_right_120_t-0.2s.jpg",
+      "02_1946f1c3/02_cross_right_120_t-0.1s.jpg",
+      "02_1946f1c3/02_cross_right_120_tp0.0s.jpg"
+    ],
+    [
+      "02_1946f1c3/03_front_tele_30_t-0.3s.jpg",
+      "02_1946f1c3/03_front_tele_30_t-0.2s.jpg",
+      "02_1946f1c3/03_front_tele_30_t-0.1s.jpg",
+      "02_1946f1c3/03_front_tele_30_tp0.0s.jpg"
+    ]
+  ],
+  "contact_sheet": "02_1946f1c3/grid.jpg",
+  "ego_plot": "02_1946f1c3/ego_history.png",
+  "ego_history_xyz": [
+    [
+      -6.708000183105469,
+      0.007400000002235174,
+      -0.037300001829862595
+    ],
+    [
+      -6.241799831390381,
+      0.007600000128149986,
+      -0.03539999946951866
+    ],
+    [
+      -5.777100086212158,
+      0.00800000037997961,
+      -0.03229999914765358
+    ],
+    [
+      -5.314599990844727,
+      0.0066999997943639755,
+      -0.027699999511241913
+    ],
+    [
+      -4.853600025177002,
+      0.0066999997943639755,
+      -0.024299999698996544
+    ],
+    [
+      -4.3927001953125,
+      0.006200000178068876,
+      -0.023499999195337296
+    ],
+    [
+      -3.933300018310547,
+      0.00559999980032444,
+      -0.021299999207258224
+    ],
+    [
+      -3.4756999015808105,
+      0.004999999888241291,
+      -0.018799999728798866
+    ],
+    [
+      -3.020900011062622,
+      0.0044999998062849045,
+      -0.016200000420212746
+    ],
+    [
+      -2.5692999362945557,
+      0.00430000014603138,
+      -0.013799999840557575
+    ],
+    [
+      -2.1212000846862793,
+      0.003599999938160181,
+      -0.012000000104308128
+    ],
+    [
+      -1.6822999715805054,
+      0.0026000000070780516,
+      -0.007499999832361937
+    ],
+    [
+      -1.2512999773025513,
+      0.001500000013038516,
+      -0.003100000089034438
+    ],
+    [
+      -0.8264999985694885,
+      0.0005000000237487257,
+      -0.0013000000035390258
+    ],
+    [
+      -0.40880000591278076,
+      9.999999747378752e-05,
+      -0.0007999999797903001
+    ],
+    [
+      0.0,
+      0.0,
+      0.0
+    ]
+  ],
+  "ego_history_yaw_deg": [
+    0.05999999865889549,
+    0.03799999877810478,
+    -0.0010000000474974513,
+    -0.007000000216066837,
+    0.00800000037997961,
+    0.008999999612569809,
+    0.003000000026077032,
+    -0.008999999612569809,
+    -0.023000000044703484,
+    -0.035999998450279236,
+    -0.04899999871850014,
+    -0.04800000041723251,
+    -0.039000000804662704,
+    -0.027000000700354576,
+    -0.007000000216066837,
+    -0.0
+  ],
+  "ego_path_m": 6.708030700683594,
+  "cameras": [
+    "cross_left_120",
+    "front_wide_120",
+    "cross_right_120",
+    "front_tele_30"
+  ],
+  "top5_coc": [
+    {
+      "rank": 1,
+      "first_token": "Stop",
+      "first_token_id": 10674,
+      "first_p": 0.43886399269104004,
+      "pred_coc": "Stop to yield to the cross-traffic vehicle crossing ahead. -translate",
+      "pred_coc_raw": "Stop to yield to the cross-traffic vehicle crossing ahead.<|cot_end|><|traj_future_start|>-translate",
+      "readable": true,
+      "jaccard": 0.3333333333333333,
+      "gt_coverage": 0.6666666666666666
+    },
+    {
+      "rank": 2,
+      "first_token": "Y",
+      "first_token_id": 56,
+      "first_p": 0.3872961103916168,
+      "pred_coc": "YY toRAPNudge to yield to the oncoming car. valves",
+      "pred_coc_raw": "YY toRAPNudge to yield to the oncoming car.<|cot_end|><|traj_future_start|> valves",
+      "readable": true,
+      "jaccard": 0.2727272727272727,
+      "gt_coverage": 0.5
+    },
+    {
+      "rank": 3,
+      "first_token": "Keep",
+      "first_token_id": 19434,
+      "first_p": 0.11096220463514328,
+      "pred_coc": "Keep distance to the lead vehicle because it is stopped ahead. -translate",
+      "pred_coc_raw": "Keep distance to the lead vehicle because it is stopped ahead.<|cot_end|><|traj_future_start|>-translate",
+      "readable": true,
+      "jaccard": 0.125,
+      "gt_coverage": 0.3333333333333333
+    },
+    {
+      "rank": 4,
+      "first_token": "N",
+      "first_token_id": 45,
+      "first_p": 0.028055638074874878,
+      "pred_coc": "Nseek to keep distance from the oncoming car. Authorize",
+      "pred_coc_raw": "Nseek to keep distance from the oncoming car.<|cot_end|><|traj_future_start|>Authorize",
+      "readable": true,
+      "jaccard": 0.15384615384615385,
+      "gt_coverage": 0.3333333333333333
+    },
+    {
+      "rank": 5,
+      "first_token": "Slow",
+      "first_token_id": 58289,
+      "first_p": 0.028055638074874878,
+      "pred_coc": "Slow down to yield to the cross-traffic vehicle ahead. -translate",
+      "pred_coc_raw": "Slow down to yield to the cross-traffic vehicle ahead.<|cot_end|><|traj_future_start|>-translate",
+      "readable": true,
+      "jaccard": 0.23076923076923078,
+      "gt_coverage": 0.5
+    }
+  ]
+}
