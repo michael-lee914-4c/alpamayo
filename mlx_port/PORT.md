@@ -90,6 +90,11 @@ Counted for `num_traj_samples=1`, CoC length `N` tokens, FM steps 10.
 
 **None of encode / prefill / decode / FM is `mx.compile`d.**
 
+Stage wall-clock (T1.1): set `ALPAMAYO_STAGE_TIMERS=1`. Prints a `[STAGE]` line and
+puts `extra["stage_times"]` with G1 fields. Off by default so the e2e path is
+unchanged. When on, vision encode ends with one extra `mx.eval` so encode time
+is not lazy-attributed to prefill.
+
 Likely 110 s split (unmeasured — Phase 1): prefill over ~32k tokens + per-token decode eval + 10 uncompiled expert forwards. Do not spend a week on ego history.
 
 ## Train vs infer (for later T2.4 / T4.3)

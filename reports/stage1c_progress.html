@@ -39,7 +39,7 @@
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Stage Status</div>
                     <div class="text-3xl font-semibold text-sky-400">In Progress</div>
-                    <div class="text-xs text-slate-500 mt-1">P0 inventory landed · G1 not green</div>
+                    <div class="text-xs text-slate-500 mt-1">P0 inventory · P1a timers · G1 not green</div>
                 </div>
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Key Focus</div>
@@ -82,13 +82,13 @@
                                 <td class="px-2 py-2 font-mono text-sky-300">P0</td>
                                 <td class="px-2 py-2 font-mono">stage1c-p0-inventory</td>
                                 <td class="px-2 py-2">T0.1 + T0.2: module map, dtype, <code>mx.eval</code> counts. No runtime change.</td>
-                                <td class="px-2 py-2 text-emerald-400">this PR</td>
+                                <td class="px-2 py-2 text-emerald-400">merged (#6)</td>
                             </tr>
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono text-sky-300">P1a</td>
                                 <td class="px-2 py-2 font-mono">stage1c-p1-stage-timers</td>
                                 <td class="px-2 py-2">Wall-clock around encode / prefill / decode / FM (no behavior change).</td>
-                                <td class="px-2 py-2 text-slate-500">next</td>
+                                <td class="px-2 py-2 text-sky-400">this PR</td>
                             </tr>
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono text-sky-300">P1b</td>
@@ -186,8 +186,9 @@
                 <span>Next</span>
             </div>
             <p class="text-sm text-slate-300">
-                Merge this inventory, then open <code>stage1c-p1-stage-timers</code>:
-                instrument wall-clock only. Do not change Euler or decode yet.
+                Merge P1a timers into <code>main</code>, then open
+                <code>stage1c-p1-baseline-table</code>: 3 warm trials on the default clip.
+                Do not change Euler or decode yet.
             </p>
             <div class="mt-4 text-xs font-mono text-indigo-400">
                 reports/stage1c_progress.html · started 2026-08-29 ·
