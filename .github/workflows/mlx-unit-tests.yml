@@ -1,0 +1,46 @@
+name: MLX unit tests
+
+on:
+  pull_request:
+  push:
+
+# Job display name below is the required status check on main.
+# Do not rename it without updating the repository ruleset.
+concurrency:
+  group: mlx-unit-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mlx-unit-tests:
+    name: macos-26 (no weights)
+    runs-on: macos-26
+    env:
+      ALPAMAYO_CI_NO_WEIGHTS: "1"
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/src
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install lightweight MLX test deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install \
+            pytest \
+            numpy \
+            scipy \
+            pandas \
+            einops \
+            pillow \
+            safetensors \
+            "transformers==4.57.1" \
+            torch \
+            mlx \
+            mlx-vlm
+
+      - name: Run unit tests (no weight load)
+        run: python -m pytest mlx_port/tests -m "not slow" -q --tb=short
