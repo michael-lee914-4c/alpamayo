@@ -105,7 +105,7 @@
             <div class="bg-slate-900 border border-sky-800 rounded-2xl p-4">
                 <div class="text-slate-500 mb-1">Stage 1c</div>
                 <div class="font-semibold text-sky-400">IN PROGRESS</div>
-                <div class="text-slate-500 mt-1">P0 inventory · G1 next</div>
+                <div class="text-slate-500 mt-1">G1 signed off · P2f 6.2 s window</div>
             </div>
             <div class="bg-slate-900 border border-slate-700 rounded-2xl p-4">
                 <div class="text-slate-500 mb-1">Stage 2</div>
@@ -352,10 +352,10 @@
                     </div>
                 </div>
                 <div>
-                    <div class="uppercase text-xs tracking-widest text-slate-500 mb-2">Phases (do not skip G1)</div>
+                    <div class="uppercase text-xs tracking-widest text-slate-500 mb-2">Phases (G1 signed off 2026-08-29)</div>
                     <ol class="list-decimal list-inside space-y-1 text-sm text-slate-300">
                         <li><span class="text-sky-300 font-medium">P0 Inventory</span> — map modules to the four stages; count <code class="text-cyan-300">mx.eval</code> / host roundtrips.</li>
-                        <li><span class="text-sky-300 font-medium">P1 Profile</span> — 3 warm trials, median wall-clock. Do not start quant until G1 is green.</li>
+                        <li><span class="text-sky-300 font-medium">P1 Profile</span> — G1 signed off 2026-08-29 on the P2f greedy table (one cold trial; user accepted).</li>
                         <li><span class="text-sky-300 font-medium">P2 Compile / dtype / cut work</span> — bf16 hot path, <code class="text-cyan-300">mx.compile</code> FM + a backbone block, kill per-step eval, train knobs (1 traj, FM 4–6, CoT cap 32–64 or 0).</li>
                         <li><span class="text-sky-300 font-medium">P3 Mixed PTQ</span> — 4-bit language tower only after G2. Expert and vision stay denser. ParoQuant preferred over naive affine for CoT.</li>
                         <li><span class="text-sky-300 font-medium">T4.3 Train graph</span> — replace rollout-in-the-loop with official Stage-1 CE / Stage-2 CFM. Bigger win than 4-bit if the current “train” path generates.</li>
@@ -403,7 +403,7 @@
                 <p class="text-xs text-slate-400">
                     Unblocked when Stage 1c Bar B is green: train step is encode + one backbone forward, not
                     <code class="text-cyan-300">sample_trajectories_from_data_with_vlm_rollout</code>.
-                    Do not start a multi-day run before G1 timers exist.
+                    G1 timers exist (signed off 2026-08-29). Do not start a multi-day run before a train-step timer exists.
                 </p>
             </div>
             

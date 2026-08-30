@@ -172,6 +172,9 @@ class AlpamayoLanguageModel(LanguageModel):
         # checking attribute presence, which can be affected by nn.Module internals)
         if not hasattr(base, "_pos_valid"):
             base._pos_valid = False
+        from mlx_port.models.compiled_backbone import install_compiled_prefill
+
+        install_compiled_prefill(base)
         return base
 
     def __call__(

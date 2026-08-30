@@ -24,6 +24,27 @@ G1_MS_KEYS = (
     "convert_ms",
 )
 G1_DOMINANT = ("encode", "prefill", "decode", "action", "python-overhead")
+_COMPILED_DEFAULT = {
+    "encode": False,
+    "prefill": False,
+    "decode": False,
+    "fm": False,
+}
+_compiled = dict(_COMPILED_DEFAULT)
+
+
+def set_compiled(stage: str, enabled: bool) -> None:
+    if stage not in _compiled:
+        raise ValueError(f"unknown compile stage {stage!r}")
+    _compiled[stage] = bool(enabled)
+
+
+def reset_compiled() -> None:
+    _compiled.update(_COMPILED_DEFAULT)
+
+
+def compiled_flags() -> dict:
+    return dict(_compiled)
 
 
 def is_stage_timers_enabled() -> bool:
@@ -95,12 +116,7 @@ class StageClock:
             "convert_ms": round(self.convert_ms, 1),
             "total_ms": round(sum(stages.values()), 1),
             "dominant_stage": dominant,
-            "compiled": {
-                "encode": False,
-                "prefill": False,
-                "decode": False,
-                "fm": False,
-            },
+            "compiled": compiled_flags(),
             "dtype": "bfloat16",
         }
 

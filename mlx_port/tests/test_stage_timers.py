@@ -10,12 +10,15 @@ from mlx_port.stage_timers import (
     is_stage_timers_enabled,
     median_stage_times,
     print_stage_table,
+    reset_compiled,
+    set_compiled,
     time_stage,
     vlm_step_stage,
 )
 
 
 def test_as_dict_fills_g1_fields_and_names_dominant():
+    reset_compiled()
     clock = StageClock(
         encode_ms=100.0,
         prefill_ms=800.0,
@@ -50,6 +53,22 @@ def test_as_dict_fills_g1_fields_and_names_dominant():
         "fm": False,
     }
     assert times["dtype"] == "bfloat16"
+
+
+def test_set_compiled_updates_as_dict():
+    reset_compiled()
+    try:
+        set_compiled("prefill", True)
+        assert StageClock().as_dict()["compiled"]["prefill"] is True
+        assert StageClock().as_dict()["compiled"]["fm"] is False
+    finally:
+        reset_compiled()
+    try:
+        set_compiled("not-a-stage", True)
+    except ValueError as exc:
+        assert "unknown compile stage" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for unknown stage")
 
 
 def test_zero_clock_does_not_divide_by_zero():

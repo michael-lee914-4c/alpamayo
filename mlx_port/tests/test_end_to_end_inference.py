@@ -21,6 +21,7 @@ from mlx_port.processor import (
     create_message,
     get_processor,
     alpamayo_apply_chat_template,
+    dump_vision_inputs,
     DEFAULT_NUM_FRAMES,
 )
 from mlx_port.models.alpamayo_r1_mlx import AlpamayoR1MLX
@@ -40,8 +41,9 @@ from mlx_port.gt_eval import (
 CLIP_ID = DEFAULT_EVAL_CLIP_ID
 LOCAL_DIR = "/Volumes/MicronSSD/pai_coc"
 CHECKPOINT = "/Users/michaellee/Projects/alpamayo/pre-trained/Alpamayo-R1-10B"
-# Last confirmed greedy (temperature=0, 16×[1,H,W], event t0) CoC on CLIP_ID.
-EXPECTED_GREEDY_COC_PREFIX = "Stop for the stop sign"
+# Last confirmed greedy (T=0, NVIDIA 163840–196608, 16×[1,20,36], event t0).
+# Native 68×120 (pre-P2f) pinned "Stop for the stop sign".
+EXPECTED_GREEDY_COC_PREFIX = "Stop to yield to the pedestrian"
 # NVIDIA test_inference.py
 NVIDIA_TEMPERATURE = 0.6
 NVIDIA_TOP_P = 0.98
@@ -87,6 +89,7 @@ def _prepare_inputs(model, data):
         return_tensors="np",
     )
     # NVIDIA processor emits 16×[1,H,W]. Do not collapse to 4×[4,H,W].
+    dump_vision_inputs("e2e", inputs)
     for key in ("pixel_values", "pixel_values_videos"):
         if key in inputs:
             arr = inputs[key]
