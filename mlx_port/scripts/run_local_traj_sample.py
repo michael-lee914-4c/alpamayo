@@ -505,14 +505,21 @@ def main() -> None:
         action="store_true",
         help="T3.1 affine-4 on the language tower. Default is dense bf16.",
     )
+    parser.add_argument(
+        "--quantize-all",
+        action="store_true",
+        help="all4 affine-4 on the full VLM and diffusion expert.",
+    )
     args = parser.parse_args()
+    if args.quantize_lm and args.quantize_all:
+        parser.error("--quantize-lm and --quantize-all are exclusive")
     report_dir = args.report_dir
     report_dir.mkdir(parents=True, exist_ok=True)
 
     print(
         f"[traj-sample] {len(CLIP_IDS)} clips; T={NVIDIA_TEMPERATURE} "
         f"top_p={NVIDIA_TOP_P} num_traj_samples=1 seed={SEED} "
-        f"quantize_lm={args.quantize_lm}"
+        f"quantize_lm={args.quantize_lm} quantize_all={args.quantize_all}"
     )
     for i, cid in enumerate(CLIP_IDS):
         print(f"  [{i}] {cid}")
@@ -554,6 +561,7 @@ def main() -> None:
                     load_expert=True,
                     dtype=mx.bfloat16,
                     quantize_lm=args.quantize_lm,
+                    quantize_all=args.quantize_all,
                 )
                 processor = get_processor(model.tokenizer)
             rec = run_one_clip(model, processor, cid, clip_dir, seed=SEED + i)
@@ -572,6 +580,7 @@ def main() -> None:
     run_meta = {
         "generated_at": generated_at,
         "quantize_lm_kwarg": bool(args.quantize_lm),
+        "quantize_all_kwarg": bool(args.quantize_all),
         "quantized": flags,
         "quant_path": quant_path_label(flags),
         "n_clips": len(results),

@@ -28,6 +28,7 @@ from mlx_port.models.quantize_lm import (
     mark_language_tower_dense,
     quantize_language_tower,
     resolve_lm4_dir,
+    resolve_quant_mode,
     save_language_tower,
 )
 from mlx_port.stage_timers import quantized_flags, reset_quantized
@@ -59,11 +60,14 @@ def test_lm_quant_enabled_env_is_t31_only():
         assert lm_quant_enabled(True) is False
         os.environ[QUANT_MODE_ENV] = "lm4"
         assert lm_quant_enabled(False) is True
+        os.environ[QUANT_MODE_ENV] = "all4"
+        assert lm_quant_enabled(True) is False
+        assert resolve_quant_mode() == "all4"
         os.environ[QUANT_MODE_ENV] = "nvfp4"
         try:
             lm_quant_enabled(True)
         except ValueError as exc:
-            assert "closed" in str(exc)
+            assert "not supported" in str(exc)
         else:
             raise AssertionError("expected ValueError for leftover ALPAMAYO_QUANT")
     finally:
