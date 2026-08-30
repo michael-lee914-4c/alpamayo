@@ -11,7 +11,9 @@ from mlx_port.stage_timers import (
     median_stage_times,
     print_stage_table,
     reset_compiled,
+    reset_quantized,
     set_compiled,
+    set_quantized,
     time_stage,
     vlm_step_stage,
 )
@@ -19,6 +21,7 @@ from mlx_port.stage_timers import (
 
 def test_as_dict_fills_g1_fields_and_names_dominant():
     reset_compiled()
+    reset_quantized()
     clock = StageClock(
         encode_ms=100.0,
         prefill_ms=800.0,
@@ -40,6 +43,7 @@ def test_as_dict_fills_g1_fields_and_names_dominant():
         "ms_per_fm_step",
         "dominant_stage",
         "compiled",
+        "quantized",
         "dtype",
     ):
         assert key in times
@@ -53,6 +57,27 @@ def test_as_dict_fills_g1_fields_and_names_dominant():
         "fm": False,
     }
     assert times["dtype"] == "bfloat16"
+    assert times["quantized"] == {
+        "lm": "bf16",
+        "vision": "bf16",
+        "expert": "bf16",
+    }
+
+
+def test_set_quantized_updates_as_dict():
+    reset_quantized()
+    try:
+        set_quantized("lm", "affine-4-gs64")
+        assert StageClock().as_dict()["quantized"]["lm"] == "affine-4-gs64"
+        assert StageClock().as_dict()["quantized"]["expert"] == "bf16"
+    finally:
+        reset_quantized()
+    try:
+        set_quantized("not-a-part", "affine-4-gs64")
+    except ValueError as exc:
+        assert "unknown quant part" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for unknown quant part")
 
 
 def test_set_compiled_updates_as_dict():

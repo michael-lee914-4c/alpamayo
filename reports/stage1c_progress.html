@@ -39,11 +39,11 @@
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Stage Status</div>
                     <div class="text-3xl font-semibold text-sky-400">In Progress</div>
-                    <div class="text-xs text-slate-500 mt-1">G1 signed off · P2f 6.2 s window</div>
+                    <div class="text-xs text-slate-500 mt-1">G1 signed · P2f done · prefill quant chase closed</div>
                 </div>
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Key Focus</div>
-                    <div class="font-semibold text-xl text-cyan-400">Phase 3 / Bar B unblocked</div>
+                    <div class="font-semibold text-xl text-cyan-400">bf16 default · T3.1 opt-in</div>
                 </div>
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Gate</div>
@@ -77,6 +77,40 @@
             </p>
         </div>
 
+        <div class="bg-amber-950/40 border border-amber-700 rounded-3xl p-6 mb-8 text-sm text-slate-200 space-y-3">
+            <div class="font-semibold text-amber-300">Prefill quant chase — closed (2026-08-29)</div>
+            <p class="text-xs">
+                Same greedy clip, T=0, seq=3006, 16×[1,20,36]. Prefill GEMM at
+                3006 tokens is compute-bound on M4 Max (~60× above the
+                ~51 FLOP/byte ridge). Metal has no int4 / nvfp4 MMA.
+                <code>QuantizedLinear</code> dequants a tile in registers then
+                runs the same FP16/BF16 <code>BlockMMA</code>. Extra recipes
+                added unpack work; none beat P2f prefill <strong>3645&nbsp;ms</strong>.
+                Decode W4 (−160&nbsp;ms) is the only real speed signal.
+                Metal peak drops ~10&nbsp;GB once the decoder is 4-bit;
+                packing vision / head / expert does not move that peak
+                (sampled during first <code>vlm()</code>). RSS high-water stayed ~63&nbsp;GB.
+                minADE on these shots is unseeded FM — ignore. CoC pin held on 12–13 tokens.
+            </p>
+            <p class="text-xs">
+                <strong class="text-slate-200">Code now:</strong> two kept
+                paths. Default is dense bf16
+                (<code>quantize_lm=False</code> / unset /
+                <code>ALPAMAYO_QUANT=none</code>) — the signed P2f path.
+                T3.1 is opt-in
+                (<code>quantize_lm=True</code> or
+                <code>ALPAMAYO_QUANT=lm4</code>).
+                Packed tower is
+                <code>pre-trained/Alpamayo-R1-10B/mlx_lm4/</code>
+                (6.02&nbsp;GiB).
+                <code>quantize_vlm.py</code>, <code>quantize_expert.py</code>,
+                and their tests are deleted. Leftover
+                <code>ALPAMAYO_QUANT=vlm8|vlm4|all4|nvfp4</code> raises.
+                T3.1 is a memory recipe (−9.30&nbsp;GiB weights), not a speed recipe.
+                G3 is not signed.
+            </p>
+        </div>
+
         <div class="mb-8">
             <div class="section-header">
                 <i class="fa-solid fa-lightbulb text-amber-400"></i>
@@ -98,6 +132,8 @@
                         <li>P2e first wrap assigned instance <code>__call__</code> — a no-op for <code>layer(...)</code>. 14:40 e2e was eager. Fix: replace each decoder with <code>CompiledPrefillLayer</code> so the class <code>__call__</code> is what <code>Qwen3VLModel</code> invokes.</li>
                         <li>P2f: <code>bind_image_pixel_budget</code> after processor load. Qwen3-VL JSON <code>size.longest_edge=16777216</code> left 1080p at grid <code>68×120</code>. NVIDIA budget is <code>163840–196608</code> (~320×576, grid <code>20×36</code>).</li>
                         <li>5-clip T=0.6 after P2f is the quality check for that bind (same clips/seeds as <code>coc_sample_5_t06</code>). Native-32k snapshot kept at <code>results_pre_p2f.json</code>.</li>
+                        <li>Two kept load paths. Default: dense bf16 (P2f). Opt-in T3.1: affine 4-bit gs64 on <code>vlm.language_model</code> only. Packed tower lives at <code>{alpamayo}/mlx_lm4/language_model.safetensors</code> (6.02&nbsp;GiB). First T3.1 load live-packs and saves; later loads install empty <code>QuantizedLinear</code> and <code>load_weights</code> (skip Alpamayo language / <code>lm_head</code> keys). Incomplete pair raises. KEEP_DENSE stays <strong>bf16</strong>: vision / expert / <code>lm_head</code> / embeddings. <code>ALPAMAYO_QUANT=none|lm4</code> overrides the kwarg; any other value raises.</li>
+                        <li>VLM W8 / W4 / all4 / nvfp4 were one-shot probes (measured 2026-08-29, then removed from the load path). Affine cannot pack vision <code>mlp.linear_fc2</code> (4304 ≉ 64); nvfp4 gs16 can. Conv3D patch embed never has <code>to_quantized</code>. Expert last dims 2048/8256 are ÷64. Action-in/out stayed dense. Metal nvfp4 is E2M1 + per-group FP8 scales, not Blackwell tensor cores.</li>
                     </ul>
                 </div>
                 <div>
@@ -119,6 +155,36 @@
                         Binding that after load yields <code>20×36</code> (~180 tokens/frame, seq 3006).
                         The greedy CoC pin moved from stop-sign to yield-to-pedestrian (closer to GT).
                     </p>
+                    <p class="text-xs mt-2">
+                        <strong class="text-slate-200">Why VLM affine-8 did not cut the window.</strong>
+                        Same first-shot compile tax as T3.1 W4.                         Encode got slower (8-bit vision
+                        Linears, encode is not compiled). Prefill 4.13&nbsp;s vs P2f 3.64&nbsp;s.
+                        Decode matched bf16, not the W4 decode win. CoC pin held.
+                    </p>
+                    <p class="text-xs mt-2">
+                        <strong class="text-slate-200">Why VLM affine-4 is the slowest prefill.</strong>
+                        Same 342 packed leaves as W8, but 4-bit dequant on the compiled 3006-token
+                        first capture costs more (6.54&nbsp;s vs 3.64&nbsp;s bf16). Decode is the
+                        one stage that improved (664&nbsp;ms). CoC pin still held with 4-bit
+                        <code>lm_head</code> + embeds.
+                    </p>
+                    <p class="text-xs mt-2">
+                        <strong class="text-slate-200">Why all4 did not cut FM.</strong>
+                        The 10 Euler steps still dequant 252 expert Linears on a first-shot
+                        graph. FM 1131&nbsp;ms vs P2f 630&nbsp;ms. Action-in/out stayed bf16.
+                        Prefill is the same VLM-W4 recipe as 21:25; 4.47&nbsp;s vs 6.54&nbsp;s
+                        is first-capture noise, not an all4 win.
+                    </p>
+                    <p class="text-xs mt-2">
+                        <strong class="text-slate-200">Why VLM nvfp4 did not cut the window.</strong>
+                        Apple Silicon is not NVIDIA nvfp4: Metal dequant shaders, not FP4
+                        tensor cores. Group size 16 has more scale traffic than affine gs64.
+                        Prefill 5.90&nbsp;s vs P2f 3.64&nbsp;s and T3.1 W4 4.43&nbsp;s.
+                        Faster than affine VLM-W4 6.54&nbsp;s (fc2 now packed, different kernel).
+                        Encode 1.27&nbsp;s is the slowest of the set (quantized vision).
+                        Expert stayed bf16; FM 1.38&nbsp;s is first-shot noise, not an nvfp4 claim.
+                        CoC pin held (12 decode tokens vs 13 on the other probes).
+                    </p>
                 </div>
                 <div>
                     <div class="font-semibold text-slate-200 mb-1">Rejected</div>
@@ -129,6 +195,8 @@
                         <li>P2b decode host-sync and P2c compile-FM first — G1 says they are under 5%.</li>
                         <li>Compile the same 36 decoder layers again, or compile the whole 32k stack as the next speed cut — same FLOPs, worse first-call cost.</li>
                         <li>Install torchvision to make HF’s Fast processor load — it pulled torch 2.12→2.10. mlx_vlm’s torch-free processor + bind is enough.</li>
+                        <li>Treat Metal <code>mode=nvfp4</code> as Blackwell tensor cores, or pad/split vision <code>fc2</code> so affine can pack it.</li>
+                        <li>Keep the probe walks in the load path after the chase closed. Leftover env values must raise, not silently fall back to T3.1.</li>
                     </ul>
                 </div>
             </div>
@@ -184,7 +252,24 @@
                     <li>mlx_port/processor.py — bind_image_pixel_budget, smart_resize_hw, get_processor binds after load</li>
                     <li>mlx_port/tests/test_pixel_budget.py — 1080p → 20×36; 16-frame prefix not ~32k</li>
                     <li>mlx_port/PORT.md · mlx_port/alpamayo1-mlx-speedup-plan.html T2.5</li>
-                    <li>mlx_port/scripts/run_local_traj_sample.py — print token count + grid; note P2f in HTML</li>
+                    <li>mlx_port/scripts/run_local_traj_sample.py — print token count + grid; note P2f in HTML; --quantize-lm + load-path stamp</li>
+                </ul>
+                <div class="text-[11px] uppercase tracking-wider text-slate-500">T3.1 (this increment)</div>
+                <ul class="text-xs space-y-1 font-mono">
+                    <li>mlx_port/models/quantize_lm.py — predicate + live pack + save/load mlx_lm4 + empty QuantizedLinear install</li>
+                    <li>mlx_port/models/alpamayo_r1_mlx.py — default quantize_lm=False (bf16); T3.1 opt-in; skip language keys when packed LM exists</li>
+                    <li>mlx_port/vlm_loader.py — resize lm_head with embed so packed load can assign 155697 rows</li>
+                    <li>mlx_port/scripts/save_quantized_lm.py — write {alpamayo}/mlx_lm4 (no expert)</li>
+                    <li>mlx_port/tests/test_quantize_lm.py — tiny save/load, incomplete pair raises, spec mismatch raises</li>
+                    <li>.gitignore — ignore jpg/png under <code>reports/traj_sample_5_t06*</code> (keep HTML/JSON)</li>
+                </ul>
+                <div class="text-[11px] uppercase tracking-wider text-slate-500">Prefill quant chase — removed from code</div>
+                <ul class="text-xs space-y-1 font-mono">
+                    <li>deleted mlx_port/models/quantize_vlm.py</li>
+                    <li>deleted mlx_port/models/quantize_expert.py</li>
+                    <li>deleted mlx_port/tests/test_quantize_vlm.py</li>
+                    <li>deleted mlx_port/tests/test_quantize_expert.py</li>
+                    <li>alpamayo_r1_mlx.py — dropped quantize_vlm_8bit / 4bit / all4 / nvfp4 kwargs</li>
                 </ul>
             </div>
         </div>
@@ -230,6 +315,155 @@ PYTHONPATH=src:. /Users/michaellee/Projects/alpamayo/.venv/bin/python \
   mlx_port/scripts/run_local_traj_sample.py \
   --report-dir reports/traj_sample_5_t06 --no-reuse
 # all 5 clips tokens=3006 · 16×[1,20,36] · wrote index.html · ~119 s wall
+
+# 2026-08-29 20:50 · T3.1 unit tests
+PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
+  /Users/michaellee/Projects/alpamayo/.venv/bin/python -m pytest \
+  mlx_port/tests/test_quantize_lm.py mlx_port/tests/test_stage_timers.py -q --tb=short
+# 15 passed
+# not slow: 101 passed, 1 skipped (2.32 s)
+
+# 2026-08-29 20:51 · T3.1 greedy e2e (quantize_lm=True)
+PYTHONPATH=src:. ALPAMAYO_STAGE_TIMERS=1 \
+  /Users/michaellee/Projects/alpamayo/.venv/bin/python -m pytest \
+  mlx_port/tests/test_end_to_end_inference.py::test_end_to_end_inference_prints_coc_vlm_only \
+  -s --tb=short
+# 1 passed in 36.01 s
+# [QUANT] 252 QuantizedLinear, kept dense 2 (lm_head, model.embed_tokens)
+# [STAGE] encode=1070.1 prefill=4426.7 decode=695.4 decode_tok=13 fm=1298.8 dominant=prefill
+# CoC pin held: Stop to yield to the pedestrian in the crosswalk.
+# minADE 3.877 m (unseeded FM)
+
+# 2026-08-29 21:00 · VLM W8 unit tests + not-slow
+PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
+  /Users/michaellee/Projects/alpamayo/.venv/bin/python -m pytest \
+  mlx_port/tests -m "not slow" -q --tb=short
+# 108 passed, 1 skipped · 2.33 s
+
+# 2026-08-29 21:01 · VLM affine-8 greedy e2e
+PYTHONPATH=src:. ALPAMAYO_STAGE_TIMERS=1 ALPAMAYO_QUANT=vlm8 \
+  /Users/michaellee/Projects/alpamayo/.venv/bin/python -m pytest \
+  mlx_port/tests/test_end_to_end_inference.py::test_end_to_end_inference_prints_coc_vlm_only \
+  -s --tb=short
+# 1 passed in 32.13 s
+# [QUANT] 342 QuantizedLinear, 2 QuantizedEmbedding, 27 vision mlp.linear_fc2 left dense
+# [STAGE] encode=1252.5 prefill=4134.4 decode=848.7 decode_tok=13 fm=759.1 dominant=prefill
+# CoC pin held. minADE 3.868 m. Metal peak 46.98 GB
+
+# 2026-08-29 21:24 · VLM W4 unit tests + not-slow
+PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
+  /Users/michaellee/Projects/alpamayo/.venv/bin/python -m pytest \
+  mlx_port/tests -m "not slow" -q --tb=short
+# 109 passed, 1 skipped · 2.26 s
+
+# 2026-08-29 21:25 · VLM affine-4 greedy e2e
+PYTHONPATH=src:. ALPAMAYO_STAGE_TIMERS=1 ALPAMAYO_QUANT=vlm4 \
+  /Users/michaellee/Projects/alpamayo/.venv/bin/python -m pytest \
+  mlx_port/tests/test_end_to_end_inference.py::test_end_to_end_inference_prints_coc_vlm_only \
+  -s --tb=short
+# 1 passed in 34.51 s
+# [QUANT] 342 QuantizedLinear, 2 QuantizedEmbedding, 27 vision mlp.linear_fc2 left dense
+# [STAGE] encode=1187.2 prefill=6537.9 decode=664.3 decode_tok=13 fm=1411.4 dominant=prefill
+# CoC pin held. minADE 3.664 m. Metal peak 45.41 GB
+
+# 2026-08-29 21:28 · all4 unit tests + not-slow
+PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
+  /Users/michaellee/Projects/alpamayo/.venv/bin/python -m pytest \
+  mlx_port/tests -m "not slow" -q --tb=short
+# 113 passed, 1 skipped · 2.36 s
+
+# 2026-08-29 21:29 · VLM+expert affine-4 greedy e2e
+PYTHONPATH=src:. ALPAMAYO_STAGE_TIMERS=1 ALPAMAYO_QUANT=all4 \
+  /Users/michaellee/Projects/alpamayo/.venv/bin/python -m pytest \
+  mlx_port/tests/test_end_to_end_inference.py::test_end_to_end_inference_prints_coc_vlm_only \
+  -s --tb=short
+# 1 passed in 28.52 s
+# [QUANT] VLM 342 QuantizedLinear + 2 QuantizedEmbedding, 27 fc2 dense
+# [QUANT] expert 252 QuantizedLinear, no incompatible leaves
+# [STAGE] encode=1128.7 prefill=4466.3 decode=677.2 decode_tok=13 fm=1130.6 dominant=prefill
+# CoC pin held. minADE 5.210 m. Metal peak 45.34 GB
+
+# 2026-08-29 21:46 · nvfp4 unit tests + not-slow
+PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
+  /Users/michaellee/Projects/alpamayo/.venv/bin/python -m pytest \
+  mlx_port/tests -m "not slow" -q --tb=short
+# 115 passed, 1 skipped · 2.34 s
+
+# 2026-08-29 21:46 · VLM nvfp4 greedy e2e
+PYTHONPATH=src:. ALPAMAYO_STAGE_TIMERS=1 ALPAMAYO_QUANT=nvfp4 \
+  /Users/michaellee/Projects/alpamayo/.venv/bin/python -m pytest \
+  mlx_port/tests/test_end_to_end_inference.py::test_end_to_end_inference_prints_coc_vlm_only \
+  -s --tb=short
+# 1 passed in 30.41 s
+# [QUANT] VLM nvfp4-gs16: 369 QuantizedLinear, 2 QuantizedEmbedding, no incompatible leaves
+# [STAGE] encode=1268.6 prefill=5897.2 decode=725.6 decode_tok=12 fm=1378.2 dominant=prefill
+# CoC pin held. minADE 1.869 m. Metal peak 45.40 GB
+
+# 2026-08-29 · chase closed: probe walks deleted. leftover ALPAMAYO_QUANT=vlm8|vlm4|all4|nvfp4 raises.
+# Default load is dense bf16. T3.1 is opt-in (quantize_lm=True / ALPAMAYO_QUANT=lm4).
+PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
+  /Users/michaellee/Projects/alpamayo/.venv/bin/python -m pytest \
+  mlx_port/tests -m "not slow" -q --tb=short
+# 103 passed, 1 skipped · 2.35 s
+
+# 2026-08-29 23:58–00:00 · 5-clip path check (current load paths)
+PYTHONPATH=src:. ALPAMAYO_QUANT=none \
+  /Users/michaellee/Projects/alpamayo/.venv/bin/python \
+  mlx_port/scripts/run_local_traj_sample.py \
+  --report-dir reports/traj_sample_5_t06_bf16 --no-reuse
+# [QUANT] language tower dense bf16 · tokens=3006 · 16×[1,20,36]
+# path=bf16 flags lm/vision/expert=bf16 · wrote index.html · 115 s wall
+# mean minADE 4.562 m (matches signed P2f 4.56)
+
+PYTHONPATH=src:. ALPAMAYO_QUANT=lm4 \
+  /Users/michaellee/Projects/alpamayo/.venv/bin/python \
+  mlx_port/scripts/run_local_traj_sample.py \
+  --report-dir reports/traj_sample_5_t06_t31 --no-reuse --quantize-lm
+# [QUANT] language tower affine-4-gs64: 252 QuantizedLinear, kept dense lm_head + embed_tokens
+# tokens=3006 · 16×[1,20,36] · path=T3.1 W4 LM · 106 s wall
+# mean minADE 4.240 m · CoC same on clips 2–4
+
+# not slow after --quantize-lm HTML stamp:
+# 104 passed, 1 skipped · 2.80 s
+
+# 2026-08-30 · save packed T3.1 language tower (no expert)
+PYTHONPATH=src:. /Users/michaellee/Projects/alpamayo/.venv/bin/python \
+  -m mlx_port.scripts.save_quantized_lm
+# [QUANT] language tower affine-4-gs64: 252 QuantizedLinear, kept dense lm_head + embed_tokens
+# [QUANT] saved → pre-trained/Alpamayo-R1-10B/mlx_lm4/language_model.safetensors (6.02 GiB)
+# 8.0 s wall (load_expert=False)
+
+# reload from disk (same process, quantize_lm=True)
+# [AlpamayoR1MLX] Loaded 351/750 VLM weights, skipped 399 language keys (packed LM on disk)
+# [QUANT] loaded affine-4-gs64 from mlx_lm4/: 252 QuantizedLinear
+# lm_head / embed (155697, 4096) · 2.8 s wall
+
+# not slow after mlx_lm4 save/load:
+# 110 passed, 1 skipped · 2.28 s
+# 2026-08-30 pre-PR re-run: 110 passed, 1 skipped · 2.44 s
+
+# 2026-08-30 · greedy e2e from packed mlx_lm4
+PYTHONPATH=src:. ALPAMAYO_STAGE_TIMERS=1 ALPAMAYO_QUANT=lm4 \
+  /Users/michaellee/Projects/alpamayo/.venv/bin/python -m pytest \
+  mlx_port/tests/test_end_to_end_inference.py::test_end_to_end_inference_prints_coc_vlm_only \
+  -s --tb=short
+# 1 passed in 22.73 s
+# loaded 351/750 VLM, skipped 399 language keys
+# [QUANT] loaded affine-4-gs64 from mlx_lm4/: 252 QuantizedLinear
+# [e2e] input_ids (1, 3006) · 16×[1,20,36]
+# [STAGE] encode=1041.4 prefill=3856.3 decode=305.9 decode_tok=13 fm=587.4 dominant=prefill
+# CoC pin held. minADE 4.097 m. Metal peak 21.24 GB · RSS 40.61 GB
+
+# 2026-08-30 04:18 UTC · 5-clip T=0.6 sanity on packed mlx_lm4 (do not overwrite signed traj_sample_5_t06)
+PYTHONPATH=src:. ALPAMAYO_QUANT=lm4 \
+  /Users/michaellee/Projects/alpamayo/.venv/bin/python \
+  mlx_port/scripts/run_local_traj_sample.py \
+  --report-dir reports/traj_sample_5_t06_t31_disk --no-reuse --quantize-lm
+# loaded 351/750 VLM, skipped 399 language keys
+# [QUANT] loaded affine-4-gs64 from mlx_lm4/: 252 QuantizedLinear
+# tokens=3006 · 16×[1,20,36] · path=T3.1 W4 LM · 96.9 s wall
+# mean minADE 4.240 m · CoC + ADE match live-pack traj_sample_5_t06_t31 to many decimals
+# clip0 Metal 21.24 GB / RSS 40.85 GB after first generation
 
 # median helper (no Metal):
 PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
@@ -297,7 +531,7 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2">Remaining <code>not slow</code> suite</td>
                                 <td class="px-2 py-2 text-emerald-400">PASS</td>
-                                <td class="px-2 py-2">2026-08-29 15:20 · 104 passed, 1 skipped, 5 deselected · 19.05 s</td>
+                                <td class="px-2 py-2">2026-08-30 mlx_lm4 save/load · 110 passed, 1 skipped · 2.28 s. Earlier path-check 104.</td>
                             </tr>
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono">test_traj_to_action_numerical.py::test_without_v0_matches_nvidia_torch</td>
@@ -307,7 +541,12 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono">test_end_to_end_inference.py::test_end_to_end_inference_prints_coc_vlm_only[256]</td>
                                 <td class="px-2 py-2 text-emerald-400">PASS</td>
-                                <td class="px-2 py-2">14:47 compile (32k): 121.19 s · prefill 58103. 15:25 P2f budget: 27.66 s · seq=3006 · 16×[1,20,36] · prefill 3644.7 · encode 1044.1 · CoC pin updated. minADE 5.232 m.</td>
+                                <td class="px-2 py-2">14:47 compile (32k): 121.19 s · prefill 58103. 15:25 P2f budget: 27.66 s · seq=3006 · 16×[1,20,36] · prefill 3644.7 · encode 1044.1 · CoC pin updated. minADE 5.232 m. 20:51 T3.1 W4 live-pack: 36.01 s · 252 QuantizedLinear · prefill 4426.7 · decode 695.4 · CoC pin held · minADE 3.877 m. 2026-08-30 mlx_lm4 disk: 22.73 s · skipped 399 language keys · encode 1041.4 · prefill 3856.3 · decode 305.9 / 13 · fm 587.4 · CoC pin held · minADE 4.097 m · Metal 21.24 GB · RSS 40.61 GB. 21:01–21:46 W8/W4/all4/nvfp4 probes: code removed.</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">run_local_traj_sample.py · 5 clips T=0.6 mlx_lm4 disk</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">2026-08-30 04:18 UTC · reports/traj_sample_5_t06_t31_disk · skipped 399 · 252 QuantizedLinear · tokens=3006 · mean minADE 4.240 m · CoC/ADE match live-pack t31 · 96.9 s wall · Metal 21.24 GB</td>
                             </tr>
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono">test_alpamayo_r1_mlx.py::test_flow_matching_evals_once_after_euler_loop</td>
@@ -339,10 +578,60 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                                 <td class="px-2 py-2 text-emerald-400">PASS</td>
                                 <td class="px-2 py-2">JSON 16M budget → [1,68,120]; after bind → [1,20,36]</td>
                             </tr>
-                            <tr>
+                            <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono">test_pixel_budget.py::test_get_processor_downsamples_16_native_frames</td>
                                 <td class="px-2 py-2 text-emerald-400">PASS</td>
                                 <td class="px-2 py-2">16×1080p via get_processor: grid all [1,20,36]; input_ids &lt; 8000</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">test_quantize_lm.py::test_quantize_tiny_language_model_4bit_keeps_head_and_embed</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">14 QuantizedLinear; lm_head + embed stay nn.Linear / Embedding</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">test_quantize_lm.py::test_quantize_language_tower_refuses_vlm_and_full_model</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">Raises on vision_tower, AlpamayoR1MLX, expert (no lm_head)</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">test_quantize_lm.py::test_lm_quant_enabled_env_is_t31_only</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">unset follows kwarg; none/lm4 override; leftover nvfp4 raises</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">test_quantize_lm.py::test_mark_language_tower_dense_sets_bf16_flags</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">lm / vision / expert flags stay bf16</td>
+                            </tr>
+                            <tr>
+                                <td class="px-2 py-2 font-mono">test_alpamayo_r1_mlx.py::test_from_pretrained_stub</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">quantize_lm default False; lm4_path present; probe kwargs gone</td>
+                            </tr>
+                            <tr>
+                                <td class="px-2 py-2 font-mono">test_quantize_lm.py::test_save_and_load_language_tower_roundtrip</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">tiny compiled LM save/load; packed q_proj + dense lm_head match</td>
+                            </tr>
+                            <tr>
+                                <td class="px-2 py-2 font-mono">test_quantize_lm.py::test_lm4_checkpoint_ready_rejects_incomplete_pair</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">weights without config raises (no live-pack fallback)</td>
+                            </tr>
+                            <tr>
+                                <td class="px-2 py-2 font-mono">save_quantized_lm + from_pretrained disk load</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">6.02 GiB · 252 QuantizedLinear · skipped 399 Alpamayo language keys</td>
+                            </tr>
+                            <tr>
+                                <td class="px-2 py-2 font-mono">test_end_to_end_inference.py::…prints_coc_vlm_only · ALPAMAYO_QUANT=lm4</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">22.73 s · disk mlx_lm4 · CoC pin held · encode 1041 · prefill 3856 · decode 306 / 13 · Metal 21.24 GB</td>
+                            </tr>
+                            <tr>
+                                <td class="px-2 py-2 font-mono">test_traj_sample_plots.py::test_html_report_stamps_bf16_and_t31_paths</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">HTML load-path banner for bf16 and T3.1 W4 LM</td>
                             </tr>
                         </tbody>
                     </table>
@@ -379,6 +668,137 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                         P2e compile on the 32k path did not move prefill (−48&nbsp;ms).
                         P2f did: less work, not a faster kernel.
                         Dominant is still <strong class="text-amber-300">prefill</strong> (3.6&nbsp;s of 6.2&nbsp;s).
+                    </p>
+                </div>
+                <div>
+                    <div class="font-semibold text-slate-300 mb-2">T3.1 greedy e2e — P2f bf16 vs language-tower affine-4</div>
+                    <p class="text-xs text-slate-500 mb-2">
+                        Same clip / T=0 / seq=3006 / 16×[1,20,36].
+                        <code>[QUANT] 252 QuantizedLinear, kept dense lm_head + embed_tokens</code>.
+                        Expert and vision stay bf16.
+                    </p>
+                    <div class="overflow-auto mb-3">
+                        <table class="w-full text-left text-xs">
+                            <thead class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
+                                <tr>
+                                    <th class="px-2 py-2">Field</th>
+                                    <th class="px-2 py-2">15:25 P2f bf16</th>
+                                    <th class="px-2 py-2">20:51 T3.1 W4 LM</th>
+                                    <th class="px-2 py-2">Δ</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-300">
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">encode_ms</td><td class="px-2 py-2">1044.1</td><td class="px-2 py-2">1070.1</td><td class="px-2 py-2">+26 (noise)</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">prefill_ms</td><td class="px-2 py-2">3644.7</td><td class="px-2 py-2">4426.7</td><td class="px-2 py-2">+782 · first compile of W4 layers</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">decode_ms</td><td class="px-2 py-2">855.6 · 13 tok</td><td class="px-2 py-2">695.4 · 13 tok</td><td class="px-2 py-2">−160 (−19%)</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">fm_ms</td><td class="px-2 py-2">630.3</td><td class="px-2 py-2">1298.8</td><td class="px-2 py-2">expert still bf16; run noise</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">stage total_ms</td><td class="px-2 py-2">6174.8</td><td class="px-2 py-2">7491.1</td><td class="px-2 py-2">prefill + FM, not decode</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">pytest wall</td><td class="px-2 py-2">27.66 s</td><td class="px-2 py-2">36.01 s</td><td class="px-2 py-2">quantize + first W4 compile</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">CoC</td><td class="px-2 py-2">yield to pedestrian</td><td class="px-2 py-2">same pin held</td><td class="px-2 py-2">jaccard 0.500</td></tr>
+                                <tr><td class="px-2 py-2 font-mono">minADE</td><td class="px-2 py-2">5.232 m</td><td class="px-2 py-2">3.877 m</td><td class="px-2 py-2">unseeded FM · not a 50-clip</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-xs text-slate-400">
+                        Recipe A did not cut prefill on this one-shot window (W4 + compile first capture is slower).
+                        Decode is the only stage that moved the right way. G3 is not signed.
+                        CoC pin held — naive affine did not trash the 13-token greedy trace.
+                    </p>
+                </div>
+                <div>
+                    <div class="font-semibold text-slate-300 mb-2">T3.1 greedy e2e — packed mlx_lm4 disk load (2026-08-30)</div>
+                    <p class="text-xs text-slate-500 mb-2">
+                        Same clip / T=0 / seq=3006 / 16×[1,20,36].
+                        <code>ALPAMAYO_QUANT=lm4</code>. Loaded
+                        <code>mlx_lm4/language_model.safetensors</code>
+                        (skipped 399 Alpamayo language keys).
+                    </p>
+                    <div class="overflow-auto mb-3">
+                        <table class="w-full text-left text-xs">
+                            <thead class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
+                                <tr>
+                                    <th class="px-2 py-2">Field</th>
+                                    <th class="px-2 py-2">15:25 P2f bf16</th>
+                                    <th class="px-2 py-2">20:51 T3.1 live-pack</th>
+                                    <th class="px-2 py-2">disk mlx_lm4</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-300">
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">encode_ms</td><td class="px-2 py-2">1044.1</td><td class="px-2 py-2">1070.1</td><td class="px-2 py-2">1041.4</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">prefill_ms</td><td class="px-2 py-2 font-semibold text-emerald-300">3644.7</td><td class="px-2 py-2">4426.7</td><td class="px-2 py-2">3856.3</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">decode_ms</td><td class="px-2 py-2">855.6 · 13</td><td class="px-2 py-2">695.4 · 13</td><td class="px-2 py-2 font-semibold text-emerald-300">305.9 · 13</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">fm_ms</td><td class="px-2 py-2">630.3</td><td class="px-2 py-2">1298.8</td><td class="px-2 py-2">587.4</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">stage total</td><td class="px-2 py-2">6175</td><td class="px-2 py-2">7491</td><td class="px-2 py-2">5791</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">pytest wall</td><td class="px-2 py-2">27.66 s</td><td class="px-2 py-2">36.01 s</td><td class="px-2 py-2 font-semibold text-emerald-300">22.73 s</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">METAL PEAK</td><td class="px-2 py-2">55.10 GB</td><td class="px-2 py-2 text-slate-500">not copied</td><td class="px-2 py-2 font-semibold text-emerald-300">21.24 GB</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">RSS peak</td><td class="px-2 py-2">63.13 GB</td><td class="px-2 py-2">~63 GB</td><td class="px-2 py-2">40.61 GB</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">CoC</td><td class="px-2 py-2">yield pin</td><td class="px-2 py-2">held</td><td class="px-2 py-2">held</td></tr>
+                                <tr><td class="px-2 py-2 font-mono">minADE</td><td class="px-2 py-2">5.232 m</td><td class="px-2 py-2">3.877 m</td><td class="px-2 py-2">4.097 m</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-xs text-slate-400">
+                        Disk load is the sanity check for <code>mlx_lm4/</code>.
+                        CoC pin held. Prefill 3.86&nbsp;s is still not below P2f 3.64&nbsp;s
+                        (first W4 compile capture is in this shot).
+                        Wall 22.73&nbsp;s and Metal 21.24&nbsp;GB beat both P2f and the
+                        live-pack T3.1 shot because the bf16 decoder is never materialized.
+                        Decode 306&nbsp;ms / 13 tok is the best of the three; n=1, do not rank on it.
+                        minADE is unseeded FM.
+                    </p>
+                </div>
+                <div>
+                    <div class="font-semibold text-slate-300 mb-2">Prefill quant chase — same greedy window (closed; walks deleted)</div>
+                    <p class="text-xs text-slate-500 mb-2">
+                        VLM W8/W4/all4 pack 342 QuantizedLinear + 2 QuantizedEmbedding.
+                        27 vision <code>mlp.linear_fc2</code> stay bf16 (in=4304, not ÷ 32/64/128).
+                        nvfp4 packs those 27 (gs16): 369 QuantizedLinear + 2 QuantizedEmbedding.
+                        all4 also packs 252 expert Linears (all last dims ÷64).
+                        Action-in/out stay bf16. T3.1 W4 LM is language-tower only.
+                    </p>
+                    <div class="overflow-auto mb-3">
+                        <table class="w-full text-left text-xs">
+                            <thead class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
+                                <tr>
+                                    <th class="px-2 py-2">Field</th>
+                                    <th class="px-2 py-2">P2f bf16</th>
+                                    <th class="px-2 py-2">T3.1 W4 LM</th>
+                                    <th class="px-2 py-2">VLM W8</th>
+                                    <th class="px-2 py-2">VLM W4</th>
+                                    <th class="px-2 py-2">all4</th>
+                                    <th class="px-2 py-2">nvfp4</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-300">
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">encode_ms</td><td class="px-2 py-2">1044</td><td class="px-2 py-2">1070</td><td class="px-2 py-2">1253</td><td class="px-2 py-2">1187</td><td class="px-2 py-2">1129</td><td class="px-2 py-2">1269</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">prefill_ms</td><td class="px-2 py-2 font-semibold text-emerald-300">3645</td><td class="px-2 py-2">4427</td><td class="px-2 py-2">4134</td><td class="px-2 py-2 font-semibold text-amber-300">6538</td><td class="px-2 py-2">4466</td><td class="px-2 py-2">5897</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">decode_ms</td><td class="px-2 py-2">856 · 13</td><td class="px-2 py-2">695</td><td class="px-2 py-2">849</td><td class="px-2 py-2 font-semibold text-emerald-300">664</td><td class="px-2 py-2">677</td><td class="px-2 py-2">726 · 12</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">fm_ms</td><td class="px-2 py-2 font-semibold text-emerald-300">630</td><td class="px-2 py-2">1299</td><td class="px-2 py-2">759</td><td class="px-2 py-2">1411</td><td class="px-2 py-2">1131</td><td class="px-2 py-2">1378</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">stage total</td><td class="px-2 py-2 font-semibold text-emerald-300">6175</td><td class="px-2 py-2">7491</td><td class="px-2 py-2">6995</td><td class="px-2 py-2">9801</td><td class="px-2 py-2">7403</td><td class="px-2 py-2">9270</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">pytest wall</td><td class="px-2 py-2">27.66 s</td><td class="px-2 py-2">36.01 s</td><td class="px-2 py-2">32.13 s</td><td class="px-2 py-2">34.51 s</td><td class="px-2 py-2">28.52 s</td><td class="px-2 py-2">30.41 s</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">METAL PEAK</td><td class="px-2 py-2">55.10 GB</td><td class="px-2 py-2 text-slate-500">not copied</td><td class="px-2 py-2">46.98 GB</td><td class="px-2 py-2">45.41 GB</td><td class="px-2 py-2">45.34 GB</td><td class="px-2 py-2">45.40 GB</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">CoC</td><td class="px-2 py-2">yield pin</td><td class="px-2 py-2">held</td><td class="px-2 py-2">held</td><td class="px-2 py-2">held</td><td class="px-2 py-2">held</td><td class="px-2 py-2">held</td></tr>
+                                <tr><td class="px-2 py-2 font-mono">minADE</td><td class="px-2 py-2">5.232 m</td><td class="px-2 py-2">3.877 m</td><td class="px-2 py-2">3.868 m</td><td class="px-2 py-2">3.664 m</td><td class="px-2 py-2">5.210 m</td><td class="px-2 py-2">1.869 m</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-xs text-slate-400">
+                        all4 FM is 1131&nbsp;ms vs P2f 630&nbsp;ms — 4-bit expert did not beat dense FM
+                        on this first shot. all4 prefill 4.47&nbsp;s vs VLM-W4 6.54&nbsp;s is the
+                        same VLM recipe (first-capture noise), not an all4 speedup.
+                        nvfp4 packed all 369 2-D VLM Linears (including 27 <code>fc2</code>).
+                        Prefill 5.90&nbsp;s is slower than T3.1 W4 and P2f; faster than affine VLM-W4.
+                        minADE 1.869&nbsp;m is unseeded FM on one clip — not a quality claim.
+                        Those walks are gone from the load path. Default is dense
+                        bf16. T3.1 is opt-in. Leftover env values raise.
+                        <code>[METAL PEAK]</code> is max
+                        <code>mx.metal.get_active_memory()</code> during the
+                        first <code>vlm()</code> (encode+prefill poll).
+                        4-bit decoder cuts ~10&nbsp;GB vs P2f 55.10.
+                        Packing the rest of the VLM or the expert does not
+                        move that peak (45.34–45.41). Expert is not in that
+                        window. Process RSS high-water stayed ~63&nbsp;GB
+                        (nvfp4 63.09, compressed 27.24 during the run).
                     </p>
                 </div>
                 <div>
@@ -470,6 +890,159 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                         leftover, not a P2f regression.
                     </p>
                 </div>
+                <div>
+                    <div class="font-semibold text-slate-300 mb-2">5-clip path check — dense bf16 vs T3.1 (2026-08-30 03:58 / 04:00 UTC)</div>
+                    <p class="text-xs text-slate-500 mb-2">
+                        Fresh <code>--no-reuse</code> on the current load paths.
+                        Same clips / seed 42 / T=0.6 / top_p=0.98 / P2f budget.
+                        Signed P2f report left untouched at
+                        <a class="text-cyan-400 hover:underline" href="traj_sample_5_t06/index.html">traj_sample_5_t06</a>.
+                        New reports:
+                        <a class="text-cyan-400 hover:underline" href="traj_sample_5_t06_bf16/index.html">bf16</a>
+                        ·
+                        <a class="text-cyan-400 hover:underline" href="traj_sample_5_t06_t31/index.html">T3.1</a>
+                        ·
+                        <a class="text-cyan-400 hover:underline" href="traj_sample_5_t06_bf16_vs_t31/index.html">side-by-side</a>.
+                    </p>
+                    <div class="overflow-auto mb-3">
+                        <table class="w-full text-left text-xs">
+                            <thead class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
+                                <tr>
+                                    <th class="px-2 py-2">#</th>
+                                    <th class="px-2 py-2">Clip</th>
+                                    <th class="px-2 py-2">bf16 ADE</th>
+                                    <th class="px-2 py-2">T3.1 ADE</th>
+                                    <th class="px-2 py-2">bf16 CoC</th>
+                                    <th class="px-2 py-2">T3.1 CoC</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-300">
+                                <tr class="border-b border-slate-800/80">
+                                    <td class="px-2 py-2">0</td>
+                                    <td class="px-2 py-2 font-mono">faff17c7</td>
+                                    <td class="px-2 py-2">4.773</td>
+                                    <td class="px-2 py-2">4.633</td>
+                                    <td class="px-2 py-2">Nudge left … trucks and cones</td>
+                                    <td class="px-2 py-2">Nudge left … cones (no “trucks”)</td>
+                                </tr>
+                                <tr class="border-b border-slate-800/80">
+                                    <td class="px-2 py-2">1</td>
+                                    <td class="px-2 py-2 font-mono">8e83f069</td>
+                                    <td class="px-2 py-2">4.719</td>
+                                    <td class="px-2 py-2">2.810</td>
+                                    <td class="px-2 py-2">Slow down to yield to the pedestrian…</td>
+                                    <td class="px-2 py-2">Stop to yield to the pedestrians…</td>
+                                </tr>
+                                <tr class="border-b border-slate-800/80">
+                                    <td class="px-2 py-2">2</td>
+                                    <td class="px-2 py-2 font-mono">1946f1c3</td>
+                                    <td class="px-2 py-2">3.869</td>
+                                    <td class="px-2 py-2">4.055</td>
+                                    <td class="px-2 py-2" colspan="2">same: Stop to yield to the pedestrian in the crosswalk.</td>
+                                </tr>
+                                <tr class="border-b border-slate-800/80">
+                                    <td class="px-2 py-2">3</td>
+                                    <td class="px-2 py-2 font-mono">8e06f83c</td>
+                                    <td class="px-2 py-2">5.772</td>
+                                    <td class="px-2 py-2">5.930</td>
+                                    <td class="px-2 py-2" colspan="2">same: Yield to the pedestrian crossing the road</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-2 py-2">4</td>
+                                    <td class="px-2 py-2 font-mono">36cb5485</td>
+                                    <td class="px-2 py-2">3.675</td>
+                                    <td class="px-2 py-2">3.770</td>
+                                    <td class="px-2 py-2" colspan="2">same: Stop to yield to the pedestrians in the crosswalk.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-xs text-slate-400">
+                        Both paths good: <code>[QUANT] language tower dense bf16</code> vs
+                        <code>252 QuantizedLinear</code>; every clip 3006 tokens / 16×[1,20,36];
+                        expert on; HTML stamped with the load path.
+                        Mean minADE bf16 <strong class="text-slate-200">4.56 m</strong> (matches signed P2f)
+                        · T3.1 <strong class="text-slate-200">4.24 m</strong>.
+                        CoC identical on 3/5 clips. Clips 0–1 differ in wording (T=0.6 sample, not a quality ranking).
+                        Wall 115 s (bf16) / 106 s (T3.1). T3.1 RSS settled ~32 GB vs bf16 ~43 GB by clip 4.
+                    </p>
+                </div>
+                <div>
+                    <div class="font-semibold text-slate-300 mb-2">5-clip T3.1 sanity — packed mlx_lm4 disk (2026-08-30 04:18 UTC)</div>
+                    <p class="text-xs text-slate-500 mb-2">
+                        Same clips / seed 42 / T=0.6 / top_p=0.98 / P2f budget.
+                        <code>ALPAMAYO_QUANT=lm4</code> + <code>--quantize-lm --no-reuse</code>.
+                        Signed P2f and live-pack T3.1 reports left untouched.
+                        New report:
+                        <a class="text-cyan-400 hover:underline" href="traj_sample_5_t06_t31_disk/index.html">traj_sample_5_t06_t31_disk</a>.
+                    </p>
+                    <div class="overflow-auto mb-3">
+                        <table class="w-full text-left text-xs">
+                            <thead class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
+                                <tr>
+                                    <th class="px-2 py-2">#</th>
+                                    <th class="px-2 py-2">Clip</th>
+                                    <th class="px-2 py-2">bf16 ADE</th>
+                                    <th class="px-2 py-2">live T3.1</th>
+                                    <th class="px-2 py-2">disk T3.1</th>
+                                    <th class="px-2 py-2">disk CoC</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-300">
+                                <tr class="border-b border-slate-800/80">
+                                    <td class="px-2 py-2">0</td>
+                                    <td class="px-2 py-2 font-mono">faff17c7</td>
+                                    <td class="px-2 py-2">4.773</td>
+                                    <td class="px-2 py-2">4.633</td>
+                                    <td class="px-2 py-2">4.633</td>
+                                    <td class="px-2 py-2">Nudge to the left to increase clearance from the work zone cones on the right.</td>
+                                </tr>
+                                <tr class="border-b border-slate-800/80">
+                                    <td class="px-2 py-2">1</td>
+                                    <td class="px-2 py-2 font-mono">8e83f069</td>
+                                    <td class="px-2 py-2">4.719</td>
+                                    <td class="px-2 py-2">2.810</td>
+                                    <td class="px-2 py-2">2.810</td>
+                                    <td class="px-2 py-2">Stop to yield to the pedestrians in the crosswalk ahead.</td>
+                                </tr>
+                                <tr class="border-b border-slate-800/80">
+                                    <td class="px-2 py-2">2</td>
+                                    <td class="px-2 py-2 font-mono">1946f1c3</td>
+                                    <td class="px-2 py-2">3.869</td>
+                                    <td class="px-2 py-2">4.055</td>
+                                    <td class="px-2 py-2">4.055</td>
+                                    <td class="px-2 py-2">Stop to yield to the pedestrian in the crosswalk.</td>
+                                </tr>
+                                <tr class="border-b border-slate-800/80">
+                                    <td class="px-2 py-2">3</td>
+                                    <td class="px-2 py-2 font-mono">8e06f83c</td>
+                                    <td class="px-2 py-2">5.772</td>
+                                    <td class="px-2 py-2">5.930</td>
+                                    <td class="px-2 py-2">5.930</td>
+                                    <td class="px-2 py-2">Yield to the pedestrian crossing the road</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-2 py-2">4</td>
+                                    <td class="px-2 py-2 font-mono">36cb5485</td>
+                                    <td class="px-2 py-2">3.675</td>
+                                    <td class="px-2 py-2">3.770</td>
+                                    <td class="px-2 py-2">3.770</td>
+                                    <td class="px-2 py-2">Stop to yield to the pedestrians in the crosswalk.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-xs text-slate-400">
+                        Path confirmed: skipped 399 language keys, loaded 252 QuantizedLinear from
+                        <code>mlx_lm4/language_model.safetensors</code>, every clip 3006 tokens / 16×[1,20,36],
+                        HTML stamped <code>T3.1 W4 LM</code>.
+                        CoC and minADE match live-pack T3.1 to many decimals (same seed / T=0.6 draw).
+                        Mean minADE <strong class="text-slate-200">4.24 m</strong> (bf16 4.56 · live-pack 4.24).
+                        Wall <strong class="text-slate-200">96.9 s</strong> vs live-pack 106 s / bf16 115 s.
+                        Clip 0 after generation: RSS 40.85 / Metal 21.24 GB (same Metal peak as disk greedy e2e).
+                        T=0.6 CoC is not a quality ranking.
+                    </p>
+                </div>
             </div>
         </div>
 
@@ -481,18 +1054,18 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6">
                     <div class="text-xs text-slate-500">Peak memory (first-step e2e)</div>
-                    <div class="text-2xl font-semibold text-white mt-2">63.13 <span class="text-lg text-slate-400">GiB</span></div>
-                    <div class="text-xs text-slate-500 mt-1">RSS 63.13 · Metal 55.10 · P2f 15:25</div>
+                    <div class="text-2xl font-semibold text-white mt-2">40.61 <span class="text-lg text-slate-400">GiB</span></div>
+                    <div class="text-xs text-slate-500 mt-1">mlx_lm4 disk greedy: RSS 40.61 / Metal 21.24. P2f bf16 was 63.13 / 55.10.</div>
                 </div>
                 <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6">
                     <div class="text-xs text-slate-500">First-step window / pytest</div>
-                    <div class="text-2xl font-semibold text-white mt-2">6.2 / 28 s</div>
-                    <div class="text-xs text-slate-500 mt-1">Was 81.9 / 113 s at native 32k</div>
+                    <div class="text-2xl font-semibold text-white mt-2">5.8 / 23 s</div>
+                    <div class="text-xs text-slate-500 mt-1">mlx_lm4 disk greedy. P2f bf16 6.2 / 28 s. Live-pack T3.1 was 7.5 / 36 s. 5-clip disk T=0.6: 96.9 s wall.</div>
                 </div>
                 <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6">
                     <div class="text-xs text-slate-500">G1 dominant (first LM step)</div>
                     <div class="text-2xl font-semibold text-amber-400 mt-2">prefill</div>
-                    <div class="text-xs text-slate-500 mt-1">3.6 s · 59% of 6.2 s. Encode 1.0 s. Decode+FM ~1.5 s.</div>
+                    <div class="text-xs text-slate-500 mt-1">Disk T3.1 prefill 3.86 s · P2f bf16 3.64 s / FM 0.63 s. Prefill still not below bf16.</div>
                 </div>
             </div>
         </div>
@@ -507,7 +1080,7 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                     One task per branch. Open a PR into <code>main</code>, document
                     <code>.venv</code> tests here, then wait for user verification before merge
                     (<code>optimize-inference-time</code> landed in PR #5).
-                    Do not 4-bit the expert first. G1 is signed off; T3.1 is language-tower only.
+                    Do not 4-bit the expert first. G1 is signed off. Default load is dense bf16; T3.1 is the only remaining quant walk (opt-in).
                 </p>
                 <div class="overflow-auto">
                     <table class="w-full text-left text-xs">
@@ -568,17 +1141,47 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                                 <td class="px-2 py-2"><code>mx.compile</code> each decoder layer for prefill (<code>seq_len &gt; 1</code>). Re-time.</td>
                                 <td class="px-2 py-2 text-emerald-400">merged (#11) · no prefill win</td>
                             </tr>
-                            <tr>
+                            <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono text-sky-300">P2f</td>
                                 <td class="px-2 py-2 font-mono">stage1c-p2-compile-prefill</td>
                                 <td class="px-2 py-2">Bind NVIDIA pixel budget so 1080p downsamples. Re-time greedy e2e.</td>
                                 <td class="px-2 py-2 text-emerald-400">merged (#11) · 16× prefill</td>
                             </tr>
+                            <tr>
+                                <td class="px-2 py-2 font-mono text-sky-300">T3.1</td>
+                                <td class="px-2 py-2 font-mono">stage1c-p3-t31-affine-lm</td>
+                                <td class="px-2 py-2">Affine 4-bit language tower only. Vision / expert / <code>lm_head</code> stay bf16. Re-time greedy e2e.</td>
+                                <td class="px-2 py-2 text-sky-400">measured · CoC held · prefill not faster · <strong>opt-in</strong></td>
+                            </tr>
+                            <tr>
+                                <td class="px-2 py-2 font-mono text-sky-300">W8</td>
+                                <td class="px-2 py-2 font-mono">stage1c-p3-t31-affine-lm</td>
+                                <td class="px-2 py-2">Affine 8-bit full VLM (vision + language). Expert stays bf16. Re-time greedy e2e.</td>
+                                <td class="px-2 py-2 text-slate-400">measured · CoC held · slower than P2f · <strong>code removed</strong></td>
+                            </tr>
+                            <tr>
+                                <td class="px-2 py-2 font-mono text-sky-300">W4</td>
+                                <td class="px-2 py-2 font-mono">stage1c-p3-t31-affine-lm</td>
+                                <td class="px-2 py-2">Affine 4-bit full VLM (vision + language, including head/embeds). Expert stays bf16.</td>
+                                <td class="px-2 py-2 text-slate-400">measured · CoC held · slowest prefill (6.54 s) · <strong>code removed</strong></td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono text-sky-300">all4</td>
+                                <td class="px-2 py-2 font-mono">stage1c-p3-t31-affine-lm</td>
+                                <td class="px-2 py-2">Affine 4-bit VLM + diffusion expert. Action-in/out stay bf16.</td>
+                                <td class="px-2 py-2 text-slate-400">measured · CoC held · FM 1.13 s · <strong>code removed</strong></td>
+                            </tr>
+                            <tr>
+                                <td class="px-2 py-2 font-mono text-sky-300">nvfp4</td>
+                                <td class="px-2 py-2 font-mono">stage1c-p3-t31-affine-lm</td>
+                                <td class="px-2 py-2">Weight-only nvfp4 gs16 on the full VLM. Expert stays bf16. Packs vision <code>fc2</code>.</td>
+                                <td class="px-2 py-2 text-slate-400">measured · CoC held · prefill 5.90 s · <strong>code removed</strong></td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
                 <p class="text-xs text-slate-500">
-                    G1 is signed off. Phase 3 T3.1 and T4.3 (train graph that does not generate) are the two open forks.
+                    G1 is signed off. Prefill quant chase is closed. Default load is dense bf16; T3.1 is opt-in memory. T4.3 (train graph that does not generate) is the open fork.
                     Leftover 1b yield/stop quality is for MLX SFT after Bar B — not a NVIDIA T-match.
                 </p>
             </div>
@@ -624,14 +1227,73 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
 
         <div class="mb-8">
             <div class="section-header">
+                <i class="fa-solid fa-compass text-cyan-400"></i>
+                <div class="font-semibold text-xl">First-principles read of the quant probes (2026-08-29 21:51)</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 text-sm space-y-3 text-slate-300">
+                <p class="text-xs">
+                    The six one-shot rows are not a speed ranking. Pytest wall
+                    is ~20&nbsp;s of weight load. Prefill includes first compile
+                    capture (vlm4 6.54&nbsp;s vs all4 4.47&nbsp;s are the
+                    <em>same</em> VLM walk). FM moves even when the expert stayed
+                    bf16. minADE is one unseeded Euler draw — nvfp4 1.869&nbsp;m
+                    is not a quality win.
+                </p>
+                <p class="text-xs">
+                    <strong class="text-slate-200">Roofline (M4 Max ~28 TFLOPS FP16 / 546&nbsp;GB/s → ridge ~51 FLOP/byte).</strong>
+                    Prefill GEMM intensity is <code>2 × 3006 / 2 = 3006</code> FLOP/byte
+                    (~60× above ridge): compute-bound. Metal has no int4 / nvfp4
+                    tensor cores. MLX does <em>not</em> write a full bf16 copy
+                    to DRAM: <code>QuantizedLinear</code> calls
+                    <code>mx.quantized_matmul</code>, which dequants a tile in
+                    registers / threadgroup and then runs the same
+                    FP16/BF16 <code>BlockMMA</code>. The matmul FLOPs do not
+                    shrink; you add unpack+scale work. Predicted: prefill same
+                    or slower.
+                    Observed: every recipe slower than P2f 3.64&nbsp;s.
+                    Decode intensity is 1 FLOP/byte: memory-bound. bf16 decoder
+                    traffic 13.9&nbsp;GB → 25&nbsp;ms/tok floor; observed 66 →
+                    51–54&nbsp;ms/tok on W4. That is the only real quant signal
+                    (−160&nbsp;ms on 13 tokens). Encode got slower whenever
+                    vision was packed. all4 FM 1.13&nbsp;s did not beat bf16
+                    0.63&nbsp;s on a first shot.
+                </p>
+                <p class="text-xs">
+                    CoC pin on 12–13 greedy tokens is not a 256-token CoT
+                    result. G3 stays unsigned. Probe walks are deleted.
+                    Default load is dense bf16. T3.1 <code>lm4</code> is opt-in
+                    as a <em>memory</em> recipe (~10&nbsp;GiB decoder), not a
+                    speed recipe.
+                    Stop hunting prefill with more PTQ.
+                    Bar B is T4.3 (teacher-forced CE + one CFM draw), which
+                    does not wait on G3. Bar C toward 2&nbsp;s needs a work
+                    cut (T5.1 stream KV or T6 student), not fewer bits.
+                </p>
+                <p class="text-xs">
+                    <strong class="text-slate-200">Weight memory vs bf16 20.64&nbsp;GiB</strong>
+                    (safetensors shapes; affine-4 gs64 = 0.5625&nbsp;B/param).
+                    T3.1 decoder Linears only: 11.34&nbsp;GiB (−9.30).
+                    Language tower including <code>embed</code>+<code>lm_head</code>: 9.63&nbsp;GiB (−11.01).
+                    Full VLM affine (27 vision <code>fc2</code> stay dense): 9.04&nbsp;GiB (−11.60).
+                    VLM + expert: 5.99&nbsp;GiB (−14.65). Action-in/out are 1.35&nbsp;M and stay dense.
+                    This is weights only, not e2e RSS.
+                </p>
+            </div>
+        </div>
+
+        <div class="mb-8">
+            <div class="section-header">
                 <i class="fa-solid fa-ban text-rose-400"></i>
                 <div class="font-semibold text-xl">Do not</div>
             </div>
             <div class="bg-slate-900 border border-rose-800/50 rounded-3xl p-6 text-xs text-slate-400 space-y-1">
                 <div>• Quantize the whole model to uniform 4-bit as the first change. Do not 4-bit the expert or vision first.</div>
+                <div>• Hunt prefill with more PTQ (mxfp8, QQLinear, gs32, another expert W4, re-adding VLM/nvfp4 walks). Metal dequants into bf16; G3 is not a bit-width gate anymore.</div>
+                <div>• Rank recipes on n=1 pytest wall, n=1 prefill, or unseeded minADE.</div>
                 <div>• Start QLoRA as a substitute for T3.1. Do not backprop through packed <code>QuantizedLinear.weight</code>.</div>
                 <div>• Set <code>num_traj_samples&gt;1</code> or <code>max_generation_length=256</code> inside a training loop.</div>
                 <div>• Claim FlashDrive on Mac. Chase token-level NVIDIA numerical match.</div>
+                <div>• Compile the 36 decoder layers again as a speed cut.</div>
             </div>
         </div>
 
@@ -641,9 +1303,12 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                 <span>Next</span>
             </div>
             <p class="text-sm text-slate-300">
-                G1 is signed off. 5-clip T=0.6 after P2f reviewed by the user
-                (mean minADE 4.56 m, heading/CoC look right). Next infer cut is
-                T3.1 (language tower 4-bit). Bar B is T4.3.
+                Prefill quant chase is closed and the probe walks are gone.
+                Real next work is T4.3 (train step that does not generate).
+                Optional leftover: 3 warm trials, drop first, median P2f bf16
+                vs T3.1 only. QLoRA (T4.1) after the train graph exists.
+                Infer toward 2&nbsp;s is T5.1 / T6, not another quant mode.
+                Default load is dense bf16. T3.1 is opt-in. G3 is not signed.
             </p>
             <div class="mt-4 text-xs font-mono text-indigo-400">
                 reports/stage1c_progress.html · started 2026-08-29 ·

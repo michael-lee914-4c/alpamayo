@@ -345,6 +345,12 @@ def pred(path, m):
 
 nn.quantize(model, group_size=64, bits=4, mode="affine", class_predicate=pred)</pre>
     <p>Adjust path substrings to the real module names from T0.1. Default group size 64. Do not start at group 32 unless quality fails — gs32 is slower on Metal because of scale traffic.</p>
+    <p>In port: <code>mlx_port/models/quantize_lm.py</code> on branch <code>stage1c-p3-t31-affine-lm</code>. KEEP_DENSE returns <code>False</code> (bf16), not 8-bit. Call site is <code>vlm.language_model</code> only — full VLM / <code>AlpamayoR1MLX</code> raise. Default load is dense bf16 (<code>quantize_lm=False</code>). T3.1 is opt-in (<code>quantize_lm=True</code> or <code>ALPAMAYO_QUANT=lm4</code>). Packed tower: <code>{alpamayo}/mlx_lm4/language_model.safetensors</code> (6.02 GiB, 252 QuantizedLinear). Reload skips Alpamayo language keys.</p>
+    <p>User-requested VLM W8 probe (2026-08-29 21:01): <code>quantize_vlm(..., bits=8)</code> + <code>ALPAMAYO_QUANT=vlm8</code>. Exclusive with T3.1. Expert refused. 27 vision <code>linear_fc2</code> stay dense (4304 not ÷ 32/64/128). Greedy: encode 1253 · prefill 4134 · decode 849 · wall 32.13 s. CoC pin held. Did not beat P2f bf16.</p>
+    <p>User-requested VLM W4 probe (2026-08-29 21:25): <code>ALPAMAYO_QUANT=vlm4</code>. Same walk, bits=4. Greedy: encode 1187 · prefill 6538 · decode 664 · wall 34.51 s. CoC pin held. Slowest prefill; fastest decode. Default stays T3.1 <code>lm4</code>.</p>
+    <p>User-requested all4 probe (2026-08-29 21:29): <code>ALPAMAYO_QUANT=all4</code> — VLM W4 then expert W4 after weight load. 252 expert Linears packed (no last-dim skips). Action-in/out dense. Greedy: encode 1129 · prefill 4466 · decode 677 · FM 1131 · wall 28.52 s. CoC pin held. FM did not beat P2f 630 ms.</p>
+    <p>User-requested nvfp4 probe (2026-08-29 21:46): <code>quantize_vlm_nvfp4</code> + <code>ALPAMAYO_QUANT=nvfp4</code>. Weight-only nvfp4 gs16 on the full VLM. 369 QuantizedLinear (27 vision <code>fc2</code> now pack). Expert stays bf16. Metal shaders, not Blackwell. Greedy: encode 1269 · prefill 5897 · decode 726 / 12 tok · FM 1378 · wall 30.41 s. CoC pin held. Did not beat P2f or T3.1 W4 on prefill.</p>
+    <p><strong>Chase closed 2026-08-29.</strong> Prefill at seq=3006 is compute-bound on M4. Metal dequants 4-bit tiles into FP16/BF16 MMA. No recipe beat P2f 3.64 s prefill. Kept load paths: dense bf16 (default) and T3.1 opt-in. <code>quantize_vlm.py</code> / <code>quantize_expert.py</code> deleted. Full table: <code>reports/stage1c_progress.html</code>.</p>
     <p><strong>Done when:</strong> checkpoint saved; T1.1 rerun; 50-clip ADE and a CoT exact-match or token-level agreement vs bf16 recorded.</p>
   </div>
 
@@ -367,6 +373,7 @@ nn.quantize(model, group_size=64, bits=4, mode="affine", class_predicate=pred)</
   <div class="task gate">
     <header><span class="tid">G3</span><span class="tname">Gate</span></header>
     <p>Quantized infer is faster than G2 on decode and/or prefill. ADE within 0.2&nbsp;m of the Phase 2 bf16 port. Action expert still not 4-bit unless T3.3 explicitly says it survived.</p>
+    <p class="note">2026-08-29: G3 is not signed. Prefill quant chase closed. Default load is dense bf16. T3.1 is opt-in memory, not a speed recipe. Do not wait on G3 to start T4.3.</p>
   </div>
 
   <h2 id="p4">Phase 4 — Train in low precision the MLX way</h2>

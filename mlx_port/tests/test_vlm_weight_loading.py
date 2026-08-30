@@ -27,6 +27,7 @@ def test_load_alpamayo_vlm_language_model_weights():
         CHECKPOINT_PATH,
         load_expert=False,
         dtype=mx.bfloat16,
+        quantize_lm=False,
     )
     print("[VLM Weight Loading Test] Model loaded successfully.")
 

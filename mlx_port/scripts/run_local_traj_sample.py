@@ -37,6 +37,7 @@ from mlx_port.scripts.run_local_coc_sample import (
     _save_contact_sheet,
     _save_frames,
 )
+from mlx_port.stage_timers import quantized_flags
 from mlx_port.traj_sample_plot_utils import (
     DT_S,
     _as_xy,
@@ -309,7 +310,20 @@ def _xy_for_redraw(rec: dict, clip_id: str) -> tuple[np.ndarray, np.ndarray, np.
     return _xy_from_cached_record(filled, clip_id)
 
 
-def _html_report(results: list[dict], generated_at: str) -> str:
+def _quant_path_label(flags: dict) -> str:
+    lm = str(flags.get("lm") or "bf16")
+    if lm.startswith("affine-4"):
+        return "T3.1 W4 LM"
+    if lm == "bf16":
+        return "bf16"
+    return lm
+
+
+def _html_report(
+    results: list[dict],
+    generated_at: str,
+    run_meta: dict | None = None,
+) -> str:
     ades = [r["min_ade_m"] for r in results if r.get("min_ade_m") is not None]
     mean_ade = float(np.mean(ades)) if ades else None
     rows = []
@@ -426,12 +440,19 @@ def _html_report(results: list[dict], generated_at: str) -> str:
         )
 
     mean_txt = "—" if mean_ade is None else f"{mean_ade:.2f} m"
+    meta = run_meta or {}
+    path_label = html.escape(str(meta.get("quant_path") or _quant_path_label({})))
+    flags = meta.get("quantized") or {}
+    flag_txt = html.escape(
+        f"lm={flags.get('lm', 'bf16')} · vision={flags.get('vision', 'bf16')} · "
+        f"expert={flags.get('expert', 'bf16')}"
+    )
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Local traj sample · 5 clips · T=0.6</title>
+  <title>Local traj sample · 5 clips · T=0.6 · {path_label}</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@600&amp;display=swap');
@@ -442,6 +463,11 @@ def _html_report(results: list[dict], generated_at: str) -> str:
 <body class="bg-slate-950 text-slate-200">
   <div class="max-w-6xl mx-auto px-6 py-10">
     <h1 class="font-display text-3xl text-white mb-2">Local PAI-CoC · CoC + 1 trajectory</h1>
+    <div class="bg-slate-900 border border-cyan-800/60 rounded-2xl px-4 py-3 mb-4 text-sm">
+      <span class="text-[11px] uppercase tracking-wider text-slate-500">Load path</span>
+      <div class="font-semibold text-cyan-300 mt-0.5">{path_label}</div>
+      <div class="text-xs font-mono text-slate-400 mt-1">{flag_txt}</div>
+    </div>
     <p class="text-sm text-slate-400 mb-6">
       Same 5 clips as <a class="text-cyan-400 hover:underline" href="../coc_sample_5_t06/index.html">coc_sample_5_t06</a>
       (seed {SEED}, skip t0 &lt; 1.6 s). NVIDIA sampling: T={NVIDIA_TEMPERATURE}, top_p={NVIDIA_TOP_P},
@@ -485,13 +511,19 @@ def main() -> None:
         action="store_true",
         help="Reuse cached CoC/traj JSON and only rewrite XY/speed PNGs.",
     )
+    parser.add_argument(
+        "--quantize-lm",
+        action="store_true",
+        help="T3.1 affine-4 on the language tower. Default is dense bf16.",
+    )
     args = parser.parse_args()
     report_dir = args.report_dir
     report_dir.mkdir(parents=True, exist_ok=True)
 
     print(
         f"[traj-sample] {len(CLIP_IDS)} clips; T={NVIDIA_TEMPERATURE} "
-        f"top_p={NVIDIA_TOP_P} num_traj_samples=1 seed={SEED}"
+        f"top_p={NVIDIA_TOP_P} num_traj_samples=1 seed={SEED} "
+        f"quantize_lm={args.quantize_lm}"
     )
     for i, cid in enumerate(CLIP_IDS):
         print(f"  [{i}] {cid}")
@@ -529,7 +561,10 @@ def main() -> None:
             if model is None:
                 print("[traj-sample] loading AlpamayoR1MLX (expert on)…")
                 model = AlpamayoR1MLX.from_pretrained(
-                    str(CHECKPOINT), load_expert=True, dtype=mx.bfloat16
+                    str(CHECKPOINT),
+                    load_expert=True,
+                    dtype=mx.bfloat16,
+                    quantize_lm=args.quantize_lm,
                 )
                 processor = get_processor(model.tokenizer)
             rec = run_one_clip(model, processor, cid, clip_dir, seed=SEED + i)
@@ -544,10 +579,23 @@ def main() -> None:
         )
 
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    flags = quantized_flags()
+    run_meta = {
+        "generated_at": generated_at,
+        "quantize_lm_kwarg": bool(args.quantize_lm),
+        "quantized": flags,
+        "quant_path": _quant_path_label(flags),
+        "n_clips": len(results),
+        "temperature": NVIDIA_TEMPERATURE,
+        "top_p": NVIDIA_TOP_P,
+        "seed": SEED,
+    }
+    (report_dir / "run_meta.json").write_text(json.dumps(run_meta, indent=2) + "\n")
     (report_dir / "results.json").write_text(json.dumps(results, indent=2) + "\n")
     html_path = report_dir / "index.html"
-    html_path.write_text(_html_report(results, generated_at))
-    print(f"\n[traj-sample] wrote {html_path}")
+    html_path.write_text(_html_report(results, generated_at, run_meta))
+    print(f"\n[traj-sample] path={run_meta['quant_path']} flags={flags}")
+    print(f"[traj-sample] wrote {html_path}")
 
 
 if __name__ == "__main__":

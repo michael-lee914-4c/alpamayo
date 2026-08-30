@@ -67,3 +67,46 @@ def test_speed_from_full_path_is_not_a_chord_plateau():
     # Finite differences of a smooth accel must not sit on one mid-horizon value.
     mid = v[5:-5]
     assert float(mid.std()) > 0.05
+
+
+def test_html_report_stamps_bf16_and_t31_paths():
+    from mlx_port.scripts.run_local_traj_sample import _html_report, _quant_path_label
+
+    assert _quant_path_label({"lm": "bf16"}) == "bf16"
+    assert _quant_path_label({"lm": "affine-4-gs64"}) == "T3.1 W4 LM"
+    rec = {
+        "clip_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        "chunk": 0,
+        "split": "val",
+        "event_cluster": "test",
+        "t0_us": 0,
+        "gt_coc_texts": ["go"],
+        "pred_coc": "go",
+        "pred_coc_raw": "go",
+        "jaccard": 1.0,
+        "min_ade_m": 1.0,
+        "gt_xy": {"start": [0, 0], "end": [1, 0], "path_m": 1.0},
+        "pred_xy": {"start": [0, 0], "end": [1, 0], "path_m": 1.0},
+        "gt_speed_start_end": [1.0, 1.0],
+        "pred_speed_start_end": [1.0, 1.0],
+        "expert": [],
+        "cameras": [],
+        "image_grid": [],
+        "seed": 42,
+    }
+    page = _html_report(
+        [rec],
+        "2026-08-30 00:00 UTC",
+        {"quant_path": "bf16", "quantized": {"lm": "bf16", "vision": "bf16", "expert": "bf16"}},
+    )
+    assert "Load path" in page
+    assert "bf16" in page
+    page_q = _html_report(
+        [rec],
+        "2026-08-30 00:00 UTC",
+        {
+            "quant_path": "T3.1 W4 LM",
+            "quantized": {"lm": "affine-4-gs64", "vision": "bf16", "expert": "bf16"},
+        },
+    )
+    assert "T3.1 W4 LM" in page_q
