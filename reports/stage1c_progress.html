@@ -179,7 +179,7 @@
                     <li>mlx_port/stage_timers.py — set_compiled / compiled_flags</li>
                     <li>mlx_port/tests/test_compiled_backbone.py — eager match, KV fill, idempotent install</li>
                 </ul>
-                <div class="text-[11px] uppercase tracking-wider text-slate-500">P2f (this increment)</div>
+                <div class="text-[11px] uppercase tracking-wider text-slate-500">P2f (merged #11)</div>
                 <ul class="text-xs space-y-1 font-mono">
                     <li>mlx_port/processor.py — bind_image_pixel_budget, smart_resize_hw, get_processor binds after load</li>
                     <li>mlx_port/tests/test_pixel_budget.py — 1080p → 20×36; 16-frame prefix not ~32k</li>
@@ -562,17 +562,17 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                                 <td class="px-2 py-2">Train-config YAML: 1 traj, FM 4–6, CoT cap 32–64 or 0. Not 4-bit.</td>
                                 <td class="px-2 py-2 text-slate-500">open (Bar B)</td>
                             </tr>
-                            <tr>
+                            <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono text-sky-300">P2e</td>
                                 <td class="px-2 py-2 font-mono">stage1c-p2-compile-prefill</td>
                                 <td class="px-2 py-2"><code>mx.compile</code> each decoder layer for prefill (<code>seq_len &gt; 1</code>). Re-time.</td>
-                                <td class="px-2 py-2 text-slate-500">measured · no prefill win</td>
+                                <td class="px-2 py-2 text-emerald-400">merged (#11) · no prefill win</td>
                             </tr>
                             <tr>
                                 <td class="px-2 py-2 font-mono text-sky-300">P2f</td>
                                 <td class="px-2 py-2 font-mono">stage1c-p2-compile-prefill</td>
                                 <td class="px-2 py-2">Bind NVIDIA pixel budget so 1080p downsamples. Re-time greedy e2e.</td>
-                                <td class="px-2 py-2 text-sky-400">measured · 16× prefill</td>
+                                <td class="px-2 py-2 text-emerald-400">merged (#11) · 16× prefill</td>
                             </tr>
                         </tbody>
                     </table>
