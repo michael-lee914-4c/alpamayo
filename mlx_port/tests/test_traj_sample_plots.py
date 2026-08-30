@@ -86,3 +86,13 @@ def test_html_report_stamps_bf16_and_t31_paths():
     )
     assert t31["quant_path"] == "T3.1 W4 LM"
     assert "lm=affine-4-gs64" in t31["flag_txt"]
+    all4 = load_path_stamp(
+        {
+            "quantized": {
+                "lm": "affine-4-gs64",
+                "vision": "affine-4-gs64",
+                "expert": "affine-4-gs64",
+            }
+        }
+    )
+    assert all4["quant_path"] == "all4 W4 VLM+expert"

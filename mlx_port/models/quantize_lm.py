@@ -4,10 +4,9 @@ Vision, expert, ``lm_head``, and embeddings stay dense bf16. Do not pass the
 full ``AlpamayoR1MLX`` or the VLM (with ``vision_tower``) into
 ``quantize_language_tower`` — raise instead of walking them.
 
-Two load paths stay in code: dense bf16 (default) and T3.1 (opt-in).
-The prefill quant chase (VLM W8/W4, all4, nvfp4) is closed. Those walks
-are not in this module. ``ALPAMAYO_QUANT`` may only be unset, ``none``
-(bf16), or ``lm4`` (T3.1).
+Kept load paths: dense bf16 (default), T3.1 (``lm4``), and all4 (VLM +
+expert; see ``quantize_all.py``). ``ALPAMAYO_QUANT`` may be unset,
+``none``, ``lm4``, or ``all4``. Other values raise.
 """
 
 from __future__ import annotations
@@ -54,21 +53,36 @@ def mark_language_tower_dense() -> None:
     print("[QUANT] language tower dense bf16")
 
 
-def lm_quant_enabled(quantize_lm: bool) -> bool:
-    """T3.1 on/off. Unset follows the kwarg (default False = bf16).
-    ``ALPAMAYO_QUANT=none|lm4`` overrides the kwarg.
+def resolve_quant_mode(
+    quantize_lm: bool = False, quantize_all: bool = False
+) -> str:
+    """Return ``none``, ``lm4``, or ``all4``. Env overrides kwargs.
+
+    ``ALPAMAYO_QUANT=none|lm4|all4``. Any other value raises.
+    ``quantize_lm`` and ``quantize_all`` are exclusive when env is unset.
     """
     env = os.environ.get(QUANT_MODE_ENV, "").strip().lower()
     if env:
         if env == "none":
-            return False
-        if env == "lm4":
-            return True
+            return "none"
+        if env in ("lm4", "all4"):
+            return env
         raise ValueError(
             f"{QUANT_MODE_ENV}={env!r} is not supported. "
-            "The prefill quant chase is closed. Use unset / lm4 (T3.1) or none."
+            "Use unset / none (bf16), lm4 (T3.1), or all4 (VLM+expert)."
         )
-    return bool(quantize_lm)
+    if quantize_lm and quantize_all:
+        raise ValueError("quantize_lm and quantize_all are exclusive")
+    if quantize_all:
+        return "all4"
+    if quantize_lm:
+        return "lm4"
+    return "none"
+
+
+def lm_quant_enabled(quantize_lm: bool) -> bool:
+    """T3.1 on/off. Unset follows the kwarg (default False = bf16)."""
+    return resolve_quant_mode(quantize_lm=quantize_lm) == "lm4"
 
 
 def keep_dense(path: str) -> bool:

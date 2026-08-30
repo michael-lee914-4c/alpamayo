@@ -66,8 +66,8 @@ Entry: `sample_trajectories_from_data_with_vlm_rollout` in `mlx_port/inference.p
 
 | Piece | Dtype |
 |---|---|
-| VLM / vision / backbone weights | `mx.bfloat16` load. Default path stays dense (`quantize_lm=False` / unset / `ALPAMAYO_QUANT=none`). Opt-in T3.1: `quantize_lm=True` or `ALPAMAYO_QUANT=lm4` uses `{alpamayo}/mlx_lm4/language_model.safetensors` (6.02 GiB, 252 QuantizedLinear) when present; otherwise live-packs and saves there. `lm_head` + `embed_tokens` stay bf16 in the packed file. Vision / expert stay bf16. The VLM-W8/W4 / all4 / nvfp4 walks were probes and are gone. |
-| Expert weights | `mx.bfloat16` (same load; never 4-bit in T3.1) |
+| VLM / vision / backbone weights | `mx.bfloat16` load. Default path stays dense (`quantize_lm=False` / unset / `ALPAMAYO_QUANT=none`). Opt-in T3.1: `quantize_lm=True` or `ALPAMAYO_QUANT=lm4` uses `{alpamayo}/mlx_lm4/language_model.safetensors` (6.02 GiB, 252 QuantizedLinear). Opt-in all4: `quantize_all=True` or `ALPAMAYO_QUANT=all4` uses `{alpamayo}/mlx_all4/` (`vlm.safetensors` 4.79 GiB + `expert.safetensors` 1.19 GiB). Exclusive. `vlm8|vlm4|nvfp4` raise. |
+| Expert weights | `mx.bfloat16` on the default and T3.1 paths. all4 packs the diffusion expert (252 QuantizedLinear). Action-in/out stay bf16. |
 | `action_in_proj` hot path | **casts `x` and `t` to float32** (`action_in_proj_mlx.py`) then LayerNorm → expert bf16 |
 | `action_out_proj` | follows expert hidden (bf16) |
 | Logits / nucleus | float32 on host |
@@ -129,6 +129,25 @@ Decode W4 is the only real speed signal (−160 ms). Metal peak drops ~10 GB onc
 Path check 2026-08-30 03:58 / 04:00 UTC (current code, `--no-reuse`): dense bf16 default and T3.1 opt-in both complete. Reports `traj_sample_5_t06_bf16/` · `traj_sample_5_t06_t31/` · side-by-side `traj_sample_5_t06_bf16_vs_t31/`. Mean minADE 4.56 / 4.24 m. CoC same on clips 2–4. Load logs: `[QUANT] language tower dense bf16` vs `252 QuantizedLinear`.
 
 5-clip T3.1 disk sanity 2026-08-30 04:18 UTC (`ALPAMAYO_QUANT=lm4 --quantize-lm --no-reuse`, `reports/traj_sample_5_t06_t31_disk/`): skipped 399 language keys, loaded 252 QuantizedLinear from `mlx_lm4/`. Mean minADE 4.24 m. CoC and ADE match live-pack `traj_sample_5_t06_t31` to many decimals. Wall 96.9 s. Signed `traj_sample_5_t06/` left untouched.
+
+Packed all4 (2026-08-30, `stage1c-p3-all4-disk`): `{alpamayo}/mlx_all4/` — VLM 342 QuantizedLinear + 2 QuantizedEmbedding (27 vision `linear_fc2` listed dense, in=4304 ≉ 64) 4.79 GiB; expert 252 QuantizedLinear 1.19 GiB. Incomplete trio raises. Disk load still pulls Alpamayo `patch_embed` so Conv3D is channels-first before `load_weights`. Greedy e2e (`ALPAMAYO_QUANT=all4`): 28.15 s · encode 1116 · prefill 3821 · decode 280 / 13 · FM 487 · CoC pin held · minADE 5.217 m · Metal 9.66 GB · RSS 27.67 GB. Prefill still not below P2f 3645. 5-clip T=0.6 (`reports/traj_sample_5_t06_all4_disk/`): mean minADE 3.18 m · 122.4 s wall. T=0.6 is not a quality ranking.
+
+### all4 vs T3.1 leaves
+
+Weight-only affine-4 gs64. Pack axis = Linear / Embedding last dim. Activations stay bf16. Walks are `vlm` then `expert` — never `AlpamayoR1MLX`. Any packable Linear left dense raises.
+
+| Piece | T3.1 `lm4` | all4 |
+|---|---|---|
+| Language decoder `q/k/v/o` + `gate/up/down` (36×7=252) | 4-bit | 4-bit |
+| `lm_head` + `embed_tokens` (vocab 155697) | bf16 | 4-bit |
+| Vision `attn.qkv` / `proj` / `linear_fc1` (27 each) | bf16 | 4-bit |
+| Vision `mlp.linear_fc2` (27×, in=4304) | bf16 | **bf16** (`4304 % 64 = 16`, listed) |
+| Vision merger + 3 deepstack `fc1`/`fc2` (in=4608) | bf16 | 4-bit |
+| Vision `pos_embed` | bf16 | QuantizedEmbedding |
+| Conv3D `patch_embed.proj`, all RMS/LayerNorms | bf16 | bf16 (no `to_quantized`) |
+| Expert decoder 36×7 (hidden 2048 / MLP 8256) | bf16 | 4-bit (all last dims ÷64) |
+| `action_in_proj` / `action_out_proj` | bf16 (Fourier `freqs` fp32) | same — siblings, not in the walker |
+| `FlowMatching`, history tokenizer | no GEMM | no GEMM |
 
 ## Train vs infer (for later T2.4 / T4.3)
 

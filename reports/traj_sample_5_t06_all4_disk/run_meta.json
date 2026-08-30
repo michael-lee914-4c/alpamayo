@@ -1,0 +1,15 @@
+{
+  "generated_at": "2026-08-30 20:29 UTC",
+  "quantize_lm_kwarg": false,
+  "quantize_all_kwarg": true,
+  "quantized": {
+    "lm": "affine-4-gs64",
+    "vision": "affine-4-gs64",
+    "expert": "affine-4-gs64"
+  },
+  "quant_path": "all4 W4 VLM+expert",
+  "n_clips": 5,
+  "temperature": 0.6,
+  "top_p": 0.98,
+  "seed": 42
+}

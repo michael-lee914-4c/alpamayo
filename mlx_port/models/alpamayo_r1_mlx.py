@@ -515,7 +515,9 @@ class AlpamayoR1MLX(nn.Module):
         load_expert: bool = True,
         dtype: mx.Dtype = mx.bfloat16,
         quantize_lm: bool = False,
+        quantize_all: bool = False,
         lm4_path: str | None = None,
+        all4_path: str | None = None,
     ) -> "AlpamayoR1MLX":
         """Custom from_pretrained mirroring NVIDIA AlpamayoR1.__init__.
 
@@ -523,18 +525,23 @@ class AlpamayoR1MLX(nn.Module):
             alpamayo_path: Path to the Alpamayo-R1-10B checkpoint (for expert weights).
             vlm_model_path: Path to the base Qwen3-VL-8B-Instruct checkpoint.
                             Defaults to the local copy used throughout the port.
-            load_expert: Load the 2.3B action expert (stays dense bf16).
+            load_expert: Load the 2.3B action expert. Required when
+                         ``quantize_all`` is on.
             dtype: Weight dtype for load (bf16). Language-tower Linears stay
-                   dense unless ``quantize_lm`` is True.
+                   dense unless ``quantize_lm`` or ``quantize_all`` is True.
             quantize_lm: T3.1 Recipe A. Default False (signed P2f bf16 path).
                          Set True (or ``ALPAMAYO_QUANT=lm4``) to pack decoder
                          Linears affine-4. Vision / expert / lm_head /
-                         embeddings stay dense either way.
-                         ``ALPAMAYO_QUANT=none|lm4`` overrides this kwarg.
-                         Packed weights load from ``{alpamayo_path}/mlx_lm4``
-                         when present; otherwise live-pack and save there.
+                         embeddings stay dense on this path.
+                         Exclusive with ``quantize_all``.
+            quantize_all: Affine-4 the full VLM and the diffusion expert.
+                          Action-in/out stay bf16. ``ALPAMAYO_QUANT=all4``
+                          also selects this path. Packed weights load from
+                          ``{alpamayo_path}/mlx_all4`` when present.
             lm4_path: Override packed-LM directory. ``ALPAMAYO_LM4_DIR`` also
                       overrides the default.
+            all4_path: Override packed VLM+expert directory.
+                       ``ALPAMAYO_ALL4_DIR`` also overrides the default.
         """
         from mlx_port.vlm_loader import LOCAL_QWEN_PROCESSOR_PATH
 
@@ -561,22 +568,39 @@ class AlpamayoR1MLX(nn.Module):
         from mlx_port.models.quantize_lm import (
             apply_language_tower_quant,
             lm4_checkpoint_ready,
-            lm_quant_enabled,
             mark_language_tower_dense,
             resolve_lm4_dir,
+            resolve_quant_mode,
+        )
+        from mlx_port.models.quantize_all import (
+            all4_checkpoint_ready,
+            apply_expert_all4,
+            apply_vlm_all4,
+            resolve_all4_dir,
         )
 
-        want_lm4 = lm_quant_enabled(quantize_lm)
-        dest_lm4 = resolve_lm4_dir(alpamayo_path, lm4_path) if want_lm4 else None
+        quant_mode = resolve_quant_mode(
+            quantize_lm=quantize_lm, quantize_all=quantize_all
+        )
+        dest_lm4 = resolve_lm4_dir(alpamayo_path, lm4_path) if quant_mode == "lm4" else None
+        dest_all4 = (
+            resolve_all4_dir(alpamayo_path, all4_path) if quant_mode == "all4" else None
+        )
         have_lm4 = bool(dest_lm4) and lm4_checkpoint_ready(dest_lm4)
+        have_all4 = bool(dest_all4) and all4_checkpoint_ready(dest_all4)
+        if quant_mode == "all4" and not load_expert:
+            raise ValueError("quantize_all requires load_expert=True")
 
         # 1.5 Load the fine-tuned VLM weights from the Alpamayo checkpoint safetensors.
         # This replaces the base-Qwen weights with Alpamayo's learned CoC / driving weights
         # (including proper embeddings for <|cot_start|>, <|traj_future_start|>, and <iN> tokens).
-        # When a packed T3.1 language tower is on disk, skip Alpamayo language /
-        # lm_head keys — those come from mlx_lm4/.
+        # Packed T3.1 skips language / lm_head. Packed all4 skips the whole VLM.
         cls._load_vlm_weights(
-            vlm, alpamayo_path, dtype=dtype, skip_language=have_lm4
+            vlm,
+            alpamayo_path,
+            dtype=dtype,
+            skip_language=have_lm4,
+            skip_vlm=have_all4,
         )
 
         # ------------------------------------------------------------------
@@ -606,8 +630,11 @@ class AlpamayoR1MLX(nn.Module):
         print("[AlpamayoR1MLX] Instantiated AlpamayoLanguageModel and AlpamayoModel via from_existing")
 
         # After compile wrap, before first forward. Expert is not on ``vlm``.
-        if want_lm4:
+        all4_vlm_summary: dict | None = None
+        if quant_mode == "lm4":
             apply_language_tower_quant(vlm.language_model, dest_lm4)
+        elif quant_mode == "all4":
+            all4_vlm_summary = apply_vlm_all4(vlm, dest_all4)
         else:
             mark_language_tower_dense()
 
@@ -686,7 +713,11 @@ class AlpamayoR1MLX(nn.Module):
 
         # 5. Load all weights
         if load_expert:
-            cls._load_expert_and_action_weights(model, alpamayo_path, dtype=dtype)
+            cls._load_expert_and_action_weights(
+                model, alpamayo_path, dtype=dtype, skip_expert=have_all4
+            )
+            if quant_mode == "all4":
+                apply_expert_all4(model.expert, dest_all4, all4_vlm_summary or {})
 
         # 6. Attach token fusion attributes from the processor (Row 6)
         tokenizer = processor.tokenizer
@@ -748,6 +779,7 @@ class AlpamayoR1MLX(nn.Module):
         alpamayo_path: str,
         dtype: mx.Dtype = mx.bfloat16,
         skip_language: bool = False,
+        skip_vlm: bool = False,
     ) -> None:
         """Load all vlm.* weights from the Alpamayo checkpoint into the given mlx_vlm model.
 
@@ -771,6 +803,7 @@ class AlpamayoR1MLX(nn.Module):
         total_vlm_keys = 0
         loaded = 0
         skipped_language = 0
+        skipped_vlm = 0
 
         def _get_nested(obj, parts):
             """Navigate through attributes and list indices."""
@@ -815,6 +848,14 @@ class AlpamayoR1MLX(nn.Module):
                         continue
                     total_vlm_keys += 1
                     suffix = key[4:]
+                    if skip_vlm:
+                        # Packed vlm.safetensors was saved after AlpamayoPatchEmbed
+                        # swap (channels-first Conv3D). Base Qwen proj is still
+                        # channels-last; load that leaf from Alpamayo so the wrap
+                        # and packed load share the same shape.
+                        if not suffix.startswith("model.visual.patch_embed"):
+                            skipped_vlm += 1
+                            continue
 
                     new_key = None
                     if suffix.startswith("model.language_model.") or suffix.startswith(
@@ -848,11 +889,13 @@ class AlpamayoR1MLX(nn.Module):
                     if _assign(arr, new_key):
                         loaded += 1
 
-        skip_note = (
-            f", skipped {skipped_language} language keys (packed LM on disk)"
-            if skip_language
-            else ""
-        )
+        skip_note = ""
+        if skip_vlm:
+            skip_note = f", skipped {skipped_vlm} VLM keys (packed all4 on disk)"
+        elif skip_language:
+            skip_note = (
+                f", skipped {skipped_language} language keys (packed LM on disk)"
+            )
         print(
             f"[AlpamayoR1MLX] Loaded {loaded}/{total_vlm_keys} VLM weights "
             f"from Alpamayo checkpoint (fine-tuned CoC + vision head){skip_note}"
@@ -863,6 +906,7 @@ class AlpamayoR1MLX(nn.Module):
         model: "AlpamayoR1MLX",
         alpamayo_path: str,
         dtype: mx.Dtype = mx.bfloat16,
+        skip_expert: bool = False,
     ) -> None:
         """Load expert + action projection weights from safetensors.
 
@@ -881,11 +925,15 @@ class AlpamayoR1MLX(nn.Module):
             )
 
         state_dict = {}
+        skipped_expert = 0
         for shard in shard_files:
             # torch.load on safetensors via the safetensors.torch helper or plain torch
             # For .safetensors we use safe_open with framework="pt" (torch) which works reliably.
             with safe_open(shard, framework="pt") as f:
                 for key in f.keys():
+                    if skip_expert and key.startswith("expert."):
+                        skipped_expert += 1
+                        continue
                     if key.startswith(("expert.", "action_in_proj.", "action_out_proj.")):
                         t = f.get_tensor(key)  # torch.Tensor (possibly bfloat16)
                         # Torch CPU builds often cannot .numpy() bfloat16 directly.
@@ -919,7 +967,15 @@ class AlpamayoR1MLX(nn.Module):
                 remapped.append((new_k, v))
 
         model.load_weights(remapped, strict=False)
-        print(f"[AlpamayoR1MLX] Loaded {len(remapped)} weights from Alpamayo-R1-10B checkpoint")
+        skip_note = (
+            f", skipped {skipped_expert} expert keys (packed all4 on disk)"
+            if skip_expert
+            else ""
+        )
+        print(
+            f"[AlpamayoR1MLX] Loaded {len(remapped)} weights from "
+            f"Alpamayo-R1-10B checkpoint{skip_note}"
+        )
 
     def fuse_traj_tokens(self, input_ids: mx.array, traj_data: dict[str, Any] | None = None) -> mx.array:
         """Fuse history trajectory tokens into the input sequence.
