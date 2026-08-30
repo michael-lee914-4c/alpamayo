@@ -31,6 +31,12 @@ _COMPILED_DEFAULT = {
     "fm": False,
 }
 _compiled = dict(_COMPILED_DEFAULT)
+_QUANT_DEFAULT = {
+    "lm": "bf16",
+    "vision": "bf16",
+    "expert": "bf16",
+}
+_quantized = dict(_QUANT_DEFAULT)
 
 
 def set_compiled(stage: str, enabled: bool) -> None:
@@ -45,6 +51,22 @@ def reset_compiled() -> None:
 
 def compiled_flags() -> dict:
     return dict(_compiled)
+
+
+def set_quantized(part: str, spec: str) -> None:
+    if part not in _quantized:
+        raise ValueError(f"unknown quant part {part!r}")
+    if not spec:
+        raise ValueError("set_quantized requires a non-empty spec")
+    _quantized[part] = str(spec)
+
+
+def reset_quantized() -> None:
+    _quantized.update(_QUANT_DEFAULT)
+
+
+def quantized_flags() -> dict:
+    return dict(_quantized)
 
 
 def is_stage_timers_enabled() -> bool:
@@ -117,6 +139,7 @@ class StageClock:
             "total_ms": round(sum(stages.values()), 1),
             "dominant_stage": dominant,
             "compiled": compiled_flags(),
+            "quantized": quantized_flags(),
             "dtype": "bfloat16",
         }
 

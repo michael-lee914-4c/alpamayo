@@ -30,6 +30,7 @@ def test_load_expert_weights_successfully():
         CHECKPOINT_PATH,
         load_expert=True,
         dtype=mx.bfloat16,
+        quantize_lm=False,
     )
     print("[Expert Weight Loading Test] Model loaded successfully.")
 

@@ -7,6 +7,8 @@ from mlx_port.traj_sample_plot_utils import (
     _require_full_xy,
     _speed_mps,
     _xy_for_redraw,
+    load_path_stamp,
+    quant_path_label,
 )
 
 
@@ -67,3 +69,20 @@ def test_speed_from_full_path_is_not_a_chord_plateau():
     # Finite differences of a smooth accel must not sit on one mid-horizon value.
     mid = v[5:-5]
     assert float(mid.std()) > 0.05
+
+
+def test_html_report_stamps_bf16_and_t31_paths():
+    assert quant_path_label({"lm": "bf16"}) == "bf16"
+    assert quant_path_label({"lm": "affine-4-gs64"}) == "T3.1 W4 LM"
+    bf16 = load_path_stamp(
+        {"quant_path": "bf16", "quantized": {"lm": "bf16", "vision": "bf16", "expert": "bf16"}}
+    )
+    assert bf16["quant_path"] == "bf16"
+    assert "lm=bf16" in bf16["flag_txt"]
+    t31 = load_path_stamp(
+        {
+            "quantized": {"lm": "affine-4-gs64", "vision": "bf16", "expert": "bf16"},
+        }
+    )
+    assert t31["quant_path"] == "T3.1 W4 LM"
+    assert "lm=affine-4-gs64" in t31["flag_txt"]

@@ -225,8 +225,8 @@ reports/coc_sample_5/**/*.jpg
 reports/coc_sample_5/**/*.png
 reports/coc_sample_5_t06/**/*.jpg
 reports/coc_sample_5_t06/**/*.png
-reports/traj_sample_5_t06/**/*.jpg
-reports/traj_sample_5_t06/**/*.png
+reports/traj_sample_5_t06*/**/*.jpg
+reports/traj_sample_5_t06*/**/*.png
 reports/stage1_raw_16/
 reports/stage1_raw_16_grid.jpg
 reports/stage1_single_image_front_wide.png

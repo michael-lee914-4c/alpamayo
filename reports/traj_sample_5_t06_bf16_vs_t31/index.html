@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>5-clip path check · bf16 vs T3.1</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@600&amp;display=swap');
+    body { font-family: Inter, system-ui, sans-serif; }
+    .font-display { font-family: 'Space Grotesk', Inter, sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-200">
+  <div class="max-w-6xl mx-auto px-6 py-10">
+    <h1 class="font-display text-3xl text-white mb-2">5-clip path check · bf16 vs T3.1</h1>
+    <p class="text-sm text-slate-400 mb-4">
+      Same clips, seeds, T=0.6, top_p=0.98, P2f budget (3006 tokens, 16×[1,20,36]).
+      Both loads completed. CoC at T=0.6 is not a quality ranking.
+      Full plots:
+      <a class="text-cyan-400 hover:underline" href="../traj_sample_5_t06_bf16/index.html">bf16</a>
+      ·
+      <a class="text-cyan-400 hover:underline" href="../traj_sample_5_t06_t31/index.html">T3.1 W4 LM</a>.
+    </p>
+    <div class="grid md:grid-cols-2 gap-4 mb-8">
+      <div class="bg-slate-900 border border-slate-700 rounded-2xl p-4">
+        <div class="text-[11px] uppercase tracking-wider text-slate-500">bf16 default</div>
+        <div class="font-semibold text-cyan-300 mt-1">bf16</div>
+        <div class="text-xs font-mono text-slate-400 mt-1">lm=bf16 · vision=bf16 · expert=bf16</div>
+        <div class="text-sm mt-2">mean minADE <span class="text-amber-300 font-semibold">4.56 m</span> · 2026-08-30 03:58 UTC</div>
+      </div>
+      <div class="bg-slate-900 border border-slate-700 rounded-2xl p-4">
+        <div class="text-[11px] uppercase tracking-wider text-slate-500">T3.1 opt-in</div>
+        <div class="font-semibold text-cyan-300 mt-1">T3.1 W4 LM</div>
+        <div class="text-xs font-mono text-slate-400 mt-1">lm=affine-4-gs64 · vision=bf16 · expert=bf16</div>
+        <div class="text-sm mt-2">mean minADE <span class="text-amber-300 font-semibold">4.24 m</span> · 2026-08-30 04:00 UTC</div>
+      </div>
+    </div>
+    <div class="overflow-auto bg-slate-900 border border-slate-700 rounded-2xl mb-10">
+      <table class="w-full text-left text-sm">
+        <thead class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
+          <tr>
+            <th class="px-3 py-2">#</th><th class="px-3 py-2">Clip</th><th class="px-3 py-2">Cluster</th>
+            <th class="px-3 py-2">bf16 ADE</th><th class="px-3 py-2">T3.1 ADE</th>
+            <th class="px-3 py-2">CoC</th><th class="px-3 py-2">GT</th>
+          </tr>
+        </thead>
+        <tbody><tr class="border-b border-slate-800/80">
+      <td class="px-3 py-2 text-slate-400">0</td>
+      <td class="px-3 py-2 font-mono text-[11px]">faff17c7…</td>
+      <td class="px-3 py-2 text-xs">WORK_ZONES_TEMP_TRAFFIC_CONTROL</td>
+      <td class="px-3 py-2 text-xs tabular-nums text-amber-300">4.77</td>
+      <td class="px-3 py-2 text-xs tabular-nums text-sky-300">4.63</td>
+      <td class="px-3 py-2 text-xs text-slate-400">CoC differs</td>
+      <td class="px-3 py-2 text-xs text-slate-300">Turn left while keeping a safe distance from the construction cones on the right.</td>
+    </tr><tr class="border-b border-slate-800/80">
+      <td class="px-3 py-2 text-slate-400">1</td>
+      <td class="px-3 py-2 font-mono text-[11px]">8e83f069…</td>
+      <td class="px-3 py-2 text-xs">PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY</td>
+      <td class="px-3 py-2 text-xs tabular-nums text-amber-300">4.72</td>
+      <td class="px-3 py-2 text-xs tabular-nums text-sky-300">2.81</td>
+      <td class="px-3 py-2 text-xs text-slate-400">CoC differs</td>
+      <td class="px-3 py-2 text-xs text-slate-300">Decelerate to maintain a safe distance from the pedestrians crossing the street.</td>
+    </tr><tr class="border-b border-slate-800/80">
+      <td class="px-3 py-2 text-slate-400">2</td>
+      <td class="px-3 py-2 font-mono text-[11px]">1946f1c3…</td>
+      <td class="px-3 py-2 text-xs">PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY</td>
+      <td class="px-3 py-2 text-xs tabular-nums text-amber-300">3.87</td>
+      <td class="px-3 py-2 text-xs tabular-nums text-sky-300">4.06</td>
+      <td class="px-3 py-2 text-xs text-slate-400">same CoC</td>
+      <td class="px-3 py-2 text-xs text-slate-300">Yield to the pedestrian crossing the road.</td>
+    </tr><tr class="border-b border-slate-800/80">
+      <td class="px-3 py-2 text-slate-400">3</td>
+      <td class="px-3 py-2 font-mono text-[11px]">8e06f83c…</td>
+      <td class="px-3 py-2 text-xs">PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY</td>
+      <td class="px-3 py-2 text-xs tabular-nums text-amber-300">5.77</td>
+      <td class="px-3 py-2 text-xs tabular-nums text-sky-300">5.93</td>
+      <td class="px-3 py-2 text-xs text-slate-400">same CoC</td>
+      <td class="px-3 py-2 text-xs text-slate-300">Yield to the pedestrians crossing the road.</td>
+    </tr><tr class="border-b border-slate-800/80">
+      <td class="px-3 py-2 text-slate-400">4</td>
+      <td class="px-3 py-2 font-mono text-[11px]">36cb5485…</td>
+      <td class="px-3 py-2 text-xs">ANIMALS_BIRDS_ROADKILL</td>
+      <td class="px-3 py-2 text-xs tabular-nums text-amber-300">3.68</td>
+      <td class="px-3 py-2 text-xs tabular-nums text-sky-300">3.77</td>
+      <td class="px-3 py-2 text-xs text-slate-400">same CoC</td>
+      <td class="px-3 py-2 text-xs text-slate-300">Stop for the stop sign while waiting for pedestrians to cross the street.</td>
+    </tr></tbody>
+      </table>
+    </div>
+    <section class="bg-slate-900 border border-slate-700 rounded-3xl p-6 mb-6">
+      <div class="font-display text-xl text-white mb-3">Clip 0 · <span class="font-mono text-sm text-cyan-300">faff17c7-4572-472a-be28-0f035bb88a37</span></div>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+          <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-2">bf16 · minADE 4.773 m</div>
+          <p class="text-sm text-amber-100">Nudge to the left to increase clearance from the work zone trucks and cones on the right.</p>
+          <p class="mt-2 text-[11px] font-mono text-slate-500">end [58.6929, 37.266]</p>
+        </div>
+        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+          <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-2">T3.1 W4 LM · minADE 4.633 m</div>
+          <p class="text-sm text-amber-100">Nudge to the left to increase clearance from the work zone cones on the right.</p>
+          <p class="mt-2 text-[11px] font-mono text-slate-500">end [57.7181, 33.1622]</p>
+        </div>
+      </div>
+      <p class="mt-3 text-xs text-slate-400">GT: Turn left while keeping a safe distance from the construction cones on the right.</p>
+    </section><section class="bg-slate-900 border border-slate-700 rounded-3xl p-6 mb-6">
+      <div class="font-display text-xl text-white mb-3">Clip 1 · <span class="font-mono text-sm text-cyan-300">8e83f069-5fc5-4329-8589-4527de19d03e</span></div>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+          <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-2">bf16 · minADE 4.719 m</div>
+          <p class="text-sm text-amber-100">Slow down to yield to the pedestrian in the crosswalk ahead.</p>
+          <p class="mt-2 text-[11px] font-mono text-slate-500">end [39.3244, -0.9033]</p>
+        </div>
+        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+          <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-2">T3.1 W4 LM · minADE 2.810 m</div>
+          <p class="text-sm text-amber-100">Stop to yield to the pedestrians in the crosswalk ahead.</p>
+          <p class="mt-2 text-[11px] font-mono text-slate-500">end [32.065, -0.4707]</p>
+        </div>
+      </div>
+      <p class="mt-3 text-xs text-slate-400">GT: Decelerate to maintain a safe distance from the pedestrians crossing the street.</p>
+    </section><section class="bg-slate-900 border border-slate-700 rounded-3xl p-6 mb-6">
+      <div class="font-display text-xl text-white mb-3">Clip 2 · <span class="font-mono text-sm text-cyan-300">1946f1c3-8638-4648-8944-506e6bffc4df</span></div>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+          <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-2">bf16 · minADE 3.869 m</div>
+          <p class="text-sm text-amber-100">Stop to yield to the pedestrian in the crosswalk.</p>
+          <p class="mt-2 text-[11px] font-mono text-slate-500">end [20.6987, -0.0105]</p>
+        </div>
+        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+          <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-2">T3.1 W4 LM · minADE 4.055 m</div>
+          <p class="text-sm text-amber-100">Stop to yield to the pedestrian in the crosswalk.</p>
+          <p class="mt-2 text-[11px] font-mono text-slate-500">end [21.1789, -0.0384]</p>
+        </div>
+      </div>
+      <p class="mt-3 text-xs text-slate-400">GT: Yield to the pedestrian crossing the road.</p>
+    </section><section class="bg-slate-900 border border-slate-700 rounded-3xl p-6 mb-6">
+      <div class="font-display text-xl text-white mb-3">Clip 3 · <span class="font-mono text-sm text-cyan-300">8e06f83c-4de6-4cde-82ab-4a747645f80a</span></div>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+          <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-2">bf16 · minADE 5.772 m</div>
+          <p class="text-sm text-amber-100">Yield to the pedestrian crossing the road</p>
+          <p class="mt-2 text-[11px] font-mono text-slate-500">end [22.661, -0.1538]</p>
+        </div>
+        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+          <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-2">T3.1 W4 LM · minADE 5.930 m</div>
+          <p class="text-sm text-amber-100">Yield to the pedestrian crossing the road</p>
+          <p class="mt-2 text-[11px] font-mono text-slate-500">end [23.0165, -0.1869]</p>
+        </div>
+      </div>
+      <p class="mt-3 text-xs text-slate-400">GT: Yield to the pedestrians crossing the road.</p>
+    </section><section class="bg-slate-900 border border-slate-700 rounded-3xl p-6 mb-6">
+      <div class="font-display text-xl text-white mb-3">Clip 4 · <span class="font-mono text-sm text-cyan-300">36cb5485-5c56-48c5-8219-90095851d627</span></div>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+          <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-2">bf16 · minADE 3.675 m</div>
+          <p class="text-sm text-amber-100">Stop to yield to the pedestrians in the crosswalk.</p>
+          <p class="mt-2 text-[11px] font-mono text-slate-500">end [28.6008, 0.1362]</p>
+        </div>
+        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+          <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-2">T3.1 W4 LM · minADE 3.770 m</div>
+          <p class="text-sm text-amber-100">Stop to yield to the pedestrians in the crosswalk.</p>
+          <p class="mt-2 text-[11px] font-mono text-slate-500">end [28.8889, 0.1595]</p>
+        </div>
+      </div>
+      <p class="mt-3 text-xs text-slate-400">GT: Stop for the stop sign while waiting for pedestrians to cross the street.</p>
+    </section>
+  </div>
+</body>
+</html>

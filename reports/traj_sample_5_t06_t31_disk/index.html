@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Local traj sample · 5 clips · T=0.6 · T3.1 W4 LM</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@600&amp;display=swap');
+    body { font-family: Inter, system-ui, sans-serif; }
+    .font-display { font-family: 'Space Grotesk', Inter, sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-200">
+  <div class="max-w-6xl mx-auto px-6 py-10">
+    <h1 class="font-display text-3xl text-white mb-2">Local PAI-CoC · CoC + 1 trajectory</h1>
+    <div class="bg-slate-900 border border-cyan-800/60 rounded-2xl px-4 py-3 mb-4 text-sm">
+      <span class="text-[11px] uppercase tracking-wider text-slate-500">Load path</span>
+      <div class="font-semibold text-cyan-300 mt-0.5">T3.1 W4 LM</div>
+      <div class="text-xs font-mono text-slate-400 mt-1">lm=affine-4-gs64 · vision=bf16 · expert=bf16</div>
+    </div>
+    <p class="text-sm text-slate-400 mb-6">
+      Same 5 clips as <a class="text-cyan-400 hover:underline" href="../coc_sample_5_t06/index.html">coc_sample_5_t06</a>
+      (seed 42, skip t0 &lt; 1.6 s). NVIDIA sampling: T=0.6, top_p=0.98,
+      1 independent CoC + 1 expert trajectory per clip. Jaccard is cheap word overlap — read the sentences.
+      After <code>dxy_theta_to_v_without_v0</code> t0. Plots use the generated 64-waypoint pred
+      (<code>pred_xy_full</code>), vehicle frame x+ forward ↑ / y+ left ←.
+      Stage 1b is <a class="text-cyan-400 hover:underline" href="../stage1b_progress.html">closed</a>
+      (wiring). P2f binds NVIDIA pixel budget (<code>163840–196608</code>, grid
+      <code>20×36</code>). Generated 2026-08-30 04:18 UTC. Mean minADE: 4.24 m.
+    </p>
+    <div class="overflow-auto bg-slate-900 border border-slate-700 rounded-2xl mb-10">
+      <table class="w-full text-left text-sm">
+        <thead class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
+          <tr>
+            <th class="px-3 py-2">#</th><th class="px-3 py-2">Clip</th><th class="px-3 py-2">Cluster</th>
+            <th class="px-3 py-2">minADE</th><th class="px-3 py-2">XY end</th>
+            <th class="px-3 py-2">Speed start→end</th><th class="px-3 py-2">Accel mean</th>
+            <th class="px-3 py-2">GT CoC</th><th class="px-3 py-2">Pred CoC</th>
+          </tr>
+        </thead>
+        <tbody><tr>
+              <td class="px-3 py-2 text-slate-400">0</td>
+              <td class="px-3 py-2 font-mono text-[11px]"><a class="text-cyan-400 hover:underline" href="#clip-0">faff17c7…</a></td>
+              <td class="px-3 py-2 text-xs">WORK_ZONES_TEMP_TRAFFIC_CONTROL</td>
+              <td class="px-3 py-2 text-xs tabular-nums text-amber-300">4.63</td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
+                GT [68.1481, 31.8174] · pred [57.7181, 33.1622]
+              </td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
+                GT 7.258→15.641 · pred 7.202→14.487
+              </td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">1.64</td>
+              <td class="px-3 py-2 text-xs text-slate-300">Turn left while keeping a safe distance from the construction cones on the right.</td>
+              <td class="px-3 py-2 text-xs text-amber-200">Nudge to the left to increase clearance from the work zone cones on the right.</td>
+            </tr><tr>
+              <td class="px-3 py-2 text-slate-400">1</td>
+              <td class="px-3 py-2 font-mono text-[11px]"><a class="text-cyan-400 hover:underline" href="#clip-1">8e83f069…</a></td>
+              <td class="px-3 py-2 text-xs">PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY</td>
+              <td class="px-3 py-2 text-xs tabular-nums text-amber-300">2.81</td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
+                GT [28.212, -0.4333] · pred [32.065, -0.4707]
+              </td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
+                GT 7.483→2.184 · pred 7.532→2.418
+              </td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">-1.20</td>
+              <td class="px-3 py-2 text-xs text-slate-300">Decelerate to maintain a safe distance from the pedestrians crossing the street.</td>
+              <td class="px-3 py-2 text-xs text-amber-200">Stop to yield to the pedestrians in the crosswalk ahead.</td>
+            </tr><tr>
+              <td class="px-3 py-2 text-slate-400">2</td>
+              <td class="px-3 py-2 font-mono text-[11px]"><a class="text-cyan-400 hover:underline" href="#clip-2">1946f1c3…</a></td>
+              <td class="px-3 py-2 text-xs">PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY</td>
+              <td class="px-3 py-2 text-xs tabular-nums text-amber-300">4.06</td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
+                GT [9.1462, 0.0052] · pred [21.1789, -0.0384]
+              </td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
+                GT 3.984→0.16 · pred 4.045→4.518
+              </td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">0.08</td>
+              <td class="px-3 py-2 text-xs text-slate-300">Yield to the pedestrian crossing the road.</td>
+              <td class="px-3 py-2 text-xs text-amber-200">Stop to yield to the pedestrian in the crosswalk.</td>
+            </tr><tr>
+              <td class="px-3 py-2 text-slate-400">3</td>
+              <td class="px-3 py-2 font-mono text-[11px]"><a class="text-cyan-400 hover:underline" href="#clip-3">8e06f83c…</a></td>
+              <td class="px-3 py-2 text-xs">PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY</td>
+              <td class="px-3 py-2 text-xs tabular-nums text-amber-300">5.93</td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
+                GT [13.7136, -0.1715] · pred [23.0165, -0.1869]
+              </td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
+                GT 7.243→0.722 · pred 7.356→1.149
+              </td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">-1.47</td>
+              <td class="px-3 py-2 text-xs text-slate-300">Yield to the pedestrians crossing the road.</td>
+              <td class="px-3 py-2 text-xs text-amber-200">Yield to the pedestrian crossing the road</td>
+            </tr><tr>
+              <td class="px-3 py-2 text-slate-400">4</td>
+              <td class="px-3 py-2 font-mono text-[11px]"><a class="text-cyan-400 hover:underline" href="#clip-4">36cb5485…</a></td>
+              <td class="px-3 py-2 text-xs">ANIMALS_BIRDS_ROADKILL</td>
+              <td class="px-3 py-2 text-xs tabular-nums text-amber-300">3.77</td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
+                GT [21.0074, -0.1321] · pred [28.8889, 0.1595]
+              </td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
+                GT 9.574→0.573 · pred 9.685→2.836
+              </td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">-1.60</td>
+              <td class="px-3 py-2 text-xs text-slate-300">Stop for the stop sign while waiting for pedestrians to cross the street.</td>
+              <td class="px-3 py-2 text-xs text-amber-200">Stop to yield to the pedestrians in the crosswalk.</td>
+            </tr></tbody>
+      </table>
+    </div>
+    <section id="clip-0" class="bg-slate-900 border border-slate-700 rounded-3xl p-6 mb-8">
+              <div class="flex flex-wrap items-baseline justify-between gap-3 mb-4">
+                <div>
+                  <div class="font-display text-xl text-white">Clip 0 · <span class="font-mono text-sm text-cyan-300">faff17c7-4572-472a-be28-0f035bb88a37</span></div>
+                  <div class="text-xs text-slate-400 mt-1">chunk=4 · train · WORK_ZONES_TEMP_TRAFFIC_CONTROL · t0_us=5627325 · seed=42</div>
+                </div>
+                <div class="text-xs text-slate-400">minADE=<span class="text-amber-300 font-semibold">4.633 m</span> · jaccard=0.316</div>
+              </div>
+              <div class="grid md:grid-cols-2 gap-4 mb-5">
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+                  <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-2">GT CoC</div>
+                  <ul class="text-sm text-slate-200 list-disc pl-5"><li class='mb-1'>Turn left while keeping a safe distance from the construction cones on the right.</li></ul>
+                </div>
+                <div class="bg-slate-950 border border-amber-900/50 rounded-2xl p-4">
+                  <div class="text-[11px] uppercase tracking-wider text-amber-500 mb-2">Generated CoC (T=0.6, 1 sample)</div>
+                  <p class="text-sm text-amber-100">Nudge to the left to increase clearance from the work zone cones on the right.</p>
+                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Nudge to the left to increase clearance from the work zone cones on the right.&lt;|cot_end|&gt;&lt;|traj_future_start|&gt;&lt;|endoftext|&gt;</p>
+                </div>
+              </div>
+              <div class="grid md:grid-cols-2 gap-3 mb-5 text-xs font-mono">
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-emerald-300">
+                  GT XY start [0.7258, 0.0085] → end [68.1481, 31.8174] · path 75.2098 m
+                  · speed [7.258, 15.641] m/s
+                </div>
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-amber-200">
+                  Pred XY start [0.7201, 0.0135] → end [57.7181, 33.1622] · path 66.5666 m
+                  · speed [7.202, 14.487] m/s
+                </div>
+              </div>
+              
+              <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 mb-5 text-[11px] font-mono text-slate-300">
+                expert t0_v=7.195375919342041 m/s · accel mean=1.641786813735962
+                min=0.18909195065498352 max=2.2876641750335693 ·
+                kappa mean=0.44535768032073975 |max|=1.982830286026001 ·
+                pos0_ok=True hide=None:None
+              </div>
+              
+              <div class="grid md:grid-cols-2 gap-4 mb-5">
+                <figure class="m-0">
+                  <img src="00_faff17c7/traj_xy.png" alt="pred vs GT XY" class="w-full rounded-xl border border-slate-700 bg-slate-950">
+                  <figcaption class="mt-1 text-[11px] text-slate-500">Bird's-eye XY · x+ forward ↑ · y+ left ← · cyan history · gray GT · amber pred (64 waypoints)</figcaption>
+                </figure>
+                <figure class="m-0">
+                  <img src="00_faff17c7/traj_speed.png" alt="speed vs time" class="w-full rounded-xl border border-slate-700 bg-slate-950">
+                  <figcaption class="mt-1 text-[11px] text-slate-500">Waypoint speed (m/s) from the 64-pt pred</figcaption>
+                </figure>
+              </div>
+              <div class="text-sm font-semibold text-slate-300 mb-2">16-image history (4 cameras × 4 frames)</div>
+              <div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="00_faff17c7/00_cross_left_120_t-0.3s.jpg" alt="cross_left_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="00_faff17c7/00_cross_left_120_t-0.2s.jpg" alt="cross_left_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="00_faff17c7/00_cross_left_120_t-0.1s.jpg" alt="cross_left_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="00_faff17c7/00_cross_left_120_tp0.0s.jpg" alt="cross_left_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="00_faff17c7/01_front_wide_120_t-0.3s.jpg" alt="front_wide_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="00_faff17c7/01_front_wide_120_t-0.2s.jpg" alt="front_wide_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="00_faff17c7/01_front_wide_120_t-0.1s.jpg" alt="front_wide_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="00_faff17c7/01_front_wide_120_tp0.0s.jpg" alt="front_wide_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="00_faff17c7/02_cross_right_120_t-0.3s.jpg" alt="cross_right_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="00_faff17c7/02_cross_right_120_t-0.2s.jpg" alt="cross_right_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="00_faff17c7/02_cross_right_120_t-0.1s.jpg" alt="cross_right_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="00_faff17c7/02_cross_right_120_tp0.0s.jpg" alt="cross_right_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="00_faff17c7/03_front_tele_30_t-0.3s.jpg" alt="front_tele_30 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="00_faff17c7/03_front_tele_30_t-0.2s.jpg" alt="front_tele_30 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="00_faff17c7/03_front_tele_30_t-0.1s.jpg" alt="front_tele_30 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="00_faff17c7/03_front_tele_30_tp0.0s.jpg" alt="front_tele_30 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t+0.0s</figcaption>
+                    </figure></div>
+            </section><section id="clip-1" class="bg-slate-900 border border-slate-700 rounded-3xl p-6 mb-8">
+              <div class="flex flex-wrap items-baseline justify-between gap-3 mb-4">
+                <div>
+                  <div class="font-display text-xl text-white">Clip 1 · <span class="font-mono text-sm text-cyan-300">8e83f069-5fc5-4329-8589-4527de19d03e</span></div>
+                  <div class="text-xs text-slate-400 mt-1">chunk=176 · train · PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY · t0_us=1733299 · seed=43</div>
+                </div>
+                <div class="text-xs text-slate-400">minADE=<span class="text-amber-300 font-semibold">2.810 m</span> · jaccard=0.188</div>
+              </div>
+              <div class="grid md:grid-cols-2 gap-4 mb-5">
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+                  <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-2">GT CoC</div>
+                  <ul class="text-sm text-slate-200 list-disc pl-5"><li class='mb-1'>Decelerate to maintain a safe distance from the pedestrians crossing the street.</li><li class='mb-1'>Decelerate to maintain a safe distance from the pedestrians crossing the street.</li></ul>
+                </div>
+                <div class="bg-slate-950 border border-amber-900/50 rounded-2xl p-4">
+                  <div class="text-[11px] uppercase tracking-wider text-amber-500 mb-2">Generated CoC (T=0.6, 1 sample)</div>
+                  <p class="text-sm text-amber-100">Stop to yield to the pedestrians in the crosswalk ahead.</p>
+                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Stop to yield to the pedestrians in the crosswalk ahead.&lt;|cot_end|&gt;&lt;|traj_future_start|&gt;&lt;|endoftext|&gt;</p>
+                </div>
+              </div>
+              <div class="grid md:grid-cols-2 gap-3 mb-5 text-xs font-mono">
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-emerald-300">
+                  GT XY start [0.7483, 0.0008] → end [28.212, -0.4333] · path 28.2153 m
+                  · speed [7.483, 2.184] m/s
+                </div>
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-amber-200">
+                  Pred XY start [0.7532, -0.0001] → end [32.065, -0.4707] · path 32.0685 m
+                  · speed [7.532, 2.418] m/s
+                </div>
+              </div>
+              
+              <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 mb-5 text-[11px] font-mono text-slate-300">
+                expert t0_v=7.529344081878662 m/s · accel mean=-1.199967622756958
+                min=-3.104140281677246 max=1.9326460361480713 ·
+                kappa mean=-0.026500046253204346 |max|=0.10325075685977936 ·
+                pos0_ok=True hide=None:None
+              </div>
+              
+              <div class="grid md:grid-cols-2 gap-4 mb-5">
+                <figure class="m-0">
+                  <img src="01_8e83f069/traj_xy.png" alt="pred vs GT XY" class="w-full rounded-xl border border-slate-700 bg-slate-950">
+                  <figcaption class="mt-1 text-[11px] text-slate-500">Bird's-eye XY · x+ forward ↑ · y+ left ← · cyan history · gray GT · amber pred (64 waypoints)</figcaption>
+                </figure>
+                <figure class="m-0">
+                  <img src="01_8e83f069/traj_speed.png" alt="speed vs time" class="w-full rounded-xl border border-slate-700 bg-slate-950">
+                  <figcaption class="mt-1 text-[11px] text-slate-500">Waypoint speed (m/s) from the 64-pt pred</figcaption>
+                </figure>
+              </div>
+              <div class="text-sm font-semibold text-slate-300 mb-2">16-image history (4 cameras × 4 frames)</div>
+              <div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="01_8e83f069/00_cross_left_120_t-0.3s.jpg" alt="cross_left_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="01_8e83f069/00_cross_left_120_t-0.2s.jpg" alt="cross_left_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="01_8e83f069/00_cross_left_120_t-0.1s.jpg" alt="cross_left_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="01_8e83f069/00_cross_left_120_tp0.0s.jpg" alt="cross_left_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="01_8e83f069/01_front_wide_120_t-0.3s.jpg" alt="front_wide_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="01_8e83f069/01_front_wide_120_t-0.2s.jpg" alt="front_wide_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="01_8e83f069/01_front_wide_120_t-0.1s.jpg" alt="front_wide_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="01_8e83f069/01_front_wide_120_tp0.0s.jpg" alt="front_wide_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="01_8e83f069/02_cross_right_120_t-0.3s.jpg" alt="cross_right_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="01_8e83f069/02_cross_right_120_t-0.2s.jpg" alt="cross_right_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="01_8e83f069/02_cross_right_120_t-0.1s.jpg" alt="cross_right_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="01_8e83f069/02_cross_right_120_tp0.0s.jpg" alt="cross_right_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="01_8e83f069/03_front_tele_30_t-0.3s.jpg" alt="front_tele_30 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="01_8e83f069/03_front_tele_30_t-0.2s.jpg" alt="front_tele_30 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="01_8e83f069/03_front_tele_30_t-0.1s.jpg" alt="front_tele_30 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="01_8e83f069/03_front_tele_30_tp0.0s.jpg" alt="front_tele_30 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t+0.0s</figcaption>
+                    </figure></div>
+            </section><section id="clip-2" class="bg-slate-900 border border-slate-700 rounded-3xl p-6 mb-8">
+              <div class="flex flex-wrap items-baseline justify-between gap-3 mb-4">
+                <div>
+                  <div class="font-display text-xl text-white">Clip 2 · <span class="font-mono text-sm text-cyan-300">1946f1c3-8638-4648-8944-506e6bffc4df</span></div>
+                  <div class="text-xs text-slate-400 mt-1">chunk=177 · train · PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY · t0_us=5699907 · seed=44</div>
+                </div>
+                <div class="text-xs text-slate-400">minADE=<span class="text-amber-300 font-semibold">4.055 m</span> · jaccard=0.444</div>
+              </div>
+              <div class="grid md:grid-cols-2 gap-4 mb-5">
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+                  <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-2">GT CoC</div>
+                  <ul class="text-sm text-slate-200 list-disc pl-5"><li class='mb-1'>Yield to the pedestrian crossing the road.</li></ul>
+                </div>
+                <div class="bg-slate-950 border border-amber-900/50 rounded-2xl p-4">
+                  <div class="text-[11px] uppercase tracking-wider text-amber-500 mb-2">Generated CoC (T=0.6, 1 sample)</div>
+                  <p class="text-sm text-amber-100">Stop to yield to the pedestrian in the crosswalk.</p>
+                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Stop to yield to the pedestrian in the crosswalk.&lt;|cot_end|&gt;&lt;|traj_future_start|&gt;&lt;|endoftext|&gt;</p>
+                </div>
+              </div>
+              <div class="grid md:grid-cols-2 gap-3 mb-5 text-xs font-mono">
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-emerald-300">
+                  GT XY start [0.3984, -0.0003] → end [9.1462, 0.0052] · path 9.1462 m
+                  · speed [3.984, 0.16] m/s
+                </div>
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-amber-200">
+                  Pred XY start [0.4045, 0.0] → end [21.1789, -0.0384] · path 21.1789 m
+                  · speed [4.045, 4.518] m/s
+                </div>
+              </div>
+              
+              <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 mb-5 text-[11px] font-mono text-slate-300">
+                expert t0_v=4.047591686248779 m/s · accel mean=0.07546365261077881
+                min=-0.9731743335723877 max=1.4247560501098633 ·
+                kappa mean=-0.01857095956802368 |max|=0.10630026459693909 ·
+                pos0_ok=True hide=None:None
+              </div>
+              
+              <div class="grid md:grid-cols-2 gap-4 mb-5">
+                <figure class="m-0">
+                  <img src="02_1946f1c3/traj_xy.png" alt="pred vs GT XY" class="w-full rounded-xl border border-slate-700 bg-slate-950">
+                  <figcaption class="mt-1 text-[11px] text-slate-500">Bird's-eye XY · x+ forward ↑ · y+ left ← · cyan history · gray GT · amber pred (64 waypoints)</figcaption>
+                </figure>
+                <figure class="m-0">
+                  <img src="02_1946f1c3/traj_speed.png" alt="speed vs time" class="w-full rounded-xl border border-slate-700 bg-slate-950">
+                  <figcaption class="mt-1 text-[11px] text-slate-500">Waypoint speed (m/s) from the 64-pt pred</figcaption>
+                </figure>
+              </div>
+              <div class="text-sm font-semibold text-slate-300 mb-2">16-image history (4 cameras × 4 frames)</div>
+              <div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="02_1946f1c3/00_cross_left_120_t-0.3s.jpg" alt="cross_left_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="02_1946f1c3/00_cross_left_120_t-0.2s.jpg" alt="cross_left_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="02_1946f1c3/00_cross_left_120_t-0.1s.jpg" alt="cross_left_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="02_1946f1c3/00_cross_left_120_tp0.0s.jpg" alt="cross_left_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="02_1946f1c3/01_front_wide_120_t-0.3s.jpg" alt="front_wide_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="02_1946f1c3/01_front_wide_120_t-0.2s.jpg" alt="front_wide_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="02_1946f1c3/01_front_wide_120_t-0.1s.jpg" alt="front_wide_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="02_1946f1c3/01_front_wide_120_tp0.0s.jpg" alt="front_wide_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="02_1946f1c3/02_cross_right_120_t-0.3s.jpg" alt="cross_right_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="02_1946f1c3/02_cross_right_120_t-0.2s.jpg" alt="cross_right_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="02_1946f1c3/02_cross_right_120_t-0.1s.jpg" alt="cross_right_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="02_1946f1c3/02_cross_right_120_tp0.0s.jpg" alt="cross_right_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="02_1946f1c3/03_front_tele_30_t-0.3s.jpg" alt="front_tele_30 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="02_1946f1c3/03_front_tele_30_t-0.2s.jpg" alt="front_tele_30 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="02_1946f1c3/03_front_tele_30_t-0.1s.jpg" alt="front_tele_30 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="02_1946f1c3/03_front_tele_30_tp0.0s.jpg" alt="front_tele_30 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t+0.0s</figcaption>
+                    </figure></div>
+            </section><section id="clip-3" class="bg-slate-900 border border-slate-700 rounded-3xl p-6 mb-8">
+              <div class="flex flex-wrap items-baseline justify-between gap-3 mb-4">
+                <div>
+                  <div class="font-display text-xl text-white">Clip 3 · <span class="font-mono text-sm text-cyan-300">8e06f83c-4de6-4cde-82ab-4a747645f80a</span></div>
+                  <div class="text-xs text-slate-400 mt-1">chunk=26 · train · PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY · t0_us=8461666 · seed=45</div>
+                </div>
+                <div class="text-xs text-slate-400">minADE=<span class="text-amber-300 font-semibold">5.930 m</span> · jaccard=0.714</div>
+              </div>
+              <div class="grid md:grid-cols-2 gap-4 mb-5">
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+                  <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-2">GT CoC</div>
+                  <ul class="text-sm text-slate-200 list-disc pl-5"><li class='mb-1'>Yield to the pedestrians crossing the road.</li></ul>
+                </div>
+                <div class="bg-slate-950 border border-amber-900/50 rounded-2xl p-4">
+                  <div class="text-[11px] uppercase tracking-wider text-amber-500 mb-2">Generated CoC (T=0.6, 1 sample)</div>
+                  <p class="text-sm text-amber-100">Yield to the pedestrian crossing the road</p>
+                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Yield to the pedestrian crossing the road&lt;|cot_end|&gt;&lt;|traj_future_start|&gt;&lt;|endoftext|&gt;</p>
+                </div>
+              </div>
+              <div class="grid md:grid-cols-2 gap-3 mb-5 text-xs font-mono">
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-emerald-300">
+                  GT XY start [0.7243, -0.0008] → end [13.7136, -0.1715] · path 13.7147 m
+                  · speed [7.243, 0.722] m/s
+                </div>
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-amber-200">
+                  Pred XY start [0.7356, -0.0002] → end [23.0165, -0.1869] · path 23.0173 m
+                  · speed [7.356, 1.149] m/s
+                </div>
+              </div>
+              
+              <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 mb-5 text-[11px] font-mono text-slate-300">
+                expert t0_v=7.357150554656982 m/s · accel mean=-1.4669650793075562
+                min=-3.7698628902435303 max=0.1376844048500061 ·
+                kappa mean=-0.02423345111310482 |max|=0.05623754858970642 ·
+                pos0_ok=True hide=None:None
+              </div>
+              
+              <div class="grid md:grid-cols-2 gap-4 mb-5">
+                <figure class="m-0">
+                  <img src="03_8e06f83c/traj_xy.png" alt="pred vs GT XY" class="w-full rounded-xl border border-slate-700 bg-slate-950">
+                  <figcaption class="mt-1 text-[11px] text-slate-500">Bird's-eye XY · x+ forward ↑ · y+ left ← · cyan history · gray GT · amber pred (64 waypoints)</figcaption>
+                </figure>
+                <figure class="m-0">
+                  <img src="03_8e06f83c/traj_speed.png" alt="speed vs time" class="w-full rounded-xl border border-slate-700 bg-slate-950">
+                  <figcaption class="mt-1 text-[11px] text-slate-500">Waypoint speed (m/s) from the 64-pt pred</figcaption>
+                </figure>
+              </div>
+              <div class="text-sm font-semibold text-slate-300 mb-2">16-image history (4 cameras × 4 frames)</div>
+              <div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="03_8e06f83c/00_cross_left_120_t-0.3s.jpg" alt="cross_left_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="03_8e06f83c/00_cross_left_120_t-0.2s.jpg" alt="cross_left_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="03_8e06f83c/00_cross_left_120_t-0.1s.jpg" alt="cross_left_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="03_8e06f83c/00_cross_left_120_tp0.0s.jpg" alt="cross_left_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="03_8e06f83c/01_front_wide_120_t-0.3s.jpg" alt="front_wide_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="03_8e06f83c/01_front_wide_120_t-0.2s.jpg" alt="front_wide_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="03_8e06f83c/01_front_wide_120_t-0.1s.jpg" alt="front_wide_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="03_8e06f83c/01_front_wide_120_tp0.0s.jpg" alt="front_wide_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="03_8e06f83c/02_cross_right_120_t-0.3s.jpg" alt="cross_right_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="03_8e06f83c/02_cross_right_120_t-0.2s.jpg" alt="cross_right_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="03_8e06f83c/02_cross_right_120_t-0.1s.jpg" alt="cross_right_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="03_8e06f83c/02_cross_right_120_tp0.0s.jpg" alt="cross_right_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="03_8e06f83c/03_front_tele_30_t-0.3s.jpg" alt="front_tele_30 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="03_8e06f83c/03_front_tele_30_t-0.2s.jpg" alt="front_tele_30 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="03_8e06f83c/03_front_tele_30_t-0.1s.jpg" alt="front_tele_30 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="03_8e06f83c/03_front_tele_30_tp0.0s.jpg" alt="front_tele_30 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t+0.0s</figcaption>
+                    </figure></div>
+            </section><section id="clip-4" class="bg-slate-900 border border-slate-700 rounded-3xl p-6 mb-8">
+              <div class="flex flex-wrap items-baseline justify-between gap-3 mb-4">
+                <div>
+                  <div class="font-display text-xl text-white">Clip 4 · <span class="font-mono text-sm text-cyan-300">36cb5485-5c56-48c5-8219-90095851d627</span></div>
+                  <div class="text-xs text-slate-400 mt-1">chunk=57 · train · ANIMALS_BIRDS_ROADKILL · t0_us=9746740 · seed=46</div>
+                </div>
+                <div class="text-xs text-slate-400">minADE=<span class="text-amber-300 font-semibold">3.770 m</span> · jaccard=0.308</div>
+              </div>
+              <div class="grid md:grid-cols-2 gap-4 mb-5">
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+                  <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-2">GT CoC</div>
+                  <ul class="text-sm text-slate-200 list-disc pl-5"><li class='mb-1'>Stop for the stop sign while waiting for pedestrians to cross the street.</li></ul>
+                </div>
+                <div class="bg-slate-950 border border-amber-900/50 rounded-2xl p-4">
+                  <div class="text-[11px] uppercase tracking-wider text-amber-500 mb-2">Generated CoC (T=0.6, 1 sample)</div>
+                  <p class="text-sm text-amber-100">Stop to yield to the pedestrians in the crosswalk.</p>
+                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Stop to yield to the pedestrians in the crosswalk.&lt;|cot_end|&gt;&lt;|traj_future_start|&gt;&lt;|endoftext|&gt;</p>
+                </div>
+              </div>
+              <div class="grid md:grid-cols-2 gap-3 mb-5 text-xs font-mono">
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-emerald-300">
+                  GT XY start [0.9574, -0.0002] → end [21.0074, -0.1321] · path 21.0078 m
+                  · speed [9.574, 0.573] m/s
+                </div>
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-amber-200">
+                  Pred XY start [0.9685, -0.0002] → end [28.8889, 0.1595] · path 28.8894 m
+                  · speed [9.685, 2.836] m/s
+                </div>
+              </div>
+              
+              <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 mb-5 text-[11px] font-mono text-slate-300">
+                expert t0_v=9.700448989868164 m/s · accel mean=-1.5959856510162354
+                min=-3.500023603439331 max=2.7224597930908203 ·
+                kappa mean=0.025266852229833603 |max|=0.32425037026405334 ·
+                pos0_ok=True hide=None:None
+              </div>
+              
+              <div class="grid md:grid-cols-2 gap-4 mb-5">
+                <figure class="m-0">
+                  <img src="04_36cb5485/traj_xy.png" alt="pred vs GT XY" class="w-full rounded-xl border border-slate-700 bg-slate-950">
+                  <figcaption class="mt-1 text-[11px] text-slate-500">Bird's-eye XY · x+ forward ↑ · y+ left ← · cyan history · gray GT · amber pred (64 waypoints)</figcaption>
+                </figure>
+                <figure class="m-0">
+                  <img src="04_36cb5485/traj_speed.png" alt="speed vs time" class="w-full rounded-xl border border-slate-700 bg-slate-950">
+                  <figcaption class="mt-1 text-[11px] text-slate-500">Waypoint speed (m/s) from the 64-pt pred</figcaption>
+                </figure>
+              </div>
+              <div class="text-sm font-semibold text-slate-300 mb-2">16-image history (4 cameras × 4 frames)</div>
+              <div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="04_36cb5485/00_cross_left_120_t-0.3s.jpg" alt="cross_left_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="04_36cb5485/00_cross_left_120_t-0.2s.jpg" alt="cross_left_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="04_36cb5485/00_cross_left_120_t-0.1s.jpg" alt="cross_left_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="04_36cb5485/00_cross_left_120_tp0.0s.jpg" alt="cross_left_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_left_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="04_36cb5485/01_front_wide_120_t-0.3s.jpg" alt="front_wide_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="04_36cb5485/01_front_wide_120_t-0.2s.jpg" alt="front_wide_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="04_36cb5485/01_front_wide_120_t-0.1s.jpg" alt="front_wide_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="04_36cb5485/01_front_wide_120_tp0.0s.jpg" alt="front_wide_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_wide_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="04_36cb5485/02_cross_right_120_t-0.3s.jpg" alt="cross_right_120 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="04_36cb5485/02_cross_right_120_t-0.2s.jpg" alt="cross_right_120 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="04_36cb5485/02_cross_right_120_t-0.1s.jpg" alt="cross_right_120 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="04_36cb5485/02_cross_right_120_tp0.0s.jpg" alt="cross_right_120 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">cross_right_120 · t+0.0s</figcaption>
+                    </figure></div><div class="grid grid-cols-4 gap-2 mb-3"><figure class="m-0">
+                      <img src="04_36cb5485/03_front_tele_30_t-0.3s.jpg" alt="front_tele_30 t-0.3s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.3s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="04_36cb5485/03_front_tele_30_t-0.2s.jpg" alt="front_tele_30 t-0.2s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.2s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="04_36cb5485/03_front_tele_30_t-0.1s.jpg" alt="front_tele_30 t-0.1s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t-0.1s</figcaption>
+                    </figure><figure class="m-0">
+                      <img src="04_36cb5485/03_front_tele_30_tp0.0s.jpg" alt="front_tele_30 t+0.0s" class="w-full rounded-lg border border-slate-700 object-cover">
+                      <figcaption class="mt-1 text-[10px] text-slate-500">front_tele_30 · t+0.0s</figcaption>
+                    </figure></div>
+            </section>
+  </div>
+</body>
+</html>

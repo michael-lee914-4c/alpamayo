@@ -1,0 +1,14 @@
+{
+  "generated_at": "2026-08-30 04:18 UTC",
+  "quantize_lm_kwarg": true,
+  "quantized": {
+    "lm": "affine-4-gs64",
+    "vision": "bf16",
+    "expert": "bf16"
+  },
+  "quant_path": "T3.1 W4 LM",
+  "n_clips": 5,
+  "temperature": 0.6,
+  "top_p": 0.98,
+  "seed": 42
+}

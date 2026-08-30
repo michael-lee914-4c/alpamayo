@@ -89,4 +89,11 @@ def test_from_pretrained_stub():
     params = list(sig.parameters.keys())
     assert "alpamayo_path" in params
     assert "load_expert" in params
+    assert "quantize_lm" in params
+    assert "lm4_path" in params
+    assert sig.parameters["quantize_lm"].default is False
+    assert "quantize_vlm_8bit" not in params
+    assert "quantize_vlm_4bit" not in params
+    assert "quantize_all_4bit" not in params
+    assert "quantize_vlm_nvfp4" not in params
     print("from_pretrained signature verified")

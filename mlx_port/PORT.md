@@ -5,8 +5,8 @@ encode → prefill → CoC decode → 10-step flow-matching → `action_to_traj`
 
 Gate G1 signed off 2026-08-29 (user). Canonical window: P2f greedy e2e,
 encode 1044 · prefill 3645 · decode 856 / 13 tok · FM 630 / 10 steps.
-Dominant = prefill. Phase 3 (T3.1 language-tower 4-bit) is unblocked.
-Do not 4-bit the expert or vision first.
+Dominant = prefill. Phase 3 T3.1 (language-tower affine 4-bit) is the current increment
+(`stage1c-p3-t31-affine-lm`). Do not 4-bit the expert or vision first.
 
 ## Four stages → files
 
@@ -66,8 +66,8 @@ Entry: `sample_trajectories_from_data_with_vlm_rollout` in `mlx_port/inference.p
 
 | Piece | Dtype |
 |---|---|
-| VLM / vision / backbone weights | `mx.bfloat16` (`AlpamayoR1MLX.from_pretrained(..., dtype=mx.bfloat16)`) |
-| Expert weights | `mx.bfloat16` (same load) |
+| VLM / vision / backbone weights | `mx.bfloat16` load. Default path stays dense (`quantize_lm=False` / unset / `ALPAMAYO_QUANT=none`). Opt-in T3.1: `quantize_lm=True` or `ALPAMAYO_QUANT=lm4` uses `{alpamayo}/mlx_lm4/language_model.safetensors` (6.02 GiB, 252 QuantizedLinear) when present; otherwise live-packs and saves there. `lm_head` + `embed_tokens` stay bf16 in the packed file. Vision / expert stay bf16. The VLM-W8/W4 / all4 / nvfp4 walks were probes and are gone. |
+| Expert weights | `mx.bfloat16` (same load; never 4-bit in T3.1) |
 | `action_in_proj` hot path | **casts `x` and `t` to float32** (`action_in_proj_mlx.py`) then LayerNorm → expert bf16 |
 | `action_out_proj` | follows expert hidden (bf16) |
 | Logits / nucleus | float32 on host |
@@ -107,7 +107,28 @@ Measure with greedy e2e: `test_end_to_end_inference_prints_coc_vlm_only` and
 
 P2f greedy window (2026-08-29 15:25): encode 1.0 s · prefill 3.6 s · decode 0.9 s · FM 0.6 s. Prefix is 3006 tokens after the pixel-budget bind. Do not spend a week on ego history.
 
+T3.1 greedy (2026-08-29 20:51, `quantize_lm=True`): 252 QuantizedLinear, `lm_head` + `embed_tokens` dense. encode 1070 · prefill 4427 · decode 695 / 13 tok · FM 1299. CoC pin held. Prefill is not faster than P2f (first W4 compile). G3 not signed. Opt-in memory recipe (−9.30 GiB weights, Metal peak ~45 GB vs P2f 55.10). Default load is the signed P2f bf16 path.
+
+Packed T3.1 language tower (2026-08-30): `pre-trained/Alpamayo-R1-10B/mlx_lm4/language_model.safetensors` (6.02 GiB) + `config.json`. First save was live-pack (`save_quantized_lm`, no expert, 8.0 s). Reload skipped 399 Alpamayo language keys, loaded 252 QuantizedLinear from disk (2.8 s, `load_expert=False`). Greedy e2e from disk (`ALPAMAYO_QUANT=lm4`): 22.73 s · encode 1041 · prefill 3856 · decode 306 / 13 · FM 587 · CoC pin held · minADE 4.097 m · Metal 21.24 GB · RSS 40.61 GB. `ALPAMAYO_LM4_DIR` / `lm4_path` override the directory. Incomplete pair raises.
+
+Prefill quant chase closed 2026-08-29. One-shot greedy, same clip / seq=3006. Metal dequants tiles into FP16/BF16 MMA — no native 4-bit compute on M4. Every extra recipe was slower on prefill than P2f 3645 ms. Code for those walks is deleted; numbers stay here.
+
+| Recipe | Packed | encode | prefill | decode | FM | wall | Metal peak |
+|---|---|---|---|---|---|---|---|
+| P2f bf16 | none | 1044 | **3645** | 856 / 13 | **630** | 27.66 s | 55.10 GB |
+| T3.1 W4 LM | 252 decoder | 1070 | 4427 | 695 / 13 | 1299 | 36.01 s | (not copied) |
+| VLM W8 | 342 + 2 embed; 27 fc2 dense | 1253 | 4134 | 849 / 13 | 759 | 32.13 s | 46.98 GB |
+| VLM W4 | same 342 + 2 | 1187 | 6538 | **664** / 13 | 1411 | 34.51 s | 45.41 GB |
+| all4 | VLM W4 + 252 expert | 1129 | 4466 | 677 / 13 | 1131 | 28.52 s | 45.34 GB |
+| nvfp4 | 369 + 2 (fc2 packs at gs16) | 1269 | 5897 | 726 / 12 | 1378 | 30.41 s | 45.40 GB |
+
+Decode W4 is the only real speed signal (−160 ms). Metal peak drops ~10 GB once the decoder is 4-bit; packing vision / head / expert does not move that peak (sampled during first `vlm()`). RSS high-water stayed ~63 GB. minADE on these shots is unseeded FM — ignore. CoC pin held on 12–13 greedy tokens.
+
 5-clip T=0.6 after P2f (`reports/traj_sample_5_t06/`, 2026-08-30 00:30 UTC): all clips `tokens=3006`, 16×`[1,20,36]`. Mean minADE 7.85 → 4.56 m vs native-32k snapshot `results_pre_p2f.json`. User reviewed plots 2026-08-29 and signed quality as good. Yield clips still overshoot (pred speed does not settle to ~0).
+
+Path check 2026-08-30 03:58 / 04:00 UTC (current code, `--no-reuse`): dense bf16 default and T3.1 opt-in both complete. Reports `traj_sample_5_t06_bf16/` · `traj_sample_5_t06_t31/` · side-by-side `traj_sample_5_t06_bf16_vs_t31/`. Mean minADE 4.56 / 4.24 m. CoC same on clips 2–4. Load logs: `[QUANT] language tower dense bf16` vs `252 QuantizedLinear`.
+
+5-clip T3.1 disk sanity 2026-08-30 04:18 UTC (`ALPAMAYO_QUANT=lm4 --quantize-lm --no-reuse`, `reports/traj_sample_5_t06_t31_disk/`): skipped 399 language keys, loaded 252 QuantizedLinear from `mlx_lm4/`. Mean minADE 4.24 m. CoC and ADE match live-pack `traj_sample_5_t06_t31` to many decimals. Wall 96.9 s. Signed `traj_sample_5_t06/` left untouched.
 
 ## Train vs infer (for later T2.4 / T4.3)
 

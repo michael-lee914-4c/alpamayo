@@ -514,6 +514,8 @@ class AlpamayoR1MLX(nn.Module):
         vlm_model_path: str | None = None,
         load_expert: bool = True,
         dtype: mx.Dtype = mx.bfloat16,
+        quantize_lm: bool = False,
+        lm4_path: str | None = None,
     ) -> "AlpamayoR1MLX":
         """Custom from_pretrained mirroring NVIDIA AlpamayoR1.__init__.
 
@@ -521,6 +523,18 @@ class AlpamayoR1MLX(nn.Module):
             alpamayo_path: Path to the Alpamayo-R1-10B checkpoint (for expert weights).
             vlm_model_path: Path to the base Qwen3-VL-8B-Instruct checkpoint.
                             Defaults to the local copy used throughout the port.
+            load_expert: Load the 2.3B action expert (stays dense bf16).
+            dtype: Weight dtype for load (bf16). Language-tower Linears stay
+                   dense unless ``quantize_lm`` is True.
+            quantize_lm: T3.1 Recipe A. Default False (signed P2f bf16 path).
+                         Set True (or ``ALPAMAYO_QUANT=lm4``) to pack decoder
+                         Linears affine-4. Vision / expert / lm_head /
+                         embeddings stay dense either way.
+                         ``ALPAMAYO_QUANT=none|lm4`` overrides this kwarg.
+                         Packed weights load from ``{alpamayo_path}/mlx_lm4``
+                         when present; otherwise live-pack and save there.
+            lm4_path: Override packed-LM directory. ``ALPAMAYO_LM4_DIR`` also
+                      overrides the default.
         """
         from mlx_port.vlm_loader import LOCAL_QWEN_PROCESSOR_PATH
 
@@ -544,10 +558,26 @@ class AlpamayoR1MLX(nn.Module):
             vlm_path, traj_vocab_size=declared_traj_vocab_size
         )
 
+        from mlx_port.models.quantize_lm import (
+            apply_language_tower_quant,
+            lm4_checkpoint_ready,
+            lm_quant_enabled,
+            mark_language_tower_dense,
+            resolve_lm4_dir,
+        )
+
+        want_lm4 = lm_quant_enabled(quantize_lm)
+        dest_lm4 = resolve_lm4_dir(alpamayo_path, lm4_path) if want_lm4 else None
+        have_lm4 = bool(dest_lm4) and lm4_checkpoint_ready(dest_lm4)
+
         # 1.5 Load the fine-tuned VLM weights from the Alpamayo checkpoint safetensors.
         # This replaces the base-Qwen weights with Alpamayo's learned CoC / driving weights
         # (including proper embeddings for <|cot_start|>, <|traj_future_start|>, and <iN> tokens).
-        cls._load_vlm_weights(vlm, alpamayo_path, dtype=dtype)
+        # When a packed T3.1 language tower is on disk, skip Alpamayo language /
+        # lm_head keys — those come from mlx_lm4/.
+        cls._load_vlm_weights(
+            vlm, alpamayo_path, dtype=dtype, skip_language=have_lm4
+        )
 
         # ------------------------------------------------------------------
         # Replace the vision tower's PatchEmbed with an Alpamayo-aware version.
@@ -574,6 +604,12 @@ class AlpamayoR1MLX(nn.Module):
         vlm = AlpamayoModel.from_existing(vlm)
 
         print("[AlpamayoR1MLX] Instantiated AlpamayoLanguageModel and AlpamayoModel via from_existing")
+
+        # After compile wrap, before first forward. Expert is not on ``vlm``.
+        if want_lm4:
+            apply_language_tower_quant(vlm.language_model, dest_lm4)
+        else:
+            mark_language_tower_dense()
 
         # Note: mlx-vlm Model objects do not expose .astype(); we rely on the
         # checkpoint being in the correct dtype (bfloat16). The final model.astype(dtype)
@@ -707,7 +743,12 @@ class AlpamayoR1MLX(nn.Module):
         return model
 
     @staticmethod
-    def _load_vlm_weights(vlm: Any, alpamayo_path: str, dtype: mx.Dtype = mx.bfloat16) -> None:
+    def _load_vlm_weights(
+        vlm: Any,
+        alpamayo_path: str,
+        dtype: mx.Dtype = mx.bfloat16,
+        skip_language: bool = False,
+    ) -> None:
         """Load all vlm.* weights from the Alpamayo checkpoint into the given mlx_vlm model.
 
         This achieves parity with the NVIDIA implementation where the fine-tuned
@@ -729,6 +770,7 @@ class AlpamayoR1MLX(nn.Module):
 
         total_vlm_keys = 0
         loaded = 0
+        skipped_language = 0
 
         def _get_nested(obj, parts):
             """Navigate through attributes and list indices."""
@@ -775,6 +817,12 @@ class AlpamayoR1MLX(nn.Module):
                     suffix = key[4:]
 
                     new_key = None
+                    if suffix.startswith("model.language_model.") or suffix.startswith(
+                        "lm_head"
+                    ):
+                        if skip_language:
+                            skipped_language += 1
+                            continue
                     if suffix.startswith("model.language_model."):
                         inner = suffix[len("model.language_model."):]
                         new_key = f"language_model.model.{inner}"
@@ -800,7 +848,15 @@ class AlpamayoR1MLX(nn.Module):
                     if _assign(arr, new_key):
                         loaded += 1
 
-        print(f"[AlpamayoR1MLX] Loaded {loaded}/{total_vlm_keys} VLM weights from Alpamayo checkpoint (fine-tuned CoC + vision head)")
+        skip_note = (
+            f", skipped {skipped_language} language keys (packed LM on disk)"
+            if skip_language
+            else ""
+        )
+        print(
+            f"[AlpamayoR1MLX] Loaded {loaded}/{total_vlm_keys} VLM weights "
+            f"from Alpamayo checkpoint (fine-tuned CoC + vision head){skip_note}"
+        )
 
     @staticmethod
     def _load_expert_and_action_weights(

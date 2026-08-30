@@ -124,6 +124,26 @@ def _resize_embeddings(model: Any, new_vocab_size: int) -> None:
     # Replace the embedding weight
     embed.weight = new_weight
 
+    # lm_head is tied in layout to vocab size. Alpamayo overwrites both from
+    # the checkpoint; packed T3.1 load skips those keys and needs the leaf
+    # already sized to 155697 or load_weights raises.
+    lm_head = getattr(model.language_model, "lm_head", None)
+    if lm_head is not None and hasattr(lm_head, "weight"):
+        old_head = lm_head.weight
+        if old_head.shape[0] != new_vocab_size:
+            if old_head.shape[0] != old_vocab:
+                raise RuntimeError(
+                    f"lm_head rows {tuple(old_head.shape)} do not match "
+                    f"embed rows {old_vocab}"
+                )
+            new_head = mx.zeros((new_vocab_size, old_head.shape[1]), dtype=old_head.dtype)
+            new_head[:old_vocab] = old_head
+            new_head[old_vocab:] = mx.random.normal(
+                shape=(new_vocab_size - old_vocab, old_head.shape[1]),
+                dtype=old_head.dtype,
+            ) * 0.02
+            lm_head.weight = new_head
+
     # Update config if present
     if hasattr(model, "config") and hasattr(model.config, "text_config"):
         model.config.text_config.vocab_size = new_vocab_size
