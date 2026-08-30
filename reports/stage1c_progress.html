@@ -252,7 +252,8 @@
                     <li>mlx_port/processor.py — bind_image_pixel_budget, smart_resize_hw, get_processor binds after load</li>
                     <li>mlx_port/tests/test_pixel_budget.py — 1080p → 20×36; 16-frame prefix not ~32k</li>
                     <li>mlx_port/PORT.md · mlx_port/alpamayo1-mlx-speedup-plan.html T2.5</li>
-                    <li>mlx_port/scripts/run_local_traj_sample.py — print token count + grid; note P2f in HTML; --quantize-lm + load-path stamp</li>
+                    <li>mlx_port/scripts/run_local_traj_sample.py — print token count + grid; note P2f in HTML; --quantize-lm</li>
+                    <li>mlx_port/traj_sample_plot_utils.py — quant_path_label / load_path_stamp (CI-safe, no physical_ai_av)</li>
                 </ul>
                 <div class="text-[11px] uppercase tracking-wider text-slate-500">T3.1 (this increment)</div>
                 <ul class="text-xs space-y-1 font-mono">
@@ -441,6 +442,8 @@ PYTHONPATH=src:. /Users/michaellee/Projects/alpamayo/.venv/bin/python \
 # not slow after mlx_lm4 save/load:
 # 110 passed, 1 skipped · 2.28 s
 # 2026-08-30 pre-PR re-run: 110 passed, 1 skipped · 2.44 s
+# CI macos-26: test_html_report_stamps imported run_local_traj_sample → physical_ai_av.
+# Stamp helpers moved to traj_sample_plot_utils.py.
 
 # 2026-08-30 · greedy e2e from packed mlx_lm4
 PYTHONPATH=src:. ALPAMAYO_STAGE_TIMERS=1 ALPAMAYO_QUANT=lm4 \
@@ -531,7 +534,7 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2">Remaining <code>not slow</code> suite</td>
                                 <td class="px-2 py-2 text-emerald-400">PASS</td>
-                                <td class="px-2 py-2">2026-08-30 mlx_lm4 save/load · 110 passed, 1 skipped · 2.28 s. Earlier path-check 104.</td>
+                                <td class="px-2 py-2">2026-08-30 mlx_lm4 save/load · 110 passed, 1 skipped · 2.28 s. CI-safe stamp helpers · 110 passed, 1 skipped · 2.29 s.</td>
                             </tr>
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono">test_traj_to_action_numerical.py::test_without_v0_matches_nvidia_torch</td>
@@ -631,7 +634,7 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                             <tr>
                                 <td class="px-2 py-2 font-mono">test_traj_sample_plots.py::test_html_report_stamps_bf16_and_t31_paths</td>
                                 <td class="px-2 py-2 text-emerald-400">PASS</td>
-                                <td class="px-2 py-2">HTML load-path banner for bf16 and T3.1 W4 LM</td>
+                                <td class="px-2 py-2">CI-safe stamp via traj_sample_plot_utils (no physical_ai_av). bf16 + T3.1 W4 LM labels.</td>
                             </tr>
                         </tbody>
                     </table>

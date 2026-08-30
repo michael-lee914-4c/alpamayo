@@ -46,3 +46,25 @@ def _xy_for_redraw(
     if pred_full is None:
         return hist_xy, gt_xy, None
     return hist_xy, gt_xy, _require_full_xy(pred_full, "pred_xy_full")
+
+
+def quant_path_label(flags: dict | None) -> str:
+    """HTML/log stamp for the load path. Safe without dataset extras."""
+    lm = str((flags or {}).get("lm") or "bf16")
+    if lm.startswith("affine-4"):
+        return "T3.1 W4 LM"
+    if lm == "bf16":
+        return "bf16"
+    return lm
+
+
+def load_path_stamp(run_meta: dict | None = None) -> dict[str, str]:
+    """Title + flag line for the traj-sample HTML banner."""
+    meta = run_meta or {}
+    flags = meta.get("quantized") or {}
+    path = str(meta.get("quant_path") or quant_path_label(flags))
+    flag_txt = (
+        f"lm={flags.get('lm', 'bf16')} · vision={flags.get('vision', 'bf16')} · "
+        f"expert={flags.get('expert', 'bf16')}"
+    )
+    return {"quant_path": path, "flag_txt": flag_txt}

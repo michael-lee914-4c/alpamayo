@@ -44,6 +44,8 @@ from mlx_port.traj_sample_plot_utils import (
     _require_full_xy,
     _speed_mps,
     _xy_for_redraw as _xy_from_cached_record,
+    load_path_stamp,
+    quant_path_label,
 )
 
 # Same five clips as reports/coc_sample_5_t06 (seed 42, skip t0 < 1.6s).
@@ -310,15 +312,6 @@ def _xy_for_redraw(rec: dict, clip_id: str) -> tuple[np.ndarray, np.ndarray, np.
     return _xy_from_cached_record(filled, clip_id)
 
 
-def _quant_path_label(flags: dict) -> str:
-    lm = str(flags.get("lm") or "bf16")
-    if lm.startswith("affine-4"):
-        return "T3.1 W4 LM"
-    if lm == "bf16":
-        return "bf16"
-    return lm
-
-
 def _html_report(
     results: list[dict],
     generated_at: str,
@@ -440,13 +433,9 @@ def _html_report(
         )
 
     mean_txt = "—" if mean_ade is None else f"{mean_ade:.2f} m"
-    meta = run_meta or {}
-    path_label = html.escape(str(meta.get("quant_path") or _quant_path_label({})))
-    flags = meta.get("quantized") or {}
-    flag_txt = html.escape(
-        f"lm={flags.get('lm', 'bf16')} · vision={flags.get('vision', 'bf16')} · "
-        f"expert={flags.get('expert', 'bf16')}"
-    )
+    stamp = load_path_stamp(run_meta)
+    path_label = html.escape(stamp["quant_path"])
+    flag_txt = html.escape(stamp["flag_txt"])
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -584,7 +573,7 @@ def main() -> None:
         "generated_at": generated_at,
         "quantize_lm_kwarg": bool(args.quantize_lm),
         "quantized": flags,
-        "quant_path": _quant_path_label(flags),
+        "quant_path": quant_path_label(flags),
         "n_clips": len(results),
         "temperature": NVIDIA_TEMPERATURE,
         "top_p": NVIDIA_TOP_P,
