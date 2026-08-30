@@ -21,7 +21,8 @@
       After <code>dxy_theta_to_v_without_v0</code> t0. Plots use the generated 64-waypoint pred
       (<code>pred_xy_full</code>), vehicle frame x+ forward ↑ / y+ left ←.
       Stage 1b is <a class="text-cyan-400 hover:underline" href="../stage1b_progress.html">closed</a>
-      (wiring); yield/stop quality is leftover there. Generated 2026-08-29 16:38 UTC. Mean minADE: 7.85 m.
+      (wiring). P2f binds NVIDIA pixel budget (<code>163840–196608</code>, grid
+      <code>20×36</code>). Generated 2026-08-30 00:30 UTC. Mean minADE: 4.56 m.
     </p>
     <div class="overflow-auto bg-slate-900 border border-slate-700 rounded-2xl mb-10">
       <table class="w-full text-left text-sm">
@@ -37,72 +38,72 @@
               <td class="px-3 py-2 text-slate-400">0</td>
               <td class="px-3 py-2 font-mono text-[11px]"><a class="text-cyan-400 hover:underline" href="#clip-0">faff17c7…</a></td>
               <td class="px-3 py-2 text-xs">WORK_ZONES_TEMP_TRAFFIC_CONTROL</td>
-              <td class="px-3 py-2 text-xs tabular-nums text-amber-300">9.19</td>
+              <td class="px-3 py-2 text-xs tabular-nums text-amber-300">4.77</td>
               <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
-                GT [68.1481, 31.8174] · pred [68.1384, 9.798]
+                GT [68.1481, 31.8174] · pred [58.6929, 37.266]
               </td>
               <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
-                GT 7.258→15.641 · pred 7.2→14.331
+                GT 7.258→15.641 · pred 7.201→15.02
               </td>
-              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">1.60</td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">1.76</td>
               <td class="px-3 py-2 text-xs text-slate-300">Turn left while keeping a safe distance from the construction cones on the right.</td>
-              <td class="px-3 py-2 text-xs text-amber-200">Slow down due to a road worker directing traffic.</td>
+              <td class="px-3 py-2 text-xs text-amber-200">Nudge to the left to increase clearance from the work zone trucks and cones on the right.</td>
             </tr><tr>
               <td class="px-3 py-2 text-slate-400">1</td>
               <td class="px-3 py-2 font-mono text-[11px]"><a class="text-cyan-400 hover:underline" href="#clip-1">8e83f069…</a></td>
               <td class="px-3 py-2 text-xs">PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY</td>
-              <td class="px-3 py-2 text-xs tabular-nums text-amber-300">6.05</td>
+              <td class="px-3 py-2 text-xs tabular-nums text-amber-300">4.72</td>
               <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
-                GT [28.212, -0.4333] · pred [43.2332, -3.7486]
+                GT [28.212, -0.4333] · pred [39.3244, -0.9033]
               </td>
               <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
-                GT 7.483→2.184 · pred 7.519→6.957
+                GT 7.483→2.184 · pred 7.546→4.808
               </td>
-              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">-0.15</td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">-0.66</td>
               <td class="px-3 py-2 text-xs text-slate-300">Decelerate to maintain a safe distance from the pedestrians crossing the street.</td>
-              <td class="px-3 py-2 text-xs text-amber-200">Stop to yield to the pedestrian in the crosswalk ahead.</td>
+              <td class="px-3 py-2 text-xs text-amber-200">Slow down to yield to the pedestrian in the crosswalk ahead.</td>
             </tr><tr>
               <td class="px-3 py-2 text-slate-400">2</td>
               <td class="px-3 py-2 font-mono text-[11px]"><a class="text-cyan-400 hover:underline" href="#clip-2">1946f1c3…</a></td>
               <td class="px-3 py-2 text-xs">PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY</td>
-              <td class="px-3 py-2 text-xs tabular-nums text-amber-300">6.46</td>
+              <td class="px-3 py-2 text-xs tabular-nums text-amber-300">3.87</td>
               <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
-                GT [9.1462, 0.0052] · pred [24.8419, -1.096]
+                GT [9.1462, 0.0052] · pred [20.6987, -0.0105]
               </td>
               <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
-                GT 3.984→0.16 · pred 4.057→3.918
+                GT 3.984→0.16 · pred 4.042→4.427
               </td>
-              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">-0.07</td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">0.05</td>
               <td class="px-3 py-2 text-xs text-slate-300">Yield to the pedestrian crossing the road.</td>
-              <td class="px-3 py-2 text-xs text-amber-200">Stop to yield to the cross-traffic vehicle ahead.</td>
+              <td class="px-3 py-2 text-xs text-amber-200">Stop to yield to the pedestrian in the crosswalk.</td>
             </tr><tr>
               <td class="px-3 py-2 text-slate-400">3</td>
               <td class="px-3 py-2 font-mono text-[11px]"><a class="text-cyan-400 hover:underline" href="#clip-3">8e06f83c…</a></td>
               <td class="px-3 py-2 text-xs">PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY</td>
-              <td class="px-3 py-2 text-xs tabular-nums text-amber-300">7.95</td>
+              <td class="px-3 py-2 text-xs tabular-nums text-amber-300">5.77</td>
               <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
-                GT [13.7136, -0.1715] · pred [28.0939, -1.0583]
+                GT [13.7136, -0.1715] · pred [22.661, -0.1538]
               </td>
               <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
-                GT 7.243→0.722 · pred 7.335→1.982
+                GT 7.243→0.722 · pred 7.357→1.097
               </td>
-              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">-1.28</td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">-1.48</td>
               <td class="px-3 py-2 text-xs text-slate-300">Yield to the pedestrians crossing the road.</td>
-              <td class="px-3 py-2 text-xs text-amber-200">Stop to yield to the pedestrian crossing ahead</td>
+              <td class="px-3 py-2 text-xs text-amber-200">Yield to the pedestrian crossing the road</td>
             </tr><tr>
               <td class="px-3 py-2 text-slate-400">4</td>
               <td class="px-3 py-2 font-mono text-[11px]"><a class="text-cyan-400 hover:underline" href="#clip-4">36cb5485…</a></td>
               <td class="px-3 py-2 text-xs">ANIMALS_BIRDS_ROADKILL</td>
-              <td class="px-3 py-2 text-xs tabular-nums text-amber-300">9.58</td>
+              <td class="px-3 py-2 text-xs tabular-nums text-amber-300">3.68</td>
               <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
-                GT [21.0074, -0.1321] · pred [37.4214, 18.2443]
+                GT [21.0074, -0.1321] · pred [28.6008, 0.1362]
               </td>
               <td class="px-3 py-2 text-[11px] font-mono text-slate-400">
-                GT 9.574→0.573 · pred 9.684→7.154
+                GT 9.574→0.573 · pred 9.684→2.751
               </td>
-              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">-0.61</td>
+              <td class="px-3 py-2 text-[11px] font-mono text-slate-400">-1.62</td>
               <td class="px-3 py-2 text-xs text-slate-300">Stop for the stop sign while waiting for pedestrians to cross the street.</td>
-              <td class="px-3 py-2 text-xs text-amber-200">Stop to yield to the pedestrian in the crosswalk.</td>
+              <td class="px-3 py-2 text-xs text-amber-200">Stop to yield to the pedestrians in the crosswalk.</td>
             </tr></tbody>
       </table>
     </div>
@@ -112,7 +113,7 @@
                   <div class="font-display text-xl text-white">Clip 0 · <span class="font-mono text-sm text-cyan-300">faff17c7-4572-472a-be28-0f035bb88a37</span></div>
                   <div class="text-xs text-slate-400 mt-1">chunk=4 · train · WORK_ZONES_TEMP_TRAFFIC_CONTROL · t0_us=5627325 · seed=42</div>
                 </div>
-                <div class="text-xs text-slate-400">minADE=<span class="text-amber-300 font-semibold">9.185 m</span> · jaccard=0.048</div>
+                <div class="text-xs text-slate-400">minADE=<span class="text-amber-300 font-semibold">4.773 m</span> · jaccard=0.286</div>
               </div>
               <div class="grid md:grid-cols-2 gap-4 mb-5">
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
@@ -121,8 +122,8 @@
                 </div>
                 <div class="bg-slate-950 border border-amber-900/50 rounded-2xl p-4">
                   <div class="text-[11px] uppercase tracking-wider text-amber-500 mb-2">Generated CoC (T=0.6, 1 sample)</div>
-                  <p class="text-sm text-amber-100">Slow down due to a road worker directing traffic.</p>
-                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Slow down due to a road worker directing traffic.&lt;|cot_end|&gt;&lt;|traj_future_start|&gt;&lt;|endoftext|&gt;</p>
+                  <p class="text-sm text-amber-100">Nudge to the left to increase clearance from the work zone trucks and cones on the right.</p>
+                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Nudge to the left to increase clearance from the work zone trucks and cones on the right.&lt;|cot_end|&gt;&lt;|traj_future_start|&gt;&lt;|endoftext|&gt;</p>
                 </div>
               </div>
               <div class="grid md:grid-cols-2 gap-3 mb-5 text-xs font-mono">
@@ -131,15 +132,15 @@
                   · speed [7.258, 15.641] m/s
                 </div>
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-amber-200">
-                  Pred XY start [0.72, 0.0021] → end [68.1384, 9.798] · path 68.8393 m
-                  · speed [7.2, 14.331] m/s
+                  Pred XY start [0.7199, 0.0141] → end [58.6929, 37.266] · path 69.5242 m
+                  · speed [7.201, 15.02] m/s
                 </div>
               </div>
               
               <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 mb-5 text-[11px] font-mono text-slate-300">
-                expert t0_v=7.195375919342041 m/s · accel mean=1.6023914813995361
-                min=-0.21246230602264404 max=3.5168540477752686 ·
-                kappa mean=0.10917621850967407 |max|=0.36390021443367004 ·
+                expert t0_v=7.195375919342041 m/s · accel mean=1.7622902393341064
+                min=0.15711405873298645 max=2.6501522064208984 ·
+                kappa mean=0.4811912178993225 |max|=2.151313304901123 ·
                 pos0_ok=True hide=None:None
               </div>
               
@@ -209,7 +210,7 @@
                   <div class="font-display text-xl text-white">Clip 1 · <span class="font-mono text-sm text-cyan-300">8e83f069-5fc5-4329-8589-4527de19d03e</span></div>
                   <div class="text-xs text-slate-400 mt-1">chunk=176 · train · PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY · t0_us=1733299 · seed=43</div>
                 </div>
-                <div class="text-xs text-slate-400">minADE=<span class="text-amber-300 font-semibold">6.049 m</span> · jaccard=0.118</div>
+                <div class="text-xs text-slate-400">minADE=<span class="text-amber-300 font-semibold">4.719 m</span> · jaccard=0.111</div>
               </div>
               <div class="grid md:grid-cols-2 gap-4 mb-5">
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
@@ -218,8 +219,8 @@
                 </div>
                 <div class="bg-slate-950 border border-amber-900/50 rounded-2xl p-4">
                   <div class="text-[11px] uppercase tracking-wider text-amber-500 mb-2">Generated CoC (T=0.6, 1 sample)</div>
-                  <p class="text-sm text-amber-100">Stop to yield to the pedestrian in the crosswalk ahead.</p>
-                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Stop to yield to the pedestrian in the crosswalk ahead.&lt;|cot_end|&gt;&lt;|traj_future_start|&gt;&lt;|endoftext|&gt;</p>
+                  <p class="text-sm text-amber-100">Slow down to yield to the pedestrian in the crosswalk ahead.</p>
+                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Slow down to yield to the pedestrian in the crosswalk ahead.&lt;|cot_end|&gt;&lt;|traj_future_start|&gt;&lt;|endoftext|&gt;</p>
                 </div>
               </div>
               <div class="grid md:grid-cols-2 gap-3 mb-5 text-xs font-mono">
@@ -228,15 +229,15 @@
                   · speed [7.483, 2.184] m/s
                 </div>
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-amber-200">
-                  Pred XY start [0.7519, -0.0021] → end [43.2332, -3.7486] · path 43.3954 m
-                  · speed [7.519, 6.957] m/s
+                  Pred XY start [0.7546, -0.0001] → end [39.3244, -0.9033] · path 39.3348 m
+                  · speed [7.546, 4.808] m/s
                 </div>
               </div>
               
               <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 mb-5 text-[11px] font-mono text-slate-300">
-                expert t0_v=7.529344081878662 m/s · accel mean=-0.1505715548992157
-                min=-2.4201560020446777 max=2.941923141479492 ·
-                kappa mean=-0.07041312754154205 |max|=0.29398488998413086 ·
+                expert t0_v=7.529344081878662 m/s · accel mean=-0.656298816204071
+                min=-2.1964633464813232 max=1.322411298751831 ·
+                kappa mean=-0.10403068363666534 |max|=0.24754765629768372 ·
                 pos0_ok=True hide=None:None
               </div>
               
@@ -306,7 +307,7 @@
                   <div class="font-display text-xl text-white">Clip 2 · <span class="font-mono text-sm text-cyan-300">1946f1c3-8638-4648-8944-506e6bffc4df</span></div>
                   <div class="text-xs text-slate-400 mt-1">chunk=177 · train · PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY · t0_us=5699907 · seed=44</div>
                 </div>
-                <div class="text-xs text-slate-400">minADE=<span class="text-amber-300 font-semibold">6.464 m</span> · jaccard=0.273</div>
+                <div class="text-xs text-slate-400">minADE=<span class="text-amber-300 font-semibold">3.869 m</span> · jaccard=0.444</div>
               </div>
               <div class="grid md:grid-cols-2 gap-4 mb-5">
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
@@ -315,8 +316,8 @@
                 </div>
                 <div class="bg-slate-950 border border-amber-900/50 rounded-2xl p-4">
                   <div class="text-[11px] uppercase tracking-wider text-amber-500 mb-2">Generated CoC (T=0.6, 1 sample)</div>
-                  <p class="text-sm text-amber-100">Stop to yield to the cross-traffic vehicle ahead.</p>
-                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Stop to yield to the cross-traffic vehicle ahead.&lt;|cot_end|&gt;&lt;|traj_future_start|&gt;&lt;|endoftext|&gt;</p>
+                  <p class="text-sm text-amber-100">Stop to yield to the pedestrian in the crosswalk.</p>
+                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Stop to yield to the pedestrian in the crosswalk.&lt;|cot_end|&gt;&lt;|traj_future_start|&gt;&lt;|endoftext|&gt;</p>
                 </div>
               </div>
               <div class="grid md:grid-cols-2 gap-3 mb-5 text-xs font-mono">
@@ -325,15 +326,15 @@
                   · speed [3.984, 0.16] m/s
                 </div>
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-amber-200">
-                  Pred XY start [0.4057, 0.0002] → end [24.8419, -1.096] · path 24.866 m
-                  · speed [4.057, 3.918] m/s
+                  Pred XY start [0.4042, 0.0] → end [20.6987, -0.0105] · path 20.6987 m
+                  · speed [4.042, 4.427] m/s
                 </div>
               </div>
               
               <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 mb-5 text-[11px] font-mono text-slate-300">
-                expert t0_v=4.047591686248779 m/s · accel mean=-0.06574688106775284
-                min=-0.6901170015335083 max=0.846832811832428 ·
-                kappa mean=-0.1384410262107849 |max|=0.6969740986824036 ·
+                expert t0_v=4.047591686248779 m/s · accel mean=0.05474959313869476
+                min=-1.034032940864563 max=1.4603519439697266 ·
+                kappa mean=-0.014272966422140598 |max|=0.09074544906616211 ·
                 pos0_ok=True hide=None:None
               </div>
               
@@ -403,7 +404,7 @@
                   <div class="font-display text-xl text-white">Clip 3 · <span class="font-mono text-sm text-cyan-300">8e06f83c-4de6-4cde-82ab-4a747645f80a</span></div>
                   <div class="text-xs text-slate-400 mt-1">chunk=26 · train · PEDESTRIAN_DENSITY_OR_CLOSE_PROXIMITY · t0_us=8461666 · seed=45</div>
                 </div>
-                <div class="text-xs text-slate-400">minADE=<span class="text-amber-300 font-semibold">7.954 m</span> · jaccard=0.444</div>
+                <div class="text-xs text-slate-400">minADE=<span class="text-amber-300 font-semibold">5.772 m</span> · jaccard=0.714</div>
               </div>
               <div class="grid md:grid-cols-2 gap-4 mb-5">
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
@@ -412,8 +413,8 @@
                 </div>
                 <div class="bg-slate-950 border border-amber-900/50 rounded-2xl p-4">
                   <div class="text-[11px] uppercase tracking-wider text-amber-500 mb-2">Generated CoC (T=0.6, 1 sample)</div>
-                  <p class="text-sm text-amber-100">Stop to yield to the pedestrian crossing ahead</p>
-                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Stop to yield to the pedestrian crossing ahead&lt;|cot_end|&gt;&lt;|traj_future_start|&gt;&lt;|endoftext|&gt;</p>
+                  <p class="text-sm text-amber-100">Yield to the pedestrian crossing the road</p>
+                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Yield to the pedestrian crossing the road&lt;|cot_end|&gt;&lt;|traj_future_start|&gt;&lt;|endoftext|&gt;</p>
                 </div>
               </div>
               <div class="grid md:grid-cols-2 gap-3 mb-5 text-xs font-mono">
@@ -422,15 +423,15 @@
                   · speed [7.243, 0.722] m/s
                 </div>
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-amber-200">
-                  Pred XY start [0.7335, -0.0035] → end [28.0939, -1.0583] · path 28.1138 m
-                  · speed [7.335, 1.982] m/s
+                  Pred XY start [0.7357, -0.0002] → end [22.661, -0.1538] · path 22.6615 m
+                  · speed [7.357, 1.097] m/s
                 </div>
               </div>
               
               <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 mb-5 text-[11px] font-mono text-slate-300">
-                expert t0_v=7.357150554656982 m/s · accel mean=-1.2802929878234863
-                min=-3.8483707904815674 max=0.37667524814605713 ·
-                kappa mean=0.03176626190543175 |max|=0.7386441826820374 ·
+                expert t0_v=7.357150554656982 m/s · accel mean=-1.4789104461669922
+                min=-3.785961389541626 max=0.15802136063575745 ·
+                kappa mean=-0.018824726343154907 |max|=0.05467495322227478 ·
                 pos0_ok=True hide=None:None
               </div>
               
@@ -500,7 +501,7 @@
                   <div class="font-display text-xl text-white">Clip 4 · <span class="font-mono text-sm text-cyan-300">36cb5485-5c56-48c5-8219-90095851d627</span></div>
                   <div class="text-xs text-slate-400 mt-1">chunk=57 · train · ANIMALS_BIRDS_ROADKILL · t0_us=9746740 · seed=46</div>
                 </div>
-                <div class="text-xs text-slate-400">minADE=<span class="text-amber-300 font-semibold">9.578 m</span> · jaccard=0.214</div>
+                <div class="text-xs text-slate-400">minADE=<span class="text-amber-300 font-semibold">3.675 m</span> · jaccard=0.308</div>
               </div>
               <div class="grid md:grid-cols-2 gap-4 mb-5">
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4">
@@ -509,8 +510,8 @@
                 </div>
                 <div class="bg-slate-950 border border-amber-900/50 rounded-2xl p-4">
                   <div class="text-[11px] uppercase tracking-wider text-amber-500 mb-2">Generated CoC (T=0.6, 1 sample)</div>
-                  <p class="text-sm text-amber-100">Stop to yield to the pedestrian in the crosswalk.</p>
-                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Stop to yield to the pedestrian in the crosswalk.&lt;|cot_end|&gt;&lt;|traj_future_start|&gt;&lt;|endoftext|&gt;</p>
+                  <p class="text-sm text-amber-100">Stop to yield to the pedestrians in the crosswalk.</p>
+                  <p class="mt-2 text-[11px] text-slate-500 font-mono break-all">Stop to yield to the pedestrians in the crosswalk.&lt;|cot_end|&gt;&lt;|traj_future_start|&gt;&lt;|endoftext|&gt;</p>
                 </div>
               </div>
               <div class="grid md:grid-cols-2 gap-3 mb-5 text-xs font-mono">
@@ -519,15 +520,15 @@
                   · speed [9.574, 0.573] m/s
                 </div>
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-amber-200">
-                  Pred XY start [0.9684, -0.0023] → end [37.4214, 18.2443] · path 41.6319 m
-                  · speed [9.684, 7.154] m/s
+                  Pred XY start [0.9684, -0.0002] → end [28.6008, 0.1362] · path 28.6011 m
+                  · speed [9.684, 2.751] m/s
                 </div>
               </div>
               
               <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 mb-5 text-[11px] font-mono text-slate-300">
-                expert t0_v=9.700448989868164 m/s · accel mean=-0.6099350452423096
-                min=-3.1774535179138184 max=2.219844102859497 ·
-                kappa mean=0.8505354523658752 |max|=3.182152032852173 ·
+                expert t0_v=9.700448989868164 m/s · accel mean=-1.6159178018569946
+                min=-3.5343985557556152 max=2.6723620891571045 ·
+                kappa mean=0.021257000043988228 |max|=0.356281578540802 ·
                 pos0_ok=True hide=None:None
               </div>
               

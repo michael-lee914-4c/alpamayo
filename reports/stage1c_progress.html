@@ -39,15 +39,15 @@
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Stage Status</div>
                     <div class="text-3xl font-semibold text-sky-400">In Progress</div>
-                    <div class="text-xs text-slate-500 mt-1">First-step LM prefill 58.2 s · still dominant</div>
+                    <div class="text-xs text-slate-500 mt-1">G1 signed off · P2f 6.2 s window</div>
                 </div>
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Key Focus</div>
-                    <div class="font-semibold text-xl text-cyan-400">Diagnose, then cut work</div>
+                    <div class="font-semibold text-xl text-cyan-400">Phase 3 / Bar B unblocked</div>
                 </div>
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Gate</div>
-                    <div class="font-semibold text-xl text-amber-400">G1 timers before quant</div>
+                    <div class="font-semibold text-xl text-emerald-400">G1 signed off</div>
                 </div>
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Plan</div>
@@ -56,21 +56,24 @@
             </div>
         </div>
 
-        <div class="bg-amber-950/40 border border-amber-700 rounded-3xl p-6 mb-8 text-sm text-slate-200 space-y-2">
-            <div class="font-semibold text-amber-400">Verification gap (protocol)</div>
+        <div class="bg-emerald-950/40 border border-emerald-700 rounded-3xl p-6 mb-8 text-sm text-slate-200 space-y-2">
+            <div class="font-semibold text-emerald-400">G1 signed off (2026-08-29)</div>
             <p>
-                PR <a class="text-cyan-400 hover:underline" href="https://github.com/michael-lee914-4c/alpamayo/pull/7">#7</a>
-                (P1a timers) was merged to <code>main</code> before a
-                <code>.venv</code> pass/fail table was written here. That violates
-                the stage-progress rule: tests must use
-                <code>/Users/michaellee/Projects/alpamayo/.venv</code> and be
-                documented before treating the change as verified.
+                User confirmed all G1 success criteria are met. Canonical
+                baseline is P2f greedy e2e: encode 1044 · prefill 3645 ·
+                decode 856 / 13 tok · FM 630 / 10 · dominant
+                <strong class="text-amber-300">prefill</strong>. Dtype bf16
+                (action_in_proj Fourier still fp32). Compiled: prefill yes;
+                encode / decode / FM no. <code>num_traj_samples=1</code>,
+                <code>max_generation_length=256</code>.
             </p>
             <p>
-                Unit tests were recorded 2026-08-29. Greedy e2e with
-                <code>ALPAMAYO_STAGE_TIMERS=1</code> was run the same day (table
-                below). That is <strong>one cold trial</strong>. Do not merge
-                the next Stage 1c PR until this report is checked.
+                One documented cold trial; user accepted. Phase 3 T3.1
+                (4-bit language tower only) is unblocked. Do not 4-bit the
+                expert or vision first. PR
+                <a class="text-cyan-400 hover:underline" href="https://github.com/michael-lee914-4c/alpamayo/pull/7">#7</a>
+                still merged before a <code>.venv</code> table — do not repeat
+                that process error.
             </p>
         </div>
 
@@ -84,27 +87,48 @@
                     <div class="font-semibold text-slate-200 mb-1">Key design choices</div>
                     <ul class="list-disc pl-5 space-y-1 text-xs">
                         <li>Stage 1c is incremental PRs into <code>main</code> (not <code>optimize-inference-time</code>; that landed in #5).</li>
-                        <li>P0 is inventory only. P1a is wall-clock only. No Euler/decode/quant change until G1 is green.</li>
+                        <li>P0 is inventory only. P1a is wall-clock only. G1 signed off 2026-08-29 on the P2f table.</li>
                         <li>Timers are opt-in (<code>ALPAMAYO_STAGE_TIMERS=1</code>) so the default e2e path stays unchanged.</li>
                         <li>Encode is timed around <code>vision_tower</code> only.</li>
                         <li><strong>Prefill is the first token</strong>: <code>language_model(...)</code> on the prompt (<code>seq_len &gt; 1</code>) plus <code>mx.eval(logits)</code> inside <code>AlpamayoModel.__call__</code>. After token 1, one-token LM calls are decode (warm KV).</li>
                         <li>T1.1 is greedy e2e + <code>ALPAMAYO_STAGE_TIMERS=1</code>.</li>
                         <li>P2a: one <code>mx.eval</code> after the Euler loop. Mid-loop <code>clear_cache</code> removed so it cannot sync every 3 steps.</li>
+                        <li>P2b skipped: decode is 0.8% of the G1 window.</li>
+                        <li>P2e / T2.2: <code>mx.compile</code> each decoder layer for <code>seq_len &gt; 1</code>. Cache is captured in the closure (it cannot be a compile argument). Decode stays eager.</li>
+                        <li>P2e first wrap assigned instance <code>__call__</code> — a no-op for <code>layer(...)</code>. 14:40 e2e was eager. Fix: replace each decoder with <code>CompiledPrefillLayer</code> so the class <code>__call__</code> is what <code>Qwen3VLModel</code> invokes.</li>
+                        <li>P2f: <code>bind_image_pixel_budget</code> after processor load. Qwen3-VL JSON <code>size.longest_edge=16777216</code> left 1080p at grid <code>68×120</code>. NVIDIA budget is <code>163840–196608</code> (~320×576, grid <code>20×36</code>).</li>
+                        <li>5-clip T=0.6 after P2f is the quality check for that bind (same clips/seeds as <code>coc_sample_5_t06</code>). Native-32k snapshot kept at <code>results_pre_p2f.json</code>.</li>
                     </ul>
                 </div>
                 <div>
                     <div class="font-semibold text-slate-200 mb-1">Why</div>
                     <p class="text-xs">
-                        The speedup plan forbids Phase 3 quant until G1 fields exist.
-                        A clock that dumps encode into prefill would pick the wrong first cut.
+                        G1 exists so the first cut is named. It was prefill at 32k tokens;
+                        P2f cut that work. Phase 3 is now allowed on the language tower only.
+                    </p>
+                    <p class="text-xs mt-2">
+                        <strong class="text-slate-200">Why P2e compile did not cut prefill (−48&nbsp;ms on 58.1&nbsp;s).</strong>
+                        <code>mx.compile</code> fuses small elementwise chains and amortizes graph capture across many same-shape calls.
+                        It does not rewrite matmul or attention. Eager MLX is already lazy: the 36-layer stack is one graph until
+                        <code>mx.eval(logits)</code>. The 32k-token pass was native 1080p, not a kernel problem.
+                    </p>
+                    <p class="text-xs mt-2">
+                        <strong class="text-slate-200">Why P2f cut prefill 16×.</strong>
+                        Qwen3-VL JSON <code>size.longest_edge=16777216</code> left 1080×1920 at grid
+                        <code>68×120</code>. NVIDIA helper/SFT already declare <code>163840–196608</code>.
+                        Binding that after load yields <code>20×36</code> (~180 tokens/frame, seq 3006).
+                        The greedy CoC pin moved from stop-sign to yield-to-pedestrian (closer to GT).
                     </p>
                 </div>
                 <div>
                     <div class="font-semibold text-slate-200 mb-1">Rejected</div>
                     <ul class="list-disc pl-5 space-y-1 text-xs">
                         <li>Always-on timers / extra eval on the default path — would change sync vs 1b e2e.</li>
-                        <li>4-bit expert or vision first — plan forbids it before G1.</li>
+                        <li>4-bit expert or vision first — still forbidden after G1. Language tower only (T3.1).</li>
                         <li>Merging P1a without a documented <code>.venv</code> table — already happened; do not repeat.</li>
+                        <li>P2b decode host-sync and P2c compile-FM first — G1 says they are under 5%.</li>
+                        <li>Compile the same 36 decoder layers again, or compile the whole 32k stack as the next speed cut — same FLOPs, worse first-call cost.</li>
+                        <li>Install torchvision to make HF’s Fast processor load — it pulled torch 2.12→2.10. mlx_vlm’s torch-free processor + bind is enough.</li>
                     </ul>
                 </div>
             </div>
@@ -145,8 +169,23 @@
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 font-mono text-xs text-cyan-300 overflow-auto">
                     ALPAMAYO_STAGE_TIMERS=1 → extra["stage_times"] + [STAGE] line<br>
                     Off by default. Extra mx.eval(hidden_states) only when current_clock() is set.<br>
-                    P2a: FlowMatching.sample evals x once after the loop (was every Euler step).
+                    P2a: FlowMatching.sample evals x once after the loop (was every Euler step).<br>
+                    P2e: wrap each decoder layer with mx.compile for seq&gt;1 (compiled_backbone.py).
                 </div>
+                <div class="text-[11px] uppercase tracking-wider text-slate-500">P2e (this PR)</div>
+                <ul class="text-xs space-y-1 font-mono">
+                    <li>mlx_port/models/compiled_backbone.py — CompiledPrefillLayer replaces list entries (class __call__)</li>
+                    <li>mlx_port/models/alpamayo_qwen3vl.py — install on AlpamayoLanguageModel.from_existing</li>
+                    <li>mlx_port/stage_timers.py — set_compiled / compiled_flags</li>
+                    <li>mlx_port/tests/test_compiled_backbone.py — eager match, KV fill, idempotent install</li>
+                </ul>
+                <div class="text-[11px] uppercase tracking-wider text-slate-500">P2f (this increment)</div>
+                <ul class="text-xs space-y-1 font-mono">
+                    <li>mlx_port/processor.py — bind_image_pixel_budget, smart_resize_hw, get_processor binds after load</li>
+                    <li>mlx_port/tests/test_pixel_budget.py — 1080p → 20×36; 16-frame prefix not ~32k</li>
+                    <li>mlx_port/PORT.md · mlx_port/alpamayo1-mlx-speedup-plan.html T2.5</li>
+                    <li>mlx_port/scripts/run_local_traj_sample.py — print token count + grid; note P2f in HTML</li>
+                </ul>
             </div>
         </div>
 
@@ -169,13 +208,37 @@ PYTHONPATH=src:. ALPAMAYO_STAGE_TIMERS=1 \
 # 2026-08-29 14:01 · first-step LM timer · 1 passed in 113.14 s
 # [STAGE] encode=21043.8 prefill=58151.3 decode=652.1 decode_tok=11 fm=2032.8 dominant=prefill
 
+# 2026-08-29 14:40 · instance __call__ wrap · 1 passed in 112.53 s · still eager
+# [STAGE] encode=21039.0 prefill=58224.4 decode=639.3 fm=2015.3
+
+# 2026-08-29 14:47 · CompiledPrefillLayer on 36 layers · 1 passed in 121.19 s
+# [COMPILE] installed 36 layers · first capture seq_len=32766
+# [STAGE] encode=21046.1 prefill=58103.1 decode=876.0 decode_tok=11 fm=9265.7 dominant=prefill
+
+# 2026-08-29 15:20 · P2f pixel-budget tests
+# pytest mlx_port/tests/test_pixel_budget.py · 7 passed
+# not slow: 104 passed, 1 skipped (19.05 s)
+
+# 2026-08-29 15:25 · P2f greedy e2e · 1 passed in 27.66 s
+# [PIXELS] bound min=163840 max=196608
+# [e2e] input_ids (1, 3006) · 16×[1,20,36] · pixel_values (11520, 1536)
+# [COMPILE] first capture seq_len=3006
+# [STAGE] encode=1044.1 prefill=3644.7 decode=855.6 decode_tok=13 fm=630.3 dominant=prefill
+
+# 2026-08-29 20:27 · 5-clip T=0.6 traj sample after P2f
+PYTHONPATH=src:. /Users/michaellee/Projects/alpamayo/.venv/bin/python \
+  mlx_port/scripts/run_local_traj_sample.py \
+  --report-dir reports/traj_sample_5_t06 --no-reuse
+# all 5 clips tokens=3006 · 16×[1,20,36] · wrote index.html · ~119 s wall
+
 # median helper (no Metal):
 PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
   /Users/michaellee/Projects/alpamayo/.venv/bin/python -m pytest \
   mlx_port/tests/test_stage_timers.py -q --tb=short
 # 2026-08-29 · 7 passed (then +vlm_step_stage)
 # later same day: test_stage_timers + test_alpamayo_r1_mlx 15 passed
-# full not-slow suite: 79 passed, 1 skipped</pre>
+# 2026-08-29 14:30 · P2e compile tests + not-slow: 85 passed, 1 skipped
+# 2026-08-29 14:47 · after class-__call__ fix: 87 passed, 1 skipped</pre>
                 <p class="text-xs text-slate-400">
                     Interpreter: <code>/Users/michaellee/Projects/alpamayo/.venv/bin/python</code>.
                     Same filter as CI <code>macos-26 (no weights)</code>.
@@ -232,9 +295,9 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                                 <td class="px-2 py-2">seq 32777 → prefill; seq 1 → decode</td>
                             </tr>
                             <tr class="border-b border-slate-800/80">
-                                <td class="px-2 py-2">Remaining <code>not slow</code> suite (69 tests in action_in_proj, expert, unicycle, tokenizer, gt_eval, rope, nucleus, traj plots, …)</td>
+                                <td class="px-2 py-2">Remaining <code>not slow</code> suite</td>
                                 <td class="px-2 py-2 text-emerald-400">PASS</td>
-                                <td class="px-2 py-2">All collected items PASSED. No assertion failures.</td>
+                                <td class="px-2 py-2">2026-08-29 15:20 · 104 passed, 1 skipped, 5 deselected · 19.05 s</td>
                             </tr>
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono">test_traj_to_action_numerical.py::test_without_v0_matches_nvidia_torch</td>
@@ -244,60 +307,168 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono">test_end_to_end_inference.py::test_end_to_end_inference_prints_coc_vlm_only[256]</td>
                                 <td class="px-2 py-2 text-emerald-400">PASS</td>
-                                <td class="px-2 py-2">First-step timer 2026-08-29 14:01 · 113.14 s · encode 21044 / prefill 58151 / decode 652 (11 tok) / fm 2033. CoC pinned. minADE 4.187 m. T=0.6 not rerun.</td>
+                                <td class="px-2 py-2">14:47 compile (32k): 121.19 s · prefill 58103. 15:25 P2f budget: 27.66 s · seq=3006 · 16×[1,20,36] · prefill 3644.7 · encode 1044.1 · CoC pin updated. minADE 5.232 m.</td>
                             </tr>
-                            <tr>
+                            <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono">test_alpamayo_r1_mlx.py::test_flow_matching_evals_once_after_euler_loop</td>
                                 <td class="px-2 py-2 text-emerald-400">PASS</td>
                                 <td class="px-2 py-2">10 Euler steps, dummy step_fn, mx.eval called once.</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">test_compiled_backbone.py::test_compiled_prefill_matches_eager_and_fills_cache</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">layer(...) hits CompiledPrefillLayer.__call__. seq=16 match eager. 1 capture then reuse.</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">test_compiled_backbone.py::test_decode_after_compiled_prefill_appends_kv</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">Prefill 8 tok compiled, then seq=1 eager. offset 8 → 9.</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">test_stage_timers.py::test_set_compiled_updates_as_dict</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">set_compiled("prefill") flips G1 compiled.prefill. Unknown stage raises.</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">test_pixel_budget.py::test_smart_resize_1080p_is_320x576</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">1080×1920 → 320×576, grid 20×36</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">test_pixel_budget.py::test_mlx_vlm_image_processor_1080p_grid_after_bind</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">JSON 16M budget → [1,68,120]; after bind → [1,20,36]</td>
+                            </tr>
+                            <tr>
+                                <td class="px-2 py-2 font-mono">test_pixel_budget.py::test_get_processor_downsamples_16_native_frames</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">16×1080p via get_processor: grid all [1,20,36]; input_ids &lt; 8000</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
                 <div>
-                    <div class="font-semibold text-slate-300 mb-2">G1 stage times — greedy e2e, first-step LM timer (2026-08-29 14:01)</div>
+                    <div class="font-semibold text-slate-300 mb-2">G1 stage times — greedy e2e, 32k native vs P2f pixel budget</div>
                     <p class="text-xs text-slate-500 mb-2">
-                        <code>ALPAMAYO_STAGE_TIMERS=1</code> · <code>.venv</code> · T=0 · clip 0abe118e-… ·
-                        prefill = <code>language_model</code> on the prompt + <code>mx.eval(logits)</code>.
-                        decode = one-token LM calls after token 1 (11 steps). Cold load.
+                        Same command, clip, T=0, first-step LM timer.
+                        14:01 eager at native <code>68×120</code> (<code>seq=32766</code>).
+                        15:25 P2f at NVIDIA <code>163840–196608</code> (<code>16×[1,20,36]</code>, <code>seq=3006</code>).
                     </p>
                     <div class="overflow-auto mb-3">
                         <table class="w-full text-left text-xs">
                             <thead class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
                                 <tr>
                                     <th class="px-2 py-2">Field</th>
-                                    <th class="px-2 py-2">Value</th>
-                                    <th class="px-2 py-2">Share of stage total</th>
+                                    <th class="px-2 py-2">14:01 eager 32k</th>
+                                    <th class="px-2 py-2">15:25 P2f 3k</th>
+                                    <th class="px-2 py-2">vs 32k</th>
                                 </tr>
                             </thead>
                             <tbody class="text-slate-300">
-                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">encode_ms</td><td class="px-2 py-2">21043.8</td><td class="px-2 py-2">25.7%</td></tr>
-                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">prefill_ms</td><td class="px-2 py-2 font-semibold text-amber-300">58151.3</td><td class="px-2 py-2">71.0% · first LM step</td></tr>
-                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">decode_ms</td><td class="px-2 py-2">652.1</td><td class="px-2 py-2">0.8% · 11 tok after first · 59.28 ms/tok</td></tr>
-                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">fm_ms</td><td class="px-2 py-2">2032.8</td><td class="px-2 py-2">2.5% · 10 steps · 203.28 ms/step</td></tr>
-                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">convert_ms</td><td class="px-2 py-2">0.1</td><td class="px-2 py-2">~0%</td></tr>
-                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">stage total_ms</td><td class="px-2 py-2">81880.1</td><td class="px-2 py-2">81.9 s window</td></tr>
-                                <tr><td class="px-2 py-2 font-mono">pytest wall</td><td class="px-2 py-2">113.14 s</td><td class="px-2 py-2">load + data + window + cleanup</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">input_ids / grid</td><td class="px-2 py-2">32766 · 16×[1,68,120]</td><td class="px-2 py-2">3006 · 16×[1,20,36]</td><td class="px-2 py-2">11× fewer tokens</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">encode_ms</td><td class="px-2 py-2">21043.8</td><td class="px-2 py-2">1044.1</td><td class="px-2 py-2">20×</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">prefill_ms</td><td class="px-2 py-2 font-semibold text-amber-300">58151.3</td><td class="px-2 py-2 font-semibold text-emerald-300">3644.7</td><td class="px-2 py-2">16×</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">decode_ms</td><td class="px-2 py-2">652.1 · 11 tok</td><td class="px-2 py-2">855.6 · 13 tok</td><td class="px-2 py-2">similar ms/tok</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">fm_ms</td><td class="px-2 py-2">2032.8</td><td class="px-2 py-2">630.3</td><td class="px-2 py-2">3× (shorter KV)</td></tr>
+                                <tr class="border-b border-slate-800/80"><td class="px-2 py-2 font-mono">stage total_ms</td><td class="px-2 py-2">81880.1</td><td class="px-2 py-2">6174.8</td><td class="px-2 py-2">13×</td></tr>
+                                <tr><td class="px-2 py-2 font-mono">pytest wall</td><td class="px-2 py-2">113.14 s</td><td class="px-2 py-2">27.66 s</td><td class="px-2 py-2">model load still ~20 s</td></tr>
                             </tbody>
                         </table>
                     </div>
                     <p class="text-xs text-slate-400">
-                        Dominant is <strong class="text-amber-300">prefill</strong> (the first LM step, ~32k tokens).
-                        Encode 21.0 s is next. Decode and FM stay under 5%.
+                        P2e compile on the 32k path did not move prefill (−48&nbsp;ms).
+                        P2f did: less work, not a faster kernel.
+                        Dominant is still <strong class="text-amber-300">prefill</strong> (3.6&nbsp;s of 6.2&nbsp;s).
                     </p>
                 </div>
                 <div>
                     <div class="font-semibold text-slate-300 mb-1">Critical Alpamayo outputs</div>
                     <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-xs text-slate-300 space-y-1">
-                        <div>CoC: <code>Stop for the stop sign at the intersection.</code> (pinned prefix held; readable=True; jaccard=0.077 vs GT yield-to-pedestrian)</div>
+                        <div>CoC: <code>Stop to yield to the pedestrian in the crosswalk.</code> (new P2f pin; readable=True; jaccard=0.500 · gt_coverage=0.625)</div>
                         <div>GT CoC: Strong deceleration to yield to the pedestrian crossing the crosswalk.</div>
-                        <div><code>pred_xyz</code> <code>(1,1,1,64,3)</code> · pred end (33.70, −0.07) · GT end (18.79, 0.06)</div>
-                        <div>minADE <strong>4.187 m</strong> · t0_v=7.953 m/s · accel mean −0.86</div>
+                        <div>Native-res pin was <code>Stop for the stop sign…</code> (jaccard 0.077). Budgeted greedy is closer to GT.</div>
+                        <div><code>pred_xyz</code> <code>(1,1,1,64,3)</code> · pred end (29.55, 0.06) · GT end (18.79, 0.06)</div>
+                        <div>minADE <strong>5.232 m</strong> · unseeded FM (14:01 native was 4.187 m)</div>
                     </div>
                 </div>
                 <div>
                     <div class="font-semibold text-slate-300 mb-1">Failure cases</div>
-                    <p class="text-xs text-slate-500">No test failure. Process: #7 merged before a <code>.venv</code> table. Quality leftover unchanged: CoC says stop-sign, GT is yield-to-pedestrian; XY overshoots.</p>
+                    <p class="text-xs text-slate-500">First P2f e2e failed the old stop-sign pin (expected). Pin updated to the budgeted greedy sentence; second run passed in 27.66 s. XY still overshoots on yield clips (pred keeps moving after GT has nearly stopped).</p>
+                </div>
+                <div>
+                    <div class="font-semibold text-slate-300 mb-2">5-clip T=0.6 traj sample — native 32k vs P2f budget</div>
+                    <p class="text-xs text-slate-500 mb-2">
+                        Same clips / seed 42 / T=0.6 / top_p=0.98 / 1 traj.
+                        Pre-P2f snapshot: <code>results_pre_p2f.json</code> (mean minADE 7.85 m).
+                        Plots: <a class="text-cyan-400 hover:underline" href="traj_sample_5_t06/index.html">reports/traj_sample_5_t06/index.html</a>.
+                    </p>
+                    <div class="overflow-auto mb-3">
+                        <table class="w-full text-left text-xs">
+                            <thead class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
+                                <tr>
+                                    <th class="px-2 py-2">#</th>
+                                    <th class="px-2 py-2">Clip</th>
+                                    <th class="px-2 py-2">minADE old</th>
+                                    <th class="px-2 py-2">minADE new</th>
+                                    <th class="px-2 py-2">Δ</th>
+                                    <th class="px-2 py-2">Pred CoC (new)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-300">
+                                <tr class="border-b border-slate-800/80">
+                                    <td class="px-2 py-2">0</td>
+                                    <td class="px-2 py-2 font-mono">faff17c7</td>
+                                    <td class="px-2 py-2">9.185</td>
+                                    <td class="px-2 py-2 text-emerald-300">4.773</td>
+                                    <td class="px-2 py-2">−4.41</td>
+                                    <td class="px-2 py-2">Nudge left for work-zone trucks/cones (was “slow for road worker”). Pred end y 37.3 vs GT 31.8 — left turn now exists.</td>
+                                </tr>
+                                <tr class="border-b border-slate-800/80">
+                                    <td class="px-2 py-2">1</td>
+                                    <td class="px-2 py-2 font-mono">8e83f069</td>
+                                    <td class="px-2 py-2">6.049</td>
+                                    <td class="px-2 py-2 text-emerald-300">4.719</td>
+                                    <td class="px-2 py-2">−1.33</td>
+                                    <td class="px-2 py-2">Slow down to yield (was “Stop”). End 39.3 vs GT 28.2.</td>
+                                </tr>
+                                <tr class="border-b border-slate-800/80">
+                                    <td class="px-2 py-2">2</td>
+                                    <td class="px-2 py-2 font-mono">1946f1c3</td>
+                                    <td class="px-2 py-2">6.464</td>
+                                    <td class="px-2 py-2 text-emerald-300">3.869</td>
+                                    <td class="px-2 py-2">−2.60</td>
+                                    <td class="px-2 py-2">Stop to yield to the pedestrian (was cross-traffic). End 20.7 vs GT 9.1 — still overshoots a stop.</td>
+                                </tr>
+                                <tr class="border-b border-slate-800/80">
+                                    <td class="px-2 py-2">3</td>
+                                    <td class="px-2 py-2 font-mono">8e06f83c</td>
+                                    <td class="px-2 py-2">7.954</td>
+                                    <td class="px-2 py-2 text-emerald-300">5.772</td>
+                                    <td class="px-2 py-2">−2.18</td>
+                                    <td class="px-2 py-2">Yield to the pedestrian crossing the road (near-exact GT). End 22.7 vs GT 13.7.</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-2 py-2">4</td>
+                                    <td class="px-2 py-2 font-mono">36cb5485</td>
+                                    <td class="px-2 py-2">9.578</td>
+                                    <td class="px-2 py-2 text-emerald-300">3.675</td>
+                                    <td class="px-2 py-2">−5.90</td>
+                                    <td class="px-2 py-2">Stop to yield to pedestrians. Lateral miss gone (y 18.2 → 0.14 vs GT −0.13).</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-xs text-slate-400">
+                        Mean minADE <strong class="text-slate-200">7.85 → 4.56 m (−3.28 m)</strong>.
+                        All five clips used the bound budget (3006 tokens, 16×[1,20,36]).
+                        Every ADE improved. Leftover: yield/stop clips still roll farther than GT.
+                    </p>
+                    <p class="text-xs text-emerald-300/90 mt-2">
+                        User reviewed the XY / CoC / speed plots 2026-08-29 and signed the
+                        5-clip quality as good. Heading and scene language are the win
+                        (clip 0 left turn, clip 4 lateral miss gone). Yield overshoot is
+                        leftover, not a P2f regression.
+                    </p>
                 </div>
             </div>
         </div>
@@ -310,18 +481,18 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6">
                     <div class="text-xs text-slate-500">Peak memory (first-step e2e)</div>
-                    <div class="text-2xl font-semibold text-white mt-2">67.51 <span class="text-lg text-slate-400">GiB</span></div>
-                    <div class="text-xs text-slate-500 mt-1">RSS 67.51 · Metal 52.59</div>
+                    <div class="text-2xl font-semibold text-white mt-2">63.13 <span class="text-lg text-slate-400">GiB</span></div>
+                    <div class="text-xs text-slate-500 mt-1">RSS 63.13 · Metal 55.10 · P2f 15:25</div>
                 </div>
                 <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6">
                     <div class="text-xs text-slate-500">First-step window / pytest</div>
-                    <div class="text-2xl font-semibold text-white mt-2">81.9 / 113 s</div>
-                    <div class="text-xs text-slate-500 mt-1">LM prefill 58.2 s · encode 21.0 s · decode 0.65 s</div>
+                    <div class="text-2xl font-semibold text-white mt-2">6.2 / 28 s</div>
+                    <div class="text-xs text-slate-500 mt-1">Was 81.9 / 113 s at native 32k</div>
                 </div>
                 <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6">
                     <div class="text-xs text-slate-500">G1 dominant (first LM step)</div>
                     <div class="text-2xl font-semibold text-amber-400 mt-2">prefill</div>
-                    <div class="text-xs text-slate-500 mt-1">58.2 s · 71% of 81.9 s. Encode 21.0 s. Decode+FM &lt;5%.</div>
+                    <div class="text-xs text-slate-500 mt-1">3.6 s · 59% of 6.2 s. Encode 1.0 s. Decode+FM ~1.5 s.</div>
                 </div>
             </div>
         </div>
@@ -336,7 +507,7 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                     One task per branch. Open a PR into <code>main</code>, document
                     <code>.venv</code> tests here, then wait for user verification before merge
                     (<code>optimize-inference-time</code> landed in PR #5).
-                    Do not 4-bit the expert first. Do not start Phase 3 until G1 is green.
+                    Do not 4-bit the expert first. G1 is signed off; T3.1 is language-tower only.
                 </p>
                 <div class="overflow-auto">
                     <table class="w-full text-left text-xs">
@@ -377,25 +548,37 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                                 <td class="px-2 py-2 font-mono text-sky-300">P2b</td>
                                 <td class="px-2 py-2 font-mono">stage1c-p2-decode-host-sync</td>
                                 <td class="px-2 py-2">Cut per-token <code>mx.eval</code> / NumPy sample if G1 says decode is material.</td>
-                                <td class="px-2 py-2 text-slate-500">after G1</td>
+                                <td class="px-2 py-2 text-slate-500">skipped (decode 0.8%)</td>
                             </tr>
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono text-sky-300">P2c</td>
                                 <td class="px-2 py-2 font-mono">stage1c-p2-compile-fm</td>
                                 <td class="px-2 py-2"><code>mx.compile</code> the fixed-shape FM step. Re-time.</td>
-                                <td class="px-2 py-2 text-slate-500">after P2a</td>
+                                <td class="px-2 py-2 text-slate-500">later (FM 2.5%)</td>
                             </tr>
-                            <tr>
+                            <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono text-sky-300">P2d</td>
                                 <td class="px-2 py-2 font-mono">stage1c-p2-train-knobs</td>
                                 <td class="px-2 py-2">Train-config YAML: 1 traj, FM 4–6, CoT cap 32–64 or 0. Not 4-bit.</td>
-                                <td class="px-2 py-2 text-slate-500">after G1</td>
+                                <td class="px-2 py-2 text-slate-500">open (Bar B)</td>
+                            </tr>
+                            <tr>
+                                <td class="px-2 py-2 font-mono text-sky-300">P2e</td>
+                                <td class="px-2 py-2 font-mono">stage1c-p2-compile-prefill</td>
+                                <td class="px-2 py-2"><code>mx.compile</code> each decoder layer for prefill (<code>seq_len &gt; 1</code>). Re-time.</td>
+                                <td class="px-2 py-2 text-slate-500">measured · no prefill win</td>
+                            </tr>
+                            <tr>
+                                <td class="px-2 py-2 font-mono text-sky-300">P2f</td>
+                                <td class="px-2 py-2 font-mono">stage1c-p2-compile-prefill</td>
+                                <td class="px-2 py-2">Bind NVIDIA pixel budget so 1080p downsamples. Re-time greedy e2e.</td>
+                                <td class="px-2 py-2 text-sky-400">measured · 16× prefill</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
                 <p class="text-xs text-slate-500">
-                    Phase 3 (mixed PTQ) and T4.3 (train graph that does not generate) stay later.
+                    G1 is signed off. Phase 3 T3.1 and T4.3 (train graph that does not generate) are the two open forks.
                     Leftover 1b yield/stop quality is for MLX SFT after Bar B — not a NVIDIA T-match.
                 </p>
             </div>
@@ -423,11 +606,12 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                     <div>
                         <div class="text-[11px] uppercase tracking-wider text-amber-400 mb-2">Already visible without a timer</div>
                         <ul class="space-y-1 text-xs">
-                            <li>• <strong>No <code>mx.compile</code></strong> on any stage</li>
-                            <li>• <code>mx.eval</code> after <em>every</em> decode token and every Euler step</li>
+                            <li>• Prefill decoder layers are compiled (<code>seq_len &gt; 1</code>)</li>
+                            <li>• Pixel budget now binds (<code>163840–196608</code>); 16-frame dummy grid is <code>20×36</code></li>
+                            <li>• <code>mx.eval</code> after every decode token; one eval after the Euler loop</li>
                             <li>• Nucleus sample is NumPy / float32 on host</li>
                             <li>• <code>action_in_proj</code> casts to float32 (10× per window)</li>
-                            <li>• Prefill ~32k tokens on the default clip</li>
+                            <li>• Prefill was ~32k at native 68×120; P2f is 3006 at 20×36</li>
                         </ul>
                     </div>
                 </div>
@@ -445,7 +629,7 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
             </div>
             <div class="bg-slate-900 border border-rose-800/50 rounded-3xl p-6 text-xs text-slate-400 space-y-1">
                 <div>• Quantize the whole model to uniform 4-bit as the first change. Do not 4-bit the expert or vision first.</div>
-                <div>• Start QLoRA before G1 timers exist. Do not backprop through packed <code>QuantizedLinear.weight</code>.</div>
+                <div>• Start QLoRA as a substitute for T3.1. Do not backprop through packed <code>QuantizedLinear.weight</code>.</div>
                 <div>• Set <code>num_traj_samples&gt;1</code> or <code>max_generation_length=256</code> inside a training loop.</div>
                 <div>• Claim FlashDrive on Mac. Chase token-level NVIDIA numerical match.</div>
             </div>
@@ -457,12 +641,9 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                 <span>Next</span>
             </div>
             <p class="text-sm text-slate-300">
-                P2a landed in
-                <a class="text-cyan-400 hover:underline" href="https://github.com/michael-lee914-4c/alpamayo/pull/9">#9</a>.
-                G1 fields are filled from greedy e2e (first-step LM timer).
-                Dominant is prefill. Do not spend a week on decode or FM. Do not
-                start Phase 3 quant until you sign off. First cut after sign-off
-                is prefill work, not Euler eval.
+                G1 is signed off. 5-clip T=0.6 after P2f reviewed by the user
+                (mean minADE 4.56 m, heading/CoC look right). Next infer cut is
+                T3.1 (language tower 4-bit). Bar B is T4.3.
             </p>
             <div class="mt-4 text-xs font-mono text-indigo-400">
                 reports/stage1c_progress.html · started 2026-08-29 ·

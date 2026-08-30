@@ -53,6 +53,7 @@
     .note { color: var(--muted); font-size: 13px; }
     .task { background: var(--bg-card); border: 1px solid var(--line); border-left: 3px solid var(--amber); border-radius: 8px; padding: 14px 16px; margin: 12px 0; }
     .task.gate { border-left-color: var(--purple); }
+    .task.gate.signed { border-left-color: var(--green); }
     .task.forbid { border-left-color: var(--red); }
     .task header { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline; margin-bottom: 6px; }
     .tid { font-family: var(--mono); color: var(--amber); font-size: 12.5px; font-weight: 650; }
@@ -141,7 +142,7 @@
     <tbody>
       <tr><td>Total / split</td><td>10B = 8.2B Cosmos-Reason backbone + 2.3B action expert</td><td>Quantize the language tower first. Expert is small enough to stay denser.</td></tr>
       <tr><td>Cameras</td><td>4: front-wide, front-tele, cross-left, cross-right</td><td>Vision prefill scales with cameras × frames.</td></tr>
-      <tr><td>Image history</td><td>0.4&nbsp;s @ 10&nbsp;Hz → 4 frames / camera = 16 RGB frames</td><td>Native 1080×1920, processor downsamples to ~320×576. Thousands of vision tokens.</td></tr>
+      <tr><td>Image history</td><td>0.4&nbsp;s @ 10&nbsp;Hz → 4 frames / camera = 16 RGB frames</td><td>Native 1080×1920. <code>bind_image_pixel_budget</code> forces <code>163840–196608</code> (JSON <code>longest_edge</code> is 16M and was leaving 68×120 / ~32k tokens). Budgeted grid is ~20×36 (~3k vision tokens).</td></tr>
       <tr><td>Ego history</td><td>16 poses @ 10&nbsp;Hz (1.6&nbsp;s)</td><td>Cheap vs vision. Do not over-optimize this.</td></tr>
       <tr><td>Trajectory</td><td>6.4&nbsp;s horizon, 64 waypoints @ 10&nbsp;Hz, unicycle accel+curvature</td><td>Expert outputs (64, 2) then integrates to xyz/rot.</td></tr>
       <tr><td>Flow matching</td><td>Euler, <strong>default 10 inference steps</strong></td><td>Corrected: not 20–50. Still worth trying 4–8 with an ADE check.</td></tr>
@@ -238,7 +239,7 @@ t2 CoT decode   # also tokens generated, ms/token
 t3 FM loop      # also ms/step, step count
 t4 convert action → xyz/rot</pre>
     <p>Instrumented: <code>ALPAMAYO_STAGE_TIMERS=1</code> → <code>extra["stage_times"]</code> and a <code>[STAGE]</code> line. <strong>Prefill</strong> is the first language-model step (token 1), timed around <code>language_model(...)</code> + <code>mx.eval(logits)</code> inside <code>AlpamayoModel.__call__</code>. After that token, decode is warm KV. Measure with greedy e2e on a fixed clip.</p>
-    <p><strong>Done when:</strong> a table like the one below is filled. If any stage is &lt;5% of 110&nbsp;s, do not spend a week on it.</p>
+    <p><strong>Done when:</strong> a table like the one below is filled. If any stage is &lt;5% of the window, do not spend a week on it. Landed and signed in G1 (2026-08-29).</p>
   </div>
 
   <div class="task">
@@ -251,16 +252,21 @@ mx.metal.stop_capture()</pre>
     <p>Open in Xcode only if T1.1 cannot explain the time (suspected launch overhead or tiny unfused kernels).</p>
   </div>
 
-  <div class="task gate">
-    <header><span class="tid">G1</span><span class="tname">Gate — do not start quant until this is green</span></header>
+  <div class="task gate signed">
+    <header><span class="tid">G1</span><span class="tname">Gate — signed off 2026-08-29</span></header>
+    <p>User signed off: all G1 fields exist and the first cut is named. Canonical baseline is P2f greedy e2e on clip <code>0abe118e-…</code> (NVIDIA pixel budget, <code>seq=3006</code>, T=0). One documented cold trial; user accepted. Phase 3 (T3.1, language tower only) is unblocked. Do not 4-bit the expert or vision first.</p>
     <table>
-      <thead><tr><th>Field</th><th>Required</th></tr></thead>
+      <thead><tr><th>Field</th><th>Value</th></tr></thead>
       <tbody>
-        <tr><td>encode_ms, prefill_ms, decode_ms, decode_tok, ms_per_tok, fm_ms, fm_steps, ms_per_fm_step</td><td>filled</td></tr>
-        <tr><td>dtype</td><td>known</td></tr>
-        <tr><td>compiled? (yes/no per stage)</td><td>known</td></tr>
-        <tr><td>num_traj_samples, max_generation_length</td><td>known</td></tr>
-        <tr><td>Dominant stage named</td><td>one of encode / prefill / decode / action / python-overhead</td></tr>
+        <tr><td>encode_ms</td><td>1044.1</td></tr>
+        <tr><td>prefill_ms</td><td>3644.7</td></tr>
+        <tr><td>decode_ms / decode_tok / ms_per_tok</td><td>855.6 / 13 / 65.82</td></tr>
+        <tr><td>fm_ms / fm_steps / ms_per_fm_step</td><td>630.3 / 10 / 63.03</td></tr>
+        <tr><td>stage total_ms</td><td>6174.8</td></tr>
+        <tr><td>dtype</td><td>bf16 weights; <code>action_in_proj</code> Fourier still fp32</td></tr>
+        <tr><td>compiled?</td><td>prefill yes (decoder layers, seq&gt;1); encode / decode / FM no</td></tr>
+        <tr><td>num_traj_samples / max_generation_length</td><td>1 / 256</td></tr>
+        <tr><td>Dominant stage</td><td class="ok">prefill</td></tr>
       </tbody>
     </table>
   </div>
@@ -283,7 +289,14 @@ def diffusion_step(x, t, *kv):
 def backbone_block(h, mask, cache):
     return block(h, mask, cache)</pre>
     <p>Capture once. Recapture if batch, cameras, or token length change. Do not compile a Python generation loop that changes shape every token unless you have a decode-step closure with static cache views.</p>
-    <p><strong>Done when:</strong> FM step and at least one backbone block are compiled; T1.1 shows lower launch overhead or lower ms/step.</p>
+    <p>Prefill (P2e): each Qwen3-VL decoder layer is compiled for <code>seq_len &gt; 1</code> (<code>mlx_port/models/compiled_backbone.py</code>). Cache stays in the closure; recapture if the cache object or length changes. Decode stays eager.</p>
+    <p><strong>Done when:</strong> FM step and at least one backbone block are compiled; T1.1 shows lower launch overhead or lower ms/step. Backbone blocks are compiled; FM step is not yet.</p>
+  </div>
+
+  <div class="task">
+    <header><span class="tid">T2.5</span><span class="tname">Bind NVIDIA pixel budget</span></header>
+    <p>Compile does not cut a one-shot 32k LM step. The 32k length was native 1080p: Qwen3-VL <code>size.longest_edge=16777216</code> ignored <code>MIN/MAX_PIXELS</code>. <code>bind_image_pixel_budget</code> in <code>mlx_port/processor.py</code> sets <code>163840–196608</code> after load. Expected grid <code>[1,20,36]</code> (~180 tokens/frame, ~3k prefix). Re-time greedy e2e. CoC pin may change — that budget is NVIDIA’s helper/SFT contract.</p>
+    <p><strong>Done when:</strong> <code>image_grid_thw</code> on the default clip is 16×<code>[1,20,36]</code> (or the smart_resize result for that frame size), not 16×<code>[1,68,120]</code>. T1.1 encode + prefill drop.</p>
   </div>
 
   <div class="task">

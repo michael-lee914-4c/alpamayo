@@ -3,8 +3,10 @@
 Filled from code on 2026-08-29, not from memory. One inference window =
 encode → prefill → CoC decode → 10-step flow-matching → `action_to_traj`.
 
-Do not start Phase 3 quant until Gate G1 in
-`alpamayo1-mlx-speedup-plan.html` is green.
+Gate G1 signed off 2026-08-29 (user). Canonical window: P2f greedy e2e,
+encode 1044 · prefill 3645 · decode 856 / 13 tok · FM 630 / 10 steps.
+Dominant = prefill. Phase 3 (T3.1 language-tower 4-bit) is unblocked.
+Do not 4-bit the expert or vision first.
 
 ## Four stages → files
 
@@ -20,10 +22,11 @@ Entry: `sample_trajectories_from_data_with_vlm_rollout` in `mlx_port/inference.p
 ## Encode
 
 - **Class:** mlx_vlm Qwen3-VL `vision_tower` with `AlpamayoPatchEmbed` (channels-first Conv3D; stock mlx_vlm `moveaxis` is bypassed).
-- **Input:** 4 cameras × `DEFAULT_NUM_FRAMES=4` = 16 RGB frames (`mlx_port/processor.py`). Native 1080×1920; processor `MIN_PIXELS=163840`, `MAX_PIXELS=196608`.
+- **Input:** 4 cameras × `DEFAULT_NUM_FRAMES=4` = 16 RGB frames (`mlx_port/processor.py`). Native 1080×1920.
+- **Pixel budget:** `MIN_PIXELS=163840`, `MAX_PIXELS=196608` (NVIDIA helper / SFT). `get_processor` calls `bind_image_pixel_budget` after load. Qwen3-VL JSON `size.longest_edge=16777216` is ignored. 1080×1920 → ~320×576, grid `[1, 20, 36]` (~180 tokens/frame). Before the bind, live greedy was native `68×120` (~32k prefix).
 - **Layout:** processor flats are HF `C*T*H*W` (1536 = 3×2×16×16). `AlpamayoPatchEmbed` views 2D as `(N, 3, 2, 16, 16)`. Do not reshape as `(N, T, H, W, C)`.
 - **Grid:** NVIDIA eval is 16×`[1, H, W]` (one temporal group per image). Do not collapse to 4×`[4, H, W]`.
-- **Tokens:** live greedy prefix is ~32k (`offset`/`prefix_len` ≈ 32777 on the default clip). Vision is most of that. Ego history is 48 discrete tokens (`DEFAULT_HISTORY_TRAJ_TOKENS`).
+- **Tokens:** greedy e2e 2026-08-29 15:25: `input_ids` `(1, 3006)`, `image_grid_thw` 16×`[1,20,36]`, `pixel_values` `(11520, 1536)`. Vision is 16×180 = 2880 pads. Ego history is 48 discrete tokens (`DEFAULT_HISTORY_TRAJ_TOKENS`).
 
 ## Prefill / backbone
 
@@ -37,7 +40,7 @@ Entry: `sample_trajectories_from_data_with_vlm_rollout` in `mlx_port/inference.p
 - Manual loop (not HF `generate`). Default `max_generation_length=256`. Official / eval `num_traj_samples=1`.
 - Sampling: greedy `T=0` or NVIDIA `T=0.6`, `top_p=0.98` (`sample_next_token` in `inference.py`).
 - Stop: `StopAfterEOS` on `<|traj_future_start|>` plus one token. Do not mask `<|im_end|>`.
-- **Not compiled.** No `mx.compile` in `mlx_port/`.
+- **Prefill compiled.** Each Qwen3-VL decoder layer is `mx.compile`d for `seq_len > 1` (`mlx_port/models/compiled_backbone.py`). Decode and FM are not compiled.
 - **Host sync every token:** `mx.eval(outputs.logits)` after each decode forward; `int(next_token.item())` every token; `sample_next_token` upcasts to float32 and goes through NumPy softmax / nucleus.
 
 ## Action expert
@@ -57,7 +60,7 @@ Entry: `sample_trajectories_from_data_with_vlm_rollout` in `mlx_port/inference.p
 | `max_generation_length` | 256 |
 | temperature / top_p | 0.0 / 1.0 greedy; 0.6 / 0.98 NVIDIA draw |
 | FM steps | 10 |
-| compiled? | no (encode / prefill / decode / FM) |
+| compiled? | prefill yes (decoder layers, seq>1); encode / decode / FM no |
 
 ## Dtype (T0.2)
 
@@ -88,7 +91,7 @@ Counted for `num_traj_samples=1`, CoC length `N` tokens, FM steps 10.
 | `mx.clear_cache()` inside FM | **0** | Removed with the per-step barrier; was every 3 steps |
 | `np.asarray(sampled)` after FM | 1 | Debug / extra dict |
 
-**None of encode / prefill / decode / FM is `mx.compile`d.**
+Prefill decoder layers are `mx.compile`d (`seq_len > 1`). Encode, decode, and FM are not.
 
 Stage wall-clock (T1.1): set `ALPAMAYO_STAGE_TIMERS=1`. Prints a `[STAGE]` line and
 puts `extra["stage_times"]` with G1 fields. Off by default so the e2e path is
@@ -102,7 +105,9 @@ tokens after the first. Encode is still `vision_tower` only.
 Measure with greedy e2e: `test_end_to_end_inference_prints_coc_vlm_only` and
 `ALPAMAYO_STAGE_TIMERS=1`. Do not use a separate multi-window warmup test.
 
-Likely 110 s split (unmeasured — Phase 1): prefill over ~32k tokens + per-token decode eval + 10 uncompiled expert forwards. Do not spend a week on ego history.
+P2f greedy window (2026-08-29 15:25): encode 1.0 s · prefill 3.6 s · decode 0.9 s · FM 0.6 s. Prefix is 3006 tokens after the pixel-budget bind. Do not spend a week on ego history.
+
+5-clip T=0.6 after P2f (`reports/traj_sample_5_t06/`, 2026-08-30 00:30 UTC): all clips `tokens=3006`, 16×`[1,20,36]`. Mean minADE 7.85 → 4.56 m vs native-32k snapshot `results_pre_p2f.json`. User reviewed plots 2026-08-29 and signed quality as good. Yield clips still overshoot (pred speed does not settle to ~0).
 
 ## Train vs infer (for later T2.4 / T4.3)
 

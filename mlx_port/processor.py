@@ -12,7 +12,8 @@ History configuration (used by create_message and the inference pipeline):
     DEFAULT_HISTORY_TRAJ_TOKENS = 48 tokens produced by the history tokenizer
 """
 
-from typing import Any, List, Union
+import math
+from typing import Any, List, Tuple, Union
 
 import numpy as np
 from PIL import Image
@@ -31,6 +32,9 @@ except ImportError:
 
 MIN_PIXELS = 163840
 MAX_PIXELS = 196608
+# Qwen3-VL preprocessor_config.json: patch 16, merge 2 → factor 32.
+VISION_PATCH_SIZE = 16
+VISION_MERGE_SIZE = 2
 # Use the locally downloaded Qwen3-VL-8B-Instruct checkpoint (not the Hub)
 LOCAL_QWEN_PROCESSOR_PATH = "/Users/michaellee/Projects/alpamayo/pre-trained/Qwen3-VL-8B-Instruct"
 
@@ -47,6 +51,159 @@ DEFAULT_NUM_FRAMES = 4
 
 # Default number of egomotion history steps (1.6 s at 0.1 s step).
 DEFAULT_NUM_HISTORY_STEPS = 16
+
+
+def smart_resize_hw(
+    height: int,
+    width: int,
+    *,
+    min_pixels: int = MIN_PIXELS,
+    max_pixels: int = MAX_PIXELS,
+    patch_size: int = VISION_PATCH_SIZE,
+    merge_size: int = VISION_MERGE_SIZE,
+) -> Tuple[int, int]:
+    """HF Qwen2/3-VL ``smart_resize`` (factor = patch × merge)."""
+    if height <= 0 or width <= 0:
+        raise ValueError(f"smart_resize_hw requires positive HxW, got {height}x{width}")
+    if min_pixels <= 0 or max_pixels <= 0 or min_pixels > max_pixels:
+        raise ValueError(
+            f"invalid pixel budget min={min_pixels} max={max_pixels}"
+        )
+    factor = int(patch_size) * int(merge_size)
+    if factor <= 0:
+        raise ValueError(f"invalid patch/merge factor {factor}")
+    if max(height, width) / min(height, width) > 200:
+        raise ValueError(
+            f"absolute aspect ratio must be smaller than 200, got "
+            f"{max(height, width) / min(height, width)}"
+        )
+    h_bar = round(height / factor) * factor
+    w_bar = round(width / factor) * factor
+    if h_bar * w_bar > max_pixels:
+        beta = math.sqrt((height * width) / max_pixels)
+        h_bar = max(factor, math.floor(height / beta / factor) * factor)
+        w_bar = max(factor, math.floor(width / beta / factor) * factor)
+    elif h_bar * w_bar < min_pixels:
+        beta = math.sqrt(min_pixels / (height * width))
+        h_bar = math.ceil(height * beta / factor) * factor
+        w_bar = math.ceil(width * beta / factor) * factor
+    return int(h_bar), int(w_bar)
+
+
+def expected_image_grid_hw(
+    height: int,
+    width: int,
+    *,
+    min_pixels: int = MIN_PIXELS,
+    max_pixels: int = MAX_PIXELS,
+    patch_size: int = VISION_PATCH_SIZE,
+    merge_size: int = VISION_MERGE_SIZE,
+) -> Tuple[int, int]:
+    """Patch grid (H, W) after NVIDIA pixel-budget resize."""
+    rh, rw = smart_resize_hw(
+        height,
+        width,
+        min_pixels=min_pixels,
+        max_pixels=max_pixels,
+        patch_size=patch_size,
+        merge_size=merge_size,
+    )
+    return rh // patch_size, rw // patch_size
+
+
+def _size_edges(size: Any) -> Tuple[Any, Any]:
+    if size is None:
+        return None, None
+    if isinstance(size, dict):
+        return size.get("shortest_edge"), size.get("longest_edge")
+    return getattr(size, "shortest_edge", None), getattr(size, "longest_edge", None)
+
+
+def image_pixel_budget(image_processor: Any) -> Tuple[int, int]:
+    """Read ``(min_pixels, max_pixels)`` from an image/video processor."""
+    if image_processor is None:
+        raise ValueError("image_pixel_budget requires an image processor")
+    mn = getattr(image_processor, "min_pixels", None)
+    mx = getattr(image_processor, "max_pixels", None)
+    short, long = _size_edges(getattr(image_processor, "size", None))
+    if mn is None:
+        mn = short
+    if mx is None:
+        mx = long
+    if mn is None or mx is None:
+        raise ValueError(
+            f"cannot read pixel budget from {type(image_processor).__name__}"
+        )
+    return int(mn), int(mx)
+
+
+def _write_size(image_processor: Any, min_pixels: int, max_pixels: int) -> None:
+    size = getattr(image_processor, "size", None)
+    if isinstance(size, dict):
+        size["shortest_edge"] = min_pixels
+        size["longest_edge"] = max_pixels
+        return
+    if size is not None and hasattr(size, "shortest_edge"):
+        try:
+            size.shortest_edge = min_pixels
+            size.longest_edge = max_pixels
+            return
+        except (AttributeError, TypeError):
+            pass
+    image_processor.size = {
+        "shortest_edge": min_pixels,
+        "longest_edge": max_pixels,
+    }
+
+
+def bind_image_pixel_budget(
+    processor: Any,
+    min_pixels: int = MIN_PIXELS,
+    max_pixels: int = MAX_PIXELS,
+) -> Any:
+    """Force the NVIDIA pixel budget onto the image (and video) processor.
+
+    Qwen3-VL ``preprocessor_config.json`` ships
+    ``size.longest_edge=16777216``. ``AutoProcessor.from_pretrained(...,
+    min_pixels=..., max_pixels=...)`` does not override that. mlx_vlm's
+    torch-free loader copies those edges into ``max_pixels``, so 1080×1920
+    stays native (grid 68×120, ~2040 tokens/frame).
+
+    Raises if nothing can be bound or the read-back does not match.
+    """
+    if processor is None:
+        raise ValueError("bind_image_pixel_budget requires a processor")
+    if min_pixels <= 0 or max_pixels <= 0 or min_pixels > max_pixels:
+        raise ValueError(
+            f"invalid pixel budget min={min_pixels} max={max_pixels}"
+        )
+
+    targets: List[Tuple[str, Any]] = []
+    for name in ("image_processor", "video_processor"):
+        sub = getattr(processor, name, None)
+        if sub is not None:
+            targets.append((name, sub))
+    if not targets:
+        if hasattr(processor, "min_pixels") or hasattr(processor, "size"):
+            targets.append(("processor", processor))
+        else:
+            raise ValueError("bind_image_pixel_budget: no image_processor to bind")
+
+    for name, sub in targets:
+        _write_size(sub, min_pixels, max_pixels)
+        sub.min_pixels = min_pixels
+        sub.max_pixels = max_pixels
+        got_min, got_max = image_pixel_budget(sub)
+        if got_min != min_pixels or got_max != max_pixels:
+            raise RuntimeError(
+                f"{name} pixel budget did not bind: "
+                f"wanted min={min_pixels} max={max_pixels}, "
+                f"got min={got_min} max={got_max}"
+            )
+
+    names = ", ".join(name for name, _ in targets)
+    print(f"[PIXELS] bound min={min_pixels} max={max_pixels} on {names}")
+    return processor
 
 
 def _to_numpy(frames: Any) -> np.ndarray:
@@ -149,8 +306,9 @@ def get_processor(tokenizer: Any, model_path: str = LOCAL_QWEN_PROCESSOR_PATH) -
     """Get the processor for the locally downloaded Qwen3-VL model.
 
     This is the MLX-port equivalent of alpamayo_r1.helper.get_processor.
-    It loads the processor from the local checkpoint directory and then
-    injects the Alpamayo tokenizer (which contains the trajectory special tokens).
+    It loads the processor from the local checkpoint directory, injects the
+    Alpamayo tokenizer, then binds the NVIDIA pixel budget. JSON
+    ``size.longest_edge=16777216`` is not left in place.
 
     Args:
         tokenizer: The Alpamayo tokenizer (with traj tokens already added).
@@ -160,13 +318,14 @@ def get_processor(tokenizer: Any, model_path: str = LOCAL_QWEN_PROCESSOR_PATH) -
     Returns:
         A processor object with the Alpamayo tokenizer attached.
     """
-    processor_kwargs = {
-        "min_pixels": MIN_PIXELS,
-        "max_pixels": MAX_PIXELS,
-    }
+    # mlx_vlm registers a torch-free Qwen3-VL processor. Without that patch,
+    # HF AutoProcessor loads Qwen3VLVideoProcessor (requires torchvision).
+    import mlx_vlm.models.qwen3_vl.processing_qwen3_vl  # noqa: F401
 
-    processor = AutoProcessor.from_pretrained(model_path, **processor_kwargs)
+    processor = AutoProcessor.from_pretrained(model_path)
     processor.tokenizer = tokenizer
+    # JSON size.longest_edge is 16M; kwargs to from_pretrained do not override.
+    bind_image_pixel_budget(processor)
     return processor
 
 
@@ -273,10 +432,8 @@ def enforce_alpamayo_temporal_grouping(
     image-pad run (16×[1,H,W]); grouped T>1 rows are split back in
     get_rope_index.
 
-    For now we use T=4 per camera (4 groups total). This keeps the total
-    patch count identical (16×68×120 = 130560) while giving the language
-    model the correct temporal structure for RoPE and vision-language
-    alignment.
+    For now we use T=4 per camera (4 groups total). Patch count is unchanged
+    (16×H×W of the per-frame grid). Do not re-enable this on greedy e2e.
 
     Args:
         inputs: Dict returned by alpamayo_apply_chat_template (or any

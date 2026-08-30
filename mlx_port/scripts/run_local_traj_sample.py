@@ -193,6 +193,9 @@ def run_one_clip(model, processor, clip_id: str, clip_dir: Path, seed: int) -> d
         num_frames=DEFAULT_NUM_FRAMES,
     )
     inputs = _prepare_inputs(processor, data["image_frames"])
+    ids = np.asarray(inputs["input_ids"])
+    grid = np.asarray(inputs.get("image_grid_thw"))
+    print(f"[traj-sample] tokens={ids.size} image_grid_thw=\n{grid}")
     payload = {
         "tokenized_data": inputs,
         "ego_history_xyz": data["ego_history_xyz"],
@@ -446,7 +449,8 @@ def _html_report(results: list[dict], generated_at: str) -> str:
       After <code>dxy_theta_to_v_without_v0</code> t0. Plots use the generated 64-waypoint pred
       (<code>pred_xy_full</code>), vehicle frame x+ forward ↑ / y+ left ←.
       Stage 1b is <a class="text-cyan-400 hover:underline" href="../stage1b_progress.html">closed</a>
-      (wiring); yield/stop quality is leftover there. Generated {html.escape(generated_at)}. Mean minADE: {mean_txt}.
+      (wiring). P2f binds NVIDIA pixel budget (<code>163840–196608</code>, grid
+      <code>20×36</code>). Generated {html.escape(generated_at)}. Mean minADE: {mean_txt}.
     </p>
     <div class="overflow-auto bg-slate-900 border border-slate-700 rounded-2xl mb-10">
       <table class="w-full text-left text-sm">
