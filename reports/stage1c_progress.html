@@ -43,7 +43,7 @@
                 </div>
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Key Focus</div>
-                    <div class="font-semibold text-xl text-cyan-400">8-clip QLoRA save sanity</div>
+                    <div class="font-semibold text-xl text-cyan-400">PR #15 CI + merge</div>
                 </div>
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Gate</div>
@@ -139,7 +139,8 @@
                         <li><strong>NVIDIA Stage 1/2 SFT parity</strong> (prior increment): side-by-side against <code>finetune/sft</code> + <code>src/alpamayo_r1</code>. Stage-1 user content is now NVIDIA’s three parts (images, hist text, prompt text). Qwen’s chat template concatenates the two text items with no separator — same tokens as the old joined string. Stage 2 train now passes a zeros additive mask <code>(B, 1, T, prefix+T)</code> when <code>expert_non_causal_attention</code> (config default true). mlx_vlm builds a <em>causal</em> mask when <code>mask is None</code>; NVIDIA Stage 2 train is <code>is_causal=False</code>, <code>attention_mask=None</code>. Hist offset stays at <code>&lt;i0&gt;</code>. Optimizer stays QLoRA (not dense VLM + 0.1× vision LR). Suite: <code>test_sft_nvidia_parity.py</code>.</li>
                         <li><strong>Small-scale Stage-1 smoke</strong> (prior increment): 8 non-CoC PAI clips, 50/50 split (4/4), language-decoder QLoRA only (252 leaves / 21.8&nbsp;M), vision encode once and <code>stop_gradient</code>, all4, lr 1e-5, 10 Adam steps. t0 is NVIDIA default keyframe 5.1&nbsp;s — not a CoC event. CoC IDs (1740, including the greedy eval clip) are excluded and the split is asserted disjoint. Script: <code>mlx_port/scripts/sft_stage1_small.py</code>.</li>
                         <li><strong>30-clip Stage-1 smoke</strong> (prior increment): same recipe, <code>--n-clips 30</code> → 15/15. Same seed 0, all4, language QLoRA, vision frozen, 10 steps, lr 1e-5, t0=5.1&nbsp;s. Report: <code>reports/sft_stage1_small_30clip.json</code> (does not overwrite the 8-clip JSON). Ten steps see 10 of 15 train clips (no revisit). Eval mean is over 15 held-out clips every step. That run did <em>not</em> write LoRA weights (they were discarded on exit).</li>
-                        <li><strong>QLoRA adapter save</strong> (this increment): <code>save_lora_adapters</code> overwrites one file, <code>adapters.safetensors</code>, plus <code>adapter_config.json</code> (step field updates). No per-step filenames. Packed ints are not written. Default <code>--lora-save-every 10</code>; the last step is always written to that same file. <code>--no-lora-save</code> disables. Default dir: <code>reports/qlora/sft_stage1_small</code>. Load is <code>load_lora_adapters</code> after inject; key-set mismatch raises.</li>
+                        <li><strong>QLoRA adapter save</strong> (prior increment): <code>save_lora_adapters</code> overwrites one file, <code>adapters.safetensors</code>, plus <code>adapter_config.json</code> (step field updates). No per-step filenames. Packed ints are not written. Default <code>--lora-save-every 10</code>; the last step is always written to that same file. <code>--no-lora-save</code> disables. Default dir: <code>reports/qlora/sft_stage1_small</code>. Load is <code>load_lora_adapters</code> after inject; key-set mismatch raises. Trained A/B stay local: <code>reports/qlora/</code> is gitignored and is not in PR <a class="text-cyan-400 hover:underline" href="https://github.com/michael-lee914-4c/alpamayo/pull/15">#15</a>.</li>
+                        <li><strong>PR #15 CI collection</strong> (this increment): <code>macos-26 (no weights)</code> failed at collection. <code>test_sft_stage1_small.py</code> and <code>test_train_step.py</code> imported <code>time_train_step</code>, which imported <code>load_physical_aiavdataset</code> and <code>run_local_coc_sample</code> at module load. CI does not install <code>physical_ai_av</code>. Fix: lazy-import the NVIDIA PAI loader inside <code>build_pai_train_batch</code>; default <code>--local-dir</code> is now <code>gt_eval.LOCAL_PAI_COC</code>.</li>
                         <li><strong>T4.1</strong> (branch <code>stage1c-t41-qlora</code>): QLoRA on the language decoder and the vision tower. <code>inject_backbone_lora</code> wraps the 36×7 decoder <code>q/k/v/o/gate/up/down</code> leaves (252). Vision scope is <code>--lora-vision full|merger|none</code> (default <code>full</code>): <code>full</code> wraps 27 blocks <code>qkv</code>/<code>proj</code>/<code>fc1</code>/<code>fc2</code> + merger + 3 deepstack (116); <code>merger</code> wraps merger + 3 deepstack only (8); <code>none</code> is language-only. mlx_lm <code>LoRALinear</code> rank 8, scale 20. Conv3D <code>patch_embed</code>, LayerNorms, <code>pos_embed</code>, expert, <code>lm_head</code>, embeddings stay frozen. After <code>model.freeze()</code>, only <code>lora_a</code>/<code>lora_b</code> train (<code>full</code> 736 / 26.2&nbsp;M; <code>merger</code> 520 / 22.4&nbsp;M). Packed <code>QuantizedLinear.weight</code> is hashed before/after the step. Vision LoRA keeps encode on the tape; <code>freeze_vision_features</code> raises if vision adapters are present. <code>--lora</code> requires <code>--stage stage1</code>. <code>--lora-vision</code> requires <code>--lora</code>.</li>
                         <li>VLM W8 / W4 / all4 / nvfp4 were one-shot probes (measured 2026-08-29, then removed from the load path). Affine cannot pack vision <code>mlp.linear_fc2</code> (4304 ≉ 64); nvfp4 gs16 can. Conv3D patch embed never has <code>to_quantized</code>. Expert last dims 2048/8256 are ÷64. Action-in/out stayed dense. Metal nvfp4 is E2M1 + per-group FP8 scales, not Blackwell tensor cores.</li>
                     </ul>
@@ -655,7 +656,9 @@
                     <li>mlx_port/scripts/sft_stage1_small.py — --lora-save-dir / --lora-save-every 10 / --no-lora-save</li>
                     <li>mlx_port/scripts/time_train_step.py — same save flags with --lora</li>
                     <li>reports/sft_stage1_small_8clip_save.json — 8-clip save sanity</li>
-                    <li>reports/qlora/sft_stage1_small/adapters.safetensors — overwritten A/B after step 10</li>
+                    <li>reports/qlora/sft_stage1_small/adapters.safetensors — overwritten A/B after step 10 (local only; gitignored)</li>
+                    <li>.gitignore — reports/qlora/</li>
+                    <li>mlx_port/scripts/time_train_step.py — lazy-import load_physical_aiavdataset; --local-dir from gt_eval.LOCAL_PAI_COC (CI can collect tests)</li>
                 </ul>
                 <div class="text-[11px] uppercase tracking-wider text-slate-500">Prefill quant chase — removed from code</div>
                 <ul class="text-xs space-y-1 font-mono">
@@ -751,11 +754,12 @@ PYTHONPATH=src:. /Users/michaellee/Projects/alpamayo/.venv/bin/python \
                         Source: <code>reports/sft_stage1_small_30clip.json</code>.
                     </p>
                 </div>
-                <pre class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-xs text-cyan-300 overflow-auto"># 2026-08-31 NVIDIA Stage 1/2 SFT parity
-PYTHONPATH=src:. /Users/michaellee/Projects/alpamayo/.venv/bin/python -m pytest \
+                <pre class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-xs text-cyan-300 overflow-auto"># 2026-08-31 CI-equivalent after lazy PAI import (PR #15)
+ALPAMAYO_CI_NO_WEIGHTS=1 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 PYTHONPATH=src:. \
+  /Users/michaellee/Projects/alpamayo/.venv/bin/python -m pytest \
   mlx_port/tests -m "not slow" -q --tb=short
-# 192 passed, 5 deselected · 40.81 s
-# hydra-core 1.3.6 + hydra-colorlog 1.2.0 installed in .venv for NVIDIA imports
+# 193 passed, 1 skipped · 25.38 s
+# First GitHub run failed at collection (physical_ai_av). This is the local re-run.
 
                 </pre>
                 <div class="overflow-auto">
@@ -1243,6 +1247,11 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                                 <td class="px-2 py-2 font-mono">test_sft_stage1_small.py (6 cases)</td>
                                 <td class="px-2 py-2 text-emerald-400">PASS</td>
                                 <td class="px-2 py-2">50/50 split disjoint + deterministic. n=8 → 4/4; n=30 → 15/15. CoC IDs and default eval clip excluded. <code>recipe=coc</code> + <code>t0_us</code> raises. Help lists --lora-save-*. --no-lora-save + --lora-save-every exclusive.</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">PR #15 macos-26 (no weights) · collect</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS (local re-run)</td>
+                                <td class="px-2 py-2">2026-08-31 · first CI: collection ERROR (physical_ai_av). After lazy import: ALPAMAYO_CI_NO_WEIGHTS=1 pytest -m "not slow" → 193 passed, 1 skipped, 25.38 s. GitHub job re-run after this push.</td>
                             </tr>
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono">test_profiling.py (2 cases)</td>

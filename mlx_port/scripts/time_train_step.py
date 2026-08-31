@@ -16,8 +16,7 @@ import mlx.core as mx
 import mlx.optimizers as optim
 import numpy as np
 
-from alpamayo_r1.load_physical_aiavdataset import load_physical_aiavdataset
-from mlx_port.gt_eval import DEFAULT_EVAL_CLIP_ID, load_clip_gt
+from mlx_port.gt_eval import DEFAULT_EVAL_CLIP_ID, LOCAL_PAI_COC, load_clip_gt
 from mlx_port.models.alpamayo_r1_mlx import AlpamayoR1MLX
 from mlx_port.models.quantize_lm import resolve_quant_mode
 from mlx_port.processor import (
@@ -28,7 +27,6 @@ from mlx_port.processor import (
     get_processor,
 )
 from mlx_port.profiling import MemoryMonitor, get_global_memory_peak
-from mlx_port.scripts.run_local_coc_sample import LOCAL_DIR
 from mlx_port.stage_timers import quantized_flags
 from mlx_port.lora import (
     DEFAULT_SAVE_EVERY,
@@ -208,6 +206,10 @@ def build_pai_train_batch(
         t0_us = int(gt["events"][0]["event_start_timestamp"])
     else:
         t0_us = int(t0_us)
+    # Lazy: macos-26 CI has no physical_ai_av. Unit tests import helpers
+    # from this module without loading a clip.
+    from alpamayo_r1.load_physical_aiavdataset import load_physical_aiavdataset
+
     data = load_physical_aiavdataset(
         clip_id,
         t0_us=t0_us,
@@ -359,7 +361,7 @@ def main() -> None:
         help="Stage-2 Adam step on expert + action proj. VLM frozen. Packed expert raises.",
     )
     parser.add_argument("--clip-id", default=DEFAULT_EVAL_CLIP_ID)
-    parser.add_argument("--local-dir", type=Path, default=LOCAL_DIR)
+    parser.add_argument("--local-dir", type=Path, default=LOCAL_PAI_COC)
     parser.add_argument(
         "--quantize-lm",
         action="store_true",
