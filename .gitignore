@@ -230,3 +230,6 @@ reports/traj_sample_5_t06*/**/*.png
 reports/stage1_raw_16/
 reports/stage1_raw_16_grid.jpg
 reports/stage1_single_image_front_wide.png
+
+# Local QLoRA A/B (do not publish trained adapters)
+reports/qlora/

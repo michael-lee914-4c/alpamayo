@@ -43,7 +43,7 @@ def record_memory_sample(label: str = "") -> dict:
     total = mem_info.get("total", resident + compressed)
 
     try:
-        metal = mx.metal.get_active_memory()
+        metal = mx.get_active_memory()
     except Exception:
         metal = 0
 
@@ -122,7 +122,7 @@ class MemoryMonitor:
 
     def _monitor_loop(self):
         while not self._stop_event.is_set():
-            record_memory_sample(self.label)
+            record_memory_sample()
             time.sleep(self.poll_interval)
 
 
@@ -247,14 +247,14 @@ class StepProfiler:
             return
         self.start_time = time.perf_counter()
         if self._baseline_mem is None:
-            self._baseline_mem = mx.metal.get_active_memory()
+            self._baseline_mem = mx.get_active_memory()
             self._baseline_rss = self._get_rss()
 
     def step_end(self):
         if not self.enabled:
             return
         elapsed = time.perf_counter() - self.start_time
-        current_mem = mx.metal.get_active_memory()
+        current_mem = mx.get_active_memory()
         current_rss = self._get_rss()
         delta_mem = current_mem - self._baseline_mem
         delta_rss = current_rss - self._baseline_rss
@@ -300,12 +300,12 @@ def profile_section(name: str, enabled: Optional[bool] = None):
         return
 
     start = time.perf_counter()
-    mem_before = mx.metal.get_active_memory()
+    mem_before = mx.get_active_memory()
     try:
         yield
     finally:
         elapsed = time.perf_counter() - start
-        mem_after = mx.metal.get_active_memory()
+        mem_after = mx.get_active_memory()
         print(
             f"[{name}] time={elapsed*1000:.1f}ms  "
             f"mem_before={mem_before/1e9:.2f}GB  "

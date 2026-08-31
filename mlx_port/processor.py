@@ -45,6 +45,13 @@ LOCAL_QWEN_PROCESSOR_PATH = "/Users/michaellee/Projects/alpamayo/pre-trained/Qwe
 # Number of discrete trajectory tokens used to represent egomotion history.
 # With the default num_history_steps=16 (1.6 s @ 10 Hz), the tokenizer emits 48 tokens.
 DEFAULT_HISTORY_TRAJ_TOKENS = 48
+# NVIDIA Stage-1 SFT: 64 waypoints × (accel, curvature). config tokens_per_future_traj.
+DEFAULT_FUTURE_TRAJ_TOKENS = 128
+SFT_STAGE1_USER_PROMPT = "output the future trajectory."
+INFER_USER_PROMPT = (
+    "output the chain-of-thought reasoning of the driving process, "
+    "then output the future trajectory."
+)
 
 # Default number of camera frames per view (visual history ending at t0).
 DEFAULT_NUM_FRAMES = 4
@@ -222,26 +229,23 @@ def _to_numpy(frames: Any) -> np.ndarray:
 def create_message(
     frames: Any,
     num_history_traj_tokens: int = DEFAULT_HISTORY_TRAJ_TOKENS,
+    teacher_cot: str | None = None,
+    sft_stage: str | None = None,
+    num_future_traj_tokens: int = DEFAULT_FUTURE_TRAJ_TOKENS,
 ) -> List[dict]:
     """Construct the chat message list expected by the VLM.
 
-    This function is an exact port of alpamayo_r1.helper.create_message.
-    It builds the system + user + assistant turn structure with the
-    trajectory-history placeholder tokens.
+    Infer (default) matches ``alpamayo_r1.helper.create_message``: CoC prompt,
+    assistant stops at ``<|cot_start|>``.
 
-    History lengths (see module constants):
-        - DEFAULT_NUM_FRAMES = 4 camera frames per view
-        - DEFAULT_NUM_HISTORY_STEPS = 16 egomotion steps (1.6 s)
-        - DEFAULT_HISTORY_TRAJ_TOKENS = 48 tokens (from hist_traj_tokenizer)
+    ``sft_stage="stage1"`` is NVIDIA ``vla_processor.yaml``:
+    ``components_order=[image, traj_history, prompt, traj_future]``,
+    user text ``output the future trajectory.``, assistant
+    ``<|traj_future_start|><|traj_future|>*N<|traj_future_end|>``.
+    Chat template with ``continue_final_message=False`` then adds
+    ``<|im_end|>``.
 
-    Args:
-        frames: Image tensor of shape (N, C, H, W). Accepts NumPy, MLX,
-                PyTorch, or Python list.
-        num_history_traj_tokens: Number of <|traj_history|> tokens to insert.
-            Defaults to 48 (matches the current tokenizer for 16 history steps).
-
-    Returns:
-        List of chat messages in the format expected by mlx_vlm / Qwen3-VL.
+    ``teacher_cot`` is paper 5.2 (CoC SFT), exclusive with ``sft_stage``.
     """
     arr = _to_numpy(frames)
     if arr.ndim != 4:
@@ -263,12 +267,35 @@ def create_message(
                 frame = frame.astype(np.uint8)
         pil_images.append(Image.fromarray(frame, mode="RGB" if frame.shape[2] == 3 else "L"))
 
+    if teacher_cot is not None and sft_stage is not None:
+        raise ValueError("teacher_cot and sft_stage are exclusive")
+    if sft_stage is not None and sft_stage != "stage1":
+        raise ValueError(f"sft_stage must be 'stage1' or None, got {sft_stage!r}")
+    if int(num_future_traj_tokens) < 1:
+        raise ValueError(f"num_future_traj_tokens must be >= 1, got {num_future_traj_tokens}")
+
     # NOTE: we expand the padding tokens to match training, so we can
     # directly apply the native processor from the VLM.
-    num_traj_token = DEFAULT_HISTORY_TRAJ_TOKENS
+    num_traj_token = int(num_history_traj_tokens)
+    if num_traj_token < 1:
+        raise ValueError(f"num_history_traj_tokens must be >= 1, got {num_history_traj_tokens}")
     hist_traj_placeholder = (
         f"<|traj_history_start|>{'<|traj_history|>' * num_traj_token}<|traj_history_end|>"
     )
+    user_prompt = (
+        SFT_STAGE1_USER_PROMPT if sft_stage == "stage1" else INFER_USER_PROMPT
+    )
+    # NVIDIA build_conversation: images, then traj_history text, then prompt text
+    # as separate content items (vla_processor.yaml components_order).
+    if sft_stage == "stage1":
+        user_text_parts = [
+            {"type": "text", "text": hist_traj_placeholder},
+            {"type": "text", "text": user_prompt},
+        ]
+    else:
+        user_text_parts = [
+            {"type": "text", "text": f"{hist_traj_placeholder}{user_prompt}"},
+        ]
 
     return [
         {
@@ -283,23 +310,44 @@ def create_message(
         {
             "role": "user",
             "content": [{"type": "image", "image": img} for img in pil_images]
-            + [
-                {
-                    "type": "text",
-                    "text": f"{hist_traj_placeholder}output the chain-of-thought reasoning of the driving process, then output the future trajectory.",
-                }
-            ],
+            + user_text_parts,
         },
         {
             "role": "assistant",
             "content": [
                 {
                     "type": "text",
-                    "text": "<|cot_start|>",
+                    "text": _assistant_text(
+                        teacher_cot,
+                        sft_stage=sft_stage,
+                        num_future_traj_tokens=int(num_future_traj_tokens),
+                    ),
                 }
             ],
         },
     ]
+
+
+def _assistant_text(
+    teacher_cot: str | None,
+    sft_stage: str | None = None,
+    num_future_traj_tokens: int = DEFAULT_FUTURE_TRAJ_TOKENS,
+) -> str:
+    """Infer stops at cot_start. Stage-1 SFT writes traj-future pads.
+
+    Paper 5.2 CoC SFT still uses ``teacher_cot`` (cot_start…end + future_start).
+    """
+    if sft_stage == "stage1":
+        n = int(num_future_traj_tokens)
+        return (
+            f"<|traj_future_start|>{'<|traj_future|>' * n}<|traj_future_end|>"
+        )
+    if teacher_cot is None:
+        return "<|cot_start|>"
+    text = teacher_cot.strip()
+    if not text:
+        raise ValueError("teacher_cot is empty")
+    return f"<|cot_start|>{text}<|cot_end|><|traj_future_start|>"
 
 
 def get_processor(tokenizer: Any, model_path: str = LOCAL_QWEN_PROCESSOR_PATH) -> Any:

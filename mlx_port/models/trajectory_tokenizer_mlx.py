@@ -140,10 +140,10 @@ def _yaw_rotation_matrices(trajectory: np.ndarray, window_size: int = 10, poly_o
 
 
 class DiscreteTrajectoryTokenizerMLX:
-    """MLX port of DiscreteTrajectoryTokenizer.
+    """MLX port of NVIDIA ``DiscreteTrajectoryTokenizer`` (future traj IDs).
 
-    This tokenizer uses an ActionSpace (UnicycleAccelCurvature) to convert
-    trajectories to actions, then discretizes the actions into tokens.
+    Alpamayo-R1-10B: 64 waypoints × (accel, curvature) = 128 tokens,
+    ``num_bins=3000``, ``dims_min/max=[-10, 10]``.
     """
 
     def __init__(
@@ -151,62 +151,77 @@ class DiscreteTrajectoryTokenizerMLX:
         action_space: ActionSpace | None = None,
         dims_min: list[float] | None = None,
         dims_max: list[float] | None = None,
-        num_bins: int = 1000,
+        num_bins: int = 3000,
+        **kwargs: Any,
     ):
+        del kwargs
         self.action_space = action_space or ActionSpace()
-        # Default normalization bounds for accel/curvature (typical values)
-        self.dims_min = mx.array(dims_min or [-5.0, -1.0])
-        self.dims_max = mx.array(dims_max or [5.0, 1.0])
-        self.num_bins = num_bins
+        self.dims_min = [float(v) for v in (dims_min or [-10.0, -10.0])]
+        self.dims_max = [float(v) for v in (dims_max or [10.0, 10.0])]
+        self.num_bins = int(num_bins)
+        if self.num_bins < 2:
+            raise ValueError(f"num_bins must be >= 2, got {self.num_bins}")
+        if len(self.dims_min) != len(self.dims_max):
+            raise ValueError(
+                f"dims_min {self.dims_min} and dims_max {self.dims_max} length mismatch"
+            )
+
+    @property
+    def vocab_size(self) -> int:
+        return self.num_bins
 
     def encode(
         self,
-        hist_xyz: mx.array,
-        hist_rot: mx.array,
-        fut_xyz: mx.array,
-        fut_rot: mx.array,
-        hist_tstamp: mx.array | None = None,
-        fut_tstamp: mx.array | None = None,
+        hist_xyz: Any,
+        hist_rot: Any,
+        fut_xyz: Any,
+        fut_rot: Any,
+        hist_tstamp: Any = None,
+        fut_tstamp: Any = None,
     ) -> mx.array:
-        """Encode trajectories into discrete action tokens.
+        """NVIDIA encode: ``traj_to_action`` then scale / rint / clamp.
 
-        For history tokenization we treat the history as "future" for the
-        tokenizer (as done in NVIDIA's tokenize_history_trajectory).
+        Does not force ``t0_states`` to zero — ``estimate_t0_states`` matches
+        ``DiscreteTrajectoryTokenizer.encode``.
         """
-        # Flatten batch
-        B = hist_xyz.shape[0]
-        hist_xyz_flat = hist_xyz.reshape(B, -1, 3)
-        hist_rot_flat = hist_rot.reshape(B, -1, 3, 3)
-        fut_xyz_flat = fut_xyz.reshape(B, -1, 3)
-        fut_rot_flat = fut_rot.reshape(B, -1, 3, 3)
-
-        # Real implementation: convert history trajectory to actions via traj_to_action
-        # Always provide t0_states with zero v0 for history tokenization (no ego velocity in prompt)
-        B = hist_xyz_flat.shape[0]
-        t0_states = {"v": mx.zeros((B,), dtype=mx.float32)}
+        del hist_tstamp, fut_tstamp
+        if self.action_space is None:
+            raise ValueError("DiscreteTrajectoryTokenizerMLX.encode requires action_space")
+        hist_xyz_m = mx.array(hist_xyz)
+        hist_rot_m = mx.array(hist_rot)
+        fut_xyz_m = mx.array(fut_xyz)
+        fut_rot_m = mx.array(fut_rot)
         action = self.action_space.traj_to_action(
-            hist_xyz_flat, hist_rot_flat, fut_xyz_flat, fut_rot_flat, t0_states=t0_states
+            hist_xyz_m, hist_rot_m, fut_xyz_m, fut_rot_m
         )
-        # Discretize (simple linear quantization into num_bins)
-        action = mx.clip(action, self.dims_min, self.dims_max)
-        scale = self.dims_max - self.dims_min
-        tokens = ((action - self.dims_min) / scale * (self.num_bins - 1)).astype(mx.int32)
-        # Flatten last two dims (accel + kappa per waypoint)
-        tokens = tokens.reshape(B, -1)
-        return tokens
+        action_np = np.asarray(action, dtype=np.float64)
+        dims_min = np.asarray(self.dims_min, dtype=np.float64)
+        dims_max = np.asarray(self.dims_max, dtype=np.float64)
+        scale = dims_max - dims_min
+        if np.any(scale == 0):
+            raise ValueError(f"dims_max - dims_min has a zero: {scale}")
+        scaled = (action_np - dims_min) / scale
+        bins = np.clip(
+            np.rint(scaled * (self.num_bins - 1)), 0, self.num_bins - 1
+        ).astype(np.int64)
+        return mx.array(bins.reshape(bins.shape[0], -1))
 
     def decode(
         self,
-        hist_xyz: mx.array,
-        hist_rot: mx.array,
-        tokens: mx.array,
-        hist_tstamp: mx.array | None = None,
+        hist_xyz: Any,
+        hist_rot: Any,
+        tokens: Any,
+        hist_tstamp: Any = None,
     ) -> Tuple[mx.array, mx.array, Any]:
-        """Decode tokens back to future trajectories."""
-        # This would use action_space.action_to_traj after denormalization.
-        # For now we delegate to the ActionSpace we already implemented.
-        action = tokens.reshape(-1, *self.action_space.get_action_space_dims())
+        del hist_tstamp
+        tokens_np = _to_numpy(tokens)
+        dims = self.action_space.get_action_space_dims()
+        action = tokens_np.reshape(-1, *dims).astype(np.float64)
+        dims_min = np.asarray(self.dims_min, dtype=np.float64)
+        dims_max = np.asarray(self.dims_max, dtype=np.float64)
+        action = action / (self.num_bins - 1)
+        action = action * (dims_max - dims_min) + dims_min
         fut_xyz, fut_rot = self.action_space.action_to_traj(
-            action, hist_xyz, hist_rot
+            mx.array(action), mx.array(hist_xyz), mx.array(hist_rot)
         )
         return fut_xyz, fut_rot, None

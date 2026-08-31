@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 620" width="840" height="620">
+  <rect width="840" height="620" fill="#0f172a"/>
+  <text x="28" y="32" fill="#f8fafc" font-family="Inter, system-ui, sans-serif" font-size="16" font-weight="600">Stage-1 smoke · 30 clips · train vs eval CE</text>
+  <text x="28" y="52" fill="#94a3b8" font-family="Inter, system-ui, sans-serif" font-size="11">2026-08-31 · 30 non-CoC · 15/15 · language QLoRA · all4 · Adam 1e-5 · 10 steps · no train revisits</text>
+
+  <text x="28" y="86" fill="#e2e8f0" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">Train CE (one new clip / step)</text>
+  <rect x="60" y="96" width="750" height="220" fill="#020617" stroke="#334155"/>
+  <g font-family="ui-monospace, monospace" font-size="10" fill="#94a3b8">
+    <text x="54" y="100" text-anchor="end">3.0</text>
+    <text x="54" y="173" text-anchor="end">2.5</text>
+    <text x="54" y="246" text-anchor="end">2.0</text>
+    <text x="54" y="316" text-anchor="end">1.5</text>
+  </g>
+  <g stroke="#1e293b" stroke-width="1">
+    <line x1="60" y1="169" x2="810" y2="169"/>
+    <line x1="60" y1="243" x2="810" y2="243"/>
+  </g>
+  <polyline fill="none" stroke="#38bdf8" stroke-width="2.5"
+    points="85,147.1 165,133.1 245,254.5 325,181.4 405,301.9 485,216.1 565,257.6 645,277.7 725,215.2 805,119.0"/>
+  <g fill="#38bdf8">
+    <circle cx="85" cy="147.1" r="4"/><circle cx="165" cy="133.1" r="4"/>
+    <circle cx="245" cy="254.5" r="4"/><circle cx="325" cy="181.4" r="4"/>
+    <circle cx="405" cy="301.9" r="4"/><circle cx="485" cy="216.1" r="4"/>
+    <circle cx="565" cy="257.6" r="4"/><circle cx="645" cy="277.7" r="4"/>
+    <circle cx="725" cy="215.2" r="4"/><circle cx="805" cy="119.0" r="4"/>
+  </g>
+  <g font-family="ui-monospace, monospace" font-size="10" fill="#94a3b8" text-anchor="middle">
+    <text x="85" y="334">0</text><text x="165" y="334">1</text>
+    <text x="245" y="334">2</text><text x="325" y="334">3</text>
+    <text x="405" y="334">4</text><text x="485" y="334">5</text>
+    <text x="565" y="334">6</text><text x="645" y="334">7</text>
+    <text x="725" y="334">8</text><text x="805" y="334">9</text>
+  </g>
+  <text x="435" y="350" fill="#64748b" font-family="Inter, system-ui, sans-serif" font-size="11" text-anchor="middle">Step</text>
+
+  <text x="28" y="384" fill="#e2e8f0" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">Eval mean CE (n=15, zoomed 2.48–2.76)</text>
+  <rect x="60" y="394" width="750" height="180" fill="#020617" stroke="#334155"/>
+  <g font-family="ui-monospace, monospace" font-size="10" fill="#94a3b8">
+    <text x="54" y="398" text-anchor="end">2.76</text>
+    <text x="54" y="461" text-anchor="end">2.66</text>
+    <text x="54" y="525" text-anchor="end">2.56</text>
+    <text x="54" y="574" text-anchor="end">2.48</text>
+  </g>
+  <g stroke="#1e293b" stroke-width="1">
+    <line x1="60" y1="458" x2="810" y2="458"/>
+    <line x1="60" y1="522" x2="810" y2="522"/>
+  </g>
+  <line x1="60" y1="408.0" x2="810" y2="408.0" stroke="#94a3b8" stroke-dasharray="4 4"/>
+  <polyline fill="none" stroke="#34d399" stroke-width="2.5"
+    points="70,408.0 142,418.8 214,436.0 286,456.8 358,477.0 430,495.7 502,513.9 574,529.6 646,543.7 718,555.1 790,564.2"/>
+  <g fill="#34d399">
+    <circle cx="70" cy="408.0" r="4"/><circle cx="142" cy="418.8" r="4"/>
+    <circle cx="214" cy="436.0" r="4"/><circle cx="286" cy="456.8" r="4"/>
+    <circle cx="358" cy="477.0" r="4"/><circle cx="430" cy="495.7" r="4"/>
+    <circle cx="502" cy="513.9" r="4"/><circle cx="574" cy="529.6" r="4"/>
+    <circle cx="646" cy="543.7" r="4"/><circle cx="718" cy="555.1" r="4"/>
+    <circle cx="790" cy="564.2" r="4"/>
+  </g>
+  <g font-family="ui-monospace, monospace" font-size="10" fill="#94a3b8" text-anchor="middle">
+    <text x="70" y="592">-1</text><text x="142" y="592">0</text>
+    <text x="214" y="592">1</text><text x="286" y="592">2</text>
+    <text x="358" y="592">3</text><text x="430" y="592">4</text>
+    <text x="502" y="592">5</text><text x="574" y="592">6</text>
+    <text x="646" y="592">7</text><text x="718" y="592">8</text>
+    <text x="790" y="592">9</text>
+  </g>
+  <text x="435" y="612" fill="#64748b" font-family="Inter, system-ui, sans-serif" font-size="11" text-anchor="middle">Step (eval −1 is pretrained baseline)</text>
+</svg>

@@ -127,7 +127,7 @@
     </div>
     <div class="card">
       <h3>Bar B — Trainable</h3>
-      <p>Teacher-forced or CoT-disabled train step on M4 Max in tens of seconds or less, not 110&nbsp;s. LoRA/QLoRA path works.</p>
+      <p>Teacher-forced or CoT-disabled train step on M4 Max in tens of seconds or less, not 110&nbsp;s. LoRA/QLoRA path works. Smoke 2026-08-31: T4.3 PAI 5.15&nbsp;s · T4.1 dummy 50-step 12.8&nbsp;s · PAI language 11.6&nbsp;s · PAI vision full 24.8&nbsp;s / 107.5&nbsp;GB · PAI vision merger 12.5&nbsp;s / 76.8&nbsp;GB.</p>
     </div>
     <div class="card">
       <h3>Bar C — Fast infer</h3>
@@ -388,10 +388,11 @@ nn.quantize(model, group_size=64, bits=4, mode="affine", class_predicate=pred)</
     <header><span class="tid">T4.1</span><span class="tname">QLoRA backbone, denser expert</span></header>
     <ul class="tight">
       <li>Freeze W4/PARO language weights.</li>
-      <li>Inject LoRA on q, k, v, o, gate, up, down of the backbone. Rank 8–16 to start.</li>
+      <li>Inject LoRA on q, k, v, o, gate, up, down of the backbone. Rank 8–16 to start. Vision: <code>--lora-vision full</code> (27 blocks + merger + 3 deepstack) or <code>merger</code> (projector + 3 deepstack only). Encode on the tape.</li>
       <li>Leave the 2.3B expert in bf16 or W8. LoRA it in Stage 2, or train it dense — 128&nbsp;GB can hold that.</li>
       <li>Do not update packed ints.</li>
     </ul>
+    <p>In port (branch <code>stage1c-t41-qlora</code>): <code>mlx_port/lora.py</code>. <code>--lora-vision full|merger|none</code>. full: 252 decoder + 116 vision, 26.2M. merger: 252 + 8 (merger + 3 deepstack), 22.4M. Compile uninstalled for train. Vision LoRA keeps encode on the tape. PAI Stage-1 2026-08-31: full CE 3.7714 · 24.8&nbsp;s · Metal 107.47&nbsp;GB; merger CE 3.7714 · 12.5&nbsp;s · Metal 76.79&nbsp;GB. Packed fingerprints unchanged.</p>
     <p><strong>Done when:</strong> one Stage-1 smoke (e.g. 50–100 steps, batch 1) completes without OOM; loss trends down; peak memory logged.</p>
   </div>
 
@@ -405,12 +406,13 @@ nn.quantize(model, group_size=64, bits=4, mode="affine", class_predicate=pred)</
     <header><span class="tid">T4.3</span><span class="tname">Train step that does not generate</span></header>
     <p>For SFT, teacher-force CoT tokens and run a single FM training forward (the flow-matching train loss already samples a timestep — it does not need 10 Euler steps). The 110&nbsp;s number is an <em>inference</em> window. A correct train step should be encode + one backbone forward + one expert forward, not a full rollout.</p>
     <p>If the current “training” code calls <code>sample_trajectories_from_data_with_vlm_rollout</code> every step, that is the bug. Replace it with the official SFT graphs (stage1 VLM CE / stage2 CFM loss).</p>
-    <p><strong>Done when:</strong> train-step timer does not include autoregressive CoT or a 10-step Euler loop unless the run is RL rollout.</p>
+    <p>In port: <code>mlx_port/train_step.py</code>. <code>sft_train_step(..., stage="stage1"|"stage2"|"joint")</code>. Default <code>--from-clip</code> is NVIDIA public SFT: Stage 1 discrete traj-future + assistant <code>im_end</code> (128 fused action bins, two-mean CE); Stage 2 freezes the VLM and runs one CFM draw with a non-causal expert mask (zeros <code>(B,1,T,prefix+T)</code> — mlx_vlm is causal when <code>mask is None</code>). <code>--teacher-cot</code> is paper 5.2 CoC CE. Unit tests prove 1 VLM forward, 0/1 expert, <code>FlowMatching.sample</code> never called. Side-by-side NVIDIA suite: <code>mlx_port/tests/test_sft_nvidia_parity.py</code>. all4 PAI Stage 1 2026-08-31: seq=3124 · n_ce=131 · CE 3.77 · 5143 ms · 0 expert. Stage 2: CFM 0.73 · 1 expert · 5145 ms.</p>
+    <p><strong>Done when:</strong> train-step timer does not include autoregressive CoT or a 10-step Euler loop unless the run is RL rollout. NVIDIA Stage-1/2 graphs measured on PAI. LoRA is T4.1.</p>
   </div>
 
   <div class="task gate">
     <header><span class="tid">G4</span><span class="tname">Gate</span></header>
-    <p>SFT smoke works. Train step time is in a different regime from 110&nbsp;s infer. Checkpoint can be fused (LoRA→dense) or served as base+adapter.</p>
+    <p>SFT smoke works. Train step time is in a different regime from 110&nbsp;s infer. Checkpoint can be fused (LoRA→dense) or served as base+adapter. 2026-08-31 language-only Stage-1: 8 non-CoC clips 50/50, 10 steps, train 3.99→2.22, eval 2.09→2.02, ~11&nbsp;s/step, Metal 78.6&nbsp;GB. Not G4 (no multi-clip epoch, no fuse).</p>
   </div>
 
   <h2 id="p5">Phase 5 — Pipeline: stream, speculate, skip FM steps</h2>

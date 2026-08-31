@@ -126,3 +126,31 @@ def install_compiled_prefill(language_model: Any) -> int:
     if n:
         print(f"[COMPILE] installed CompiledPrefillLayer on {n} decoder layers")
     return n
+
+
+def uninstall_compiled_prefill(language_model: Any) -> int:
+    """Restore eager decoder layers. Required for T4.1 ``value_and_grad``.
+
+    Compile + backward at the PAI window (seq≈3000) keeps the full compiled
+    graph and balloons Metal (observed ~200 GB, process killed). Infer still
+    uses compiled prefill. Train unwraps first.
+    """
+    if language_model is None or not hasattr(language_model, "model"):
+        raise ValueError("uninstall_compiled_prefill requires a language model with .model")
+    layers = getattr(language_model.model, "layers", None)
+    if layers is None:
+        raise ValueError("language_model.model.layers is missing")
+
+    n = 0
+    for i, layer in enumerate(layers):
+        if not isinstance(layer, CompiledPrefillLayer):
+            continue
+        inner = getattr(layer, "inner", None)
+        if inner is None:
+            raise RuntimeError(f"CompiledPrefillLayer at {i} has no inner")
+        layers[i] = inner
+        n += 1
+    if n:
+        set_compiled("prefill", False)
+        print(f"[COMPILE] uninstalled CompiledPrefillLayer on {n} decoder layers")
+    return n

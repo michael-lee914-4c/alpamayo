@@ -128,6 +128,20 @@ def expert_attention_mask(
     return mx.array(mask)
 
 
+def expert_non_causal_train_mask(batch: int, n_tokens: int, prefix_len: int) -> mx.array:
+    """Zeros ``(B, 1, T, prefix+T)``. NVIDIA Stage 2 train: ``is_causal=False``.
+
+    Action tokens attend to the full cropped KV and to each other. Passing this
+    explicit mask stops mlx_vlm from installing a causal ``create_attention_mask``.
+    """
+    if batch < 1 or n_tokens < 1:
+        raise ValueError(
+            f"expert_non_causal_train_mask got batch={batch} n_tokens={n_tokens}"
+        )
+    kv = int(prefix_len) + int(n_tokens)
+    return mx.zeros((int(batch), 1, int(n_tokens), kv), dtype=mx.float32)
+
+
 def expert_rope_mask_contract(
     full_sequence: np.ndarray,
     traj_future_start_id: int,

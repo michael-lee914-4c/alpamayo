@@ -149,9 +149,73 @@ Weight-only affine-4 gs64. Pack axis = Linear / Embedding last dim. Activations 
 | `action_in_proj` / `action_out_proj` | bf16 (Fourier `freqs` fp32) | same — siblings, not in the walker |
 | `FlowMatching`, history tokenizer | no GEMM | no GEMM |
 
-## Train vs infer (for later T2.4 / T4.3)
+## Train vs infer (NVIDIA SFT recipe)
 
-There is no SFT train step in this port yet. If a future loop calls
-`sample_trajectories_from_data_with_vlm_rollout` every optimizer step, that is
-the bug: NVIDIA Stage 1/2 is teacher-forced CE / one CFM draw, not a 256-token
-CoC + 10 Euler steps.
+SFT is `mlx_port/train_step.py` (`sft_train_step`). It is not the infer
+rollout. Default `--from-clip` is NVIDIA public SFT:
+
+- **Stage 1:** teacher-forced VLM CE on discrete traj-future (128 fused
+  action bins + `<|traj_future_start|>` / `<|traj_future_end|>`) plus
+  assistant `<|im_end|>`. Two-mean CE (`future_traj` + `others`). No expert.
+- **Stage 2:** freeze VLM, same fused string, crop KV at
+  `<|traj_future_start|>`, one CFM draw + one expert forward. Expert attn is
+  non-causal (`expert_non_causal_train_mask` zeros `(B,1,T,prefix+T)` —
+  mlx_vlm would otherwise install a causal mask when `mask is None`). Packed
+  expert weights are not updated (`--expert-update` raises on
+  `QuantizedLinear.weight`).
+- **`joint`:** CE + CFM (`cotrain_vlm`). `--teacher-cot` is paper 5.2 CoC CE.
+
+The step raises if it decoded tokens or ran Euler. Infer
+`sample_trajectories_from_data_with_vlm_rollout` is unchanged (256-token CoC +
+10 Euler steps). Hist fusion at infer stays on `<i0>` (signed). Future IDs
+also start at `<i0>` (`future_token_start_idx=151669`). NVIDIA
+`ReasoningVLA` offsets hist by `traj_tokenizer.vocab_size` (3000); this port
+does not. Stage-1 user content matches NVIDIA `build_conversation` (images,
+hist text, prompt text as separate items). Parity suite:
+`mlx_port/tests/test_sft_nvidia_parity.py`.
+
+all4 PAI Stage 1 (2026-08-31): seq=3124 · n_ce=131 · n_future=130 ·
+n_others=1 · CE 3.77 · encode 1106 · backbone 3945 · total 5143 ms ·
+1 VLM / 0 expert / 0 Euler · Metal 10.58 GB / RSS 23.66 GB.
+all4 PAI Stage 2: same string · CFM 0.73 · expert 70 ms · total 5145 ms ·
+1 VLM / 1 expert · Metal 7.99 GB / RSS 24.95 GB.
+
+## QLoRA (T4.1)
+
+`mlx_port/lora.py` wraps decoder `q/k/v/o/gate/up/down` (36×7=252) with
+mlx_lm `LoRALinear` (rank 8, scale 20). Vision scope is
+`--lora-vision full|merger|none` (default `full`):
+`full` = 27 blocks `qkv`/`proj`/`fc1`/`fc2` + merger + 3 deepstack (116);
+`merger` = merger + 3 deepstack only (8); `none` = language only.
+After freeze, only `lora_a` / `lora_b` train. Conv3D `patch_embed`,
+LayerNorms, `pos_embed`, expert, `lm_head`, embeddings stay frozen. Packed
+`QuantizedLinear.weight` must hash-match after a step (language + vision).
+Train uninstalls `CompiledPrefillLayer` (compile+grad at seq=3024 hit
+~200 GB Metal, killed). Vision LoRA keeps encode on the tape
+(`freeze_vision_features` raises). Language-only still encodes once and
+`stop_gradient`s. `time_train_step.py --lora` is Stage-1 only.
+
+all4 dummy Stage-1 (2026-08-31, seq=64, lr=1e-5, 50 steps, language-only):
+loss 19.12 → 0.89 · ~250 ms/step · wall 12.8 s · Metal 10.66 GB / RSS 23.80 GB.
+lr=1e-4 overshoots dummy CE. PAI language-only (eager, vision stop-grad,
+CoC-span CE): loss 2.59 · 11.6 s · Metal 66.48 GB / RSS 24.99 GB.
+PAI Stage-1 + vision `full` (2026-08-31, seq=3124, n_ce=131, encode on tape):
+736 arrays / 26.2M · loss 3.7714 · 24.8 s · Metal 107.47 GB / RSS 23.27 GB.
+Packed `682:0b69306e…` unchanged.
+PAI Stage-1 + vision `merger` (2026-08-31): 520 arrays / 22.4M · loss 3.7714 ·
+12.5 s · Metal 76.79 GB / RSS 25.01 GB. Packed `601:1c370532…` unchanged.
+First-step CE matches Stage-1 forward 3.7684 (LoRA B is zeros).
+
+Small-scale Stage-1 (2026-08-31): 8 non-CoC clips, 4/4 split, t0=5.1 s,
+`--lora-vision none`, all4, 10 Adam steps lr 1e-5. Per-clip train drops on
+revisit. Eval mean 2.087 → 2.016. Metal 78.55 GB / RSS 26.15 GB.
+30-clip follow-up (15/15, same recipe): eval 2.738 → 2.495 (down every
+step). Train 2.652 / 2.843 on ten distinct clips (no revisit). Metal
+82.31 GB / RSS 28.11 GB. Script: `mlx_port/scripts/sft_stage1_small.py`.
+JSON: `reports/sft_stage1_small_10step.json`,
+`reports/sft_stage1_small_30clip.json`.
+QLoRA A/B (2026-08-31): `save_lora_adapters` overwrites
+`reports/qlora/sft_stage1_small/adapters.safetensors` (plus `adapter_config.json`).
+`--lora-save-every` default 10; same filename each save. 8-clip save sanity
+(2026-08-31): eval 2.0874→2.0165 matches the first 8-clip; wrote
+`reports/qlora/sft_stage1_small/adapters.safetensors` (87.4 MB, step=10).

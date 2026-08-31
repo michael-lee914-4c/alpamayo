@@ -371,10 +371,11 @@ class AlpamayoModel(Model):
         inputs_embeds = self.language_model.model.embed_tokens(input_ids)
 
         cached = kwargs.get("cached_image_features", None)
+        cached_deepstack = kwargs.get("cached_deepstack_visual_embeds", None)
         with time_stage("encode"):
             if cached is not None:
                 hidden_states = cached
-                deepstack_visual_embeds = None
+                deepstack_visual_embeds = cached_deepstack
             else:
                 hidden_states, deepstack_visual_embeds = self.vision_tower(
                     pixel_values, grid_thw
@@ -396,7 +397,6 @@ class AlpamayoModel(Model):
         )
         image_mask = image_mask[..., 0]
         visual_pos_masks = image_mask
-        mx.eval(deepstack_visual_embeds)
 
         if image_grid_thw is not None or video_grid_thw is not None:
             # Explicitly store the ROPE state on the language model so that

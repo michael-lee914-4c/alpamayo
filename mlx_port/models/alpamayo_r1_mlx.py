@@ -13,6 +13,7 @@ from glob import glob
 from typing import Any
 
 import mlx.core as mx
+import numpy as np
 
 from mlx_port.profiling import is_profiling_enabled, StepProfiler
 import mlx.nn as nn
@@ -158,11 +159,19 @@ class FlowMatching(nn.Module):
         x_dims: Any = None,
         int_method: str = "euler",
         num_inference_steps: int = 10,
+        train_timestep_sampler: str = "beta",
+        beta_scale_constant: float = 0.999,
     ):
         super().__init__()
         self.x_dims = [x_dims] if isinstance(x_dims, int) else list(x_dims) if x_dims else []
         self.int_method = int_method
         self.num_inference_steps = num_inference_steps
+        if train_timestep_sampler not in ("uniform", "beta"):
+            raise ValueError(
+                f"train_timestep_sampler must be 'uniform' or 'beta', got {train_timestep_sampler!r}"
+            )
+        self.train_timestep_sampler = train_timestep_sampler
+        self.beta_scale_constant = float(beta_scale_constant)
 
     def sample(
         self,
@@ -225,6 +234,49 @@ class FlowMatching(nn.Module):
             mx.eval(stacked)
             return stacked, time_steps
         return x
+
+    def construct_training_data(self, x: mx.array) -> dict[str, mx.array]:
+        """One CFM draw. Matches NVIDIA ``FlowMatching.construct_training_data``.
+
+        ``noisy_x = t * x + (1 - t) * noise``. This is the train graph — do
+        not call ``sample`` (10 Euler steps) from SFT.
+        """
+        if x is None:
+            raise ValueError("construct_training_data requires x")
+        x = mx.array(x)
+        if x.ndim < 1:
+            raise ValueError(f"construct_training_data got rank {x.ndim}")
+        batch = int(x.shape[0])
+        if self.train_timestep_sampler == "uniform":
+            t = mx.random.uniform(shape=(batch,), dtype=mx.float32)
+        else:
+            raw = np.random.beta(1.5, 1.0, size=(batch,)).astype(np.float32)
+            t = self.beta_scale_constant - mx.array(raw) * self.beta_scale_constant
+        while t.ndim < x.ndim:
+            t = t[..., None]
+        noise = mx.random.normal(x.shape).astype(x.dtype)
+        t = t.astype(x.dtype)
+        noisy_x = t * x + (1 - t) * noise
+        return {
+            "x": x,
+            "noisy_x": noisy_x,
+            "timesteps": t,
+            "noise": noise,
+        }
+
+    def compute_loss_from_pred(
+        self, training_data: dict[str, mx.array], pred: mx.array
+    ) -> mx.array:
+        """MSE of ``pred`` vs ``x - noise`` (NVIDIA CFM target)."""
+        if training_data is None:
+            raise ValueError("compute_loss_from_pred requires training_data")
+        if pred is None:
+            raise ValueError("compute_loss_from_pred requires pred")
+        x = training_data["x"]
+        noise = training_data["noise"]
+        target = (x - noise).astype(pred.dtype)
+        diff = pred.astype(mx.float32) - target.astype(mx.float32)
+        return mx.mean(diff * diff)
 
 
 class ActionSpace:
@@ -692,12 +744,23 @@ class AlpamayoR1MLX(nn.Module):
 
         # 4.5 History tokenizer (Row 6). NVIDIA hist_traj_tokenizer_cfg is
         # DeltaTrajectoryTokenizer: 16 steps × xyz = 48 tokens. Discrete action
-        # bins are the *future* tokenizer, not history fusion.
-        from mlx_port.models.trajectory_tokenizer_mlx import DeltaTrajectoryTokenizerMLX
+        # bins are the *future* tokenizer (Stage-1 SFT), not infer history fusion.
+        from mlx_port.models.trajectory_tokenizer_mlx import (
+            DeltaTrajectoryTokenizerMLX,
+            DiscreteTrajectoryTokenizerMLX,
+        )
 
         hist_cfg = alpamayo_cfg.get("hist_traj_tokenizer_cfg") or {}
         hist_kwargs = {k: v for k, v in hist_cfg.items() if k != "_target_"}
         hist_traj_tokenizer = DeltaTrajectoryTokenizerMLX(**hist_kwargs)
+        fut_cfg = dict(alpamayo_cfg.get("traj_tokenizer_cfg") or {})
+        fut_cfg.pop("_target_", None)
+        fut_cfg.pop("_recursive_", None)
+        fut_cfg.pop("action_space_cfg", None)
+        traj_tokenizer = DiscreteTrajectoryTokenizerMLX(
+            action_space=action_space,
+            **fut_cfg,
+        )
 
         model = cls(
             vlm=vlm,
@@ -706,6 +769,9 @@ class AlpamayoR1MLX(nn.Module):
             action_out_proj=action_out_proj,
             diffusion=diffusion,
             action_space=action_space,
+        )
+        model.expert_non_causal_attention = bool(
+            alpamayo_cfg.get("expert_non_causal_attention", True)
         )
         # Expose tokenizer and processor for convenience (mirrors NVIDIA AlpamayoR1)
         model.tokenizer = processor.tokenizer
@@ -743,10 +809,16 @@ class AlpamayoR1MLX(nn.Module):
 
         model.hist_traj_tokenizer = hist_traj_tokenizer
         model.hist_token_start_idx = tokenizer.traj_token_start_idx
+        model.traj_tokenizer = traj_tokenizer
+        # NVIDIA ReasoningVLA also sets future_token_start_idx = traj_token_start_idx
+        # and then hist_token_start_idx += traj_tokenizer.vocab_size (3000). Infer
+        # on this port is signed with hist at <i0>; keep that so Stage-2 KV matches
+        # infer. Future IDs still start at <i0> (paper / SFT Stage 1).
+        model.future_token_start_idx = tokenizer.traj_token_start_idx
         model.traj_token_ids = dict(tokenizer.traj_token_ids)
         model.traj_token_start_idx = tokenizer.traj_token_start_idx
         model.traj_vocab_size = declared_traj_vocab_size
-        model.tokens_per_future_traj = alpamayo_cfg.get("tokens_per_future_traj", 32)
+        model.tokens_per_future_traj = alpamayo_cfg.get("tokens_per_future_traj", 128)
         model.tokens_per_history_traj = alpamayo_cfg.get("tokens_per_history_traj", 48)
 
         # Contiguous after the NVIDIA add order: <i0> .. <i{N-1}> then specials.
@@ -762,7 +834,9 @@ class AlpamayoR1MLX(nn.Module):
             f"i{declared_traj_vocab_size - 1}={tokenizer.traj_token_end_idx} "
             f"cot_start={tokenizer.convert_tokens_to_ids('<|cot_start|>')} "
             f"traj_future_start={tokenizer.traj_token_ids.get('future_start')} "
-            f"hist_tok={type(hist_traj_tokenizer).__name__}"
+            f"hist_tok={type(hist_traj_tokenizer).__name__} "
+            f"fut_tok={type(traj_tokenizer).__name__} "
+            f"tokens_per_future={model.tokens_per_future_traj}"
         )
 
         # Final dtype enforcement for the whole model (Row 10)
@@ -997,4 +1071,6 @@ class AlpamayoR1MLX(nn.Module):
             hist_traj_tokenizer=self.hist_traj_tokenizer,
             hist_token_start_idx=self.hist_token_start_idx,
             traj_token_ids=self.traj_token_ids,
+            traj_tokenizer=getattr(self, "traj_tokenizer", None),
+            future_token_start_idx=getattr(self, "future_token_start_idx", None),
         )
