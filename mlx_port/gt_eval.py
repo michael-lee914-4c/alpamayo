@@ -53,6 +53,68 @@ def load_coc_table(reasoning_path: Path = REASONING_PATH) -> pd.DataFrame:
     return pd.read_parquet(reasoning_path)
 
 
+def list_local_traj_clips(
+    local_dir: Path = LOCAL_PAI_COC,
+    chunk_max: int = LOCAL_CHUNK_MAX,
+    exclude_coc: bool = True,
+) -> pd.DataFrame:
+    """Valid clips in local chunks, optionally minus the CoC reasoning set.
+
+    Stage-1 SFT is traj-future CE on the full PAI index, not the CoC subset.
+    """
+    index = pd.read_parquet(local_dir / "clip_index.parquet")
+    mask = (
+        index["clip_is_valid"].fillna(False)
+        & index["chunk"].notna()
+        & (index["chunk"] >= 0)
+        & (index["chunk"] <= int(chunk_max))
+    )
+    out = index.loc[mask].copy()
+    if exclude_coc:
+        coc_path = local_dir / "reasoning" / "ood_reasoning.parquet"
+        if not coc_path.exists():
+            raise FileNotFoundError(f"CoC labels not found: {coc_path}")
+        coc = pd.read_parquet(coc_path)
+        overlap = out.index.astype(str).isin(coc.index.astype(str))
+        out = out.loc[~overlap]
+    if out.empty:
+        raise RuntimeError(
+            f"no traj clips in {local_dir} chunks 0-{chunk_max} "
+            f"(exclude_coc={exclude_coc})"
+        )
+    return out
+
+
+def split_train_eval(
+    clip_ids: list[str],
+    *,
+    seed: int,
+    train_frac: float = 0.5,
+) -> tuple[list[str], list[str]]:
+    """Deterministic shuffle then a 50/50 (or ``train_frac``) split. No overlap."""
+    if not 0.0 < float(train_frac) < 1.0:
+        raise ValueError(f"train_frac must be in (0, 1), got {train_frac}")
+    ids = [str(c) for c in clip_ids]
+    if len(ids) != len(set(ids)):
+        raise ValueError("clip_ids must be unique")
+    if len(ids) < 2:
+        raise ValueError(f"need at least 2 clips for a train/eval split, got {len(ids)}")
+    rng = np.random.default_rng(int(seed))
+    order = np.arange(len(ids))
+    rng.shuffle(order)
+    shuffled = [ids[int(i)] for i in order]
+    n_train = int(len(shuffled) * float(train_frac))
+    if n_train < 1:
+        n_train = 1
+    if n_train >= len(shuffled):
+        n_train = len(shuffled) - 1
+    train = shuffled[:n_train]
+    eval_ids = shuffled[n_train:]
+    if set(train) & set(eval_ids):
+        raise RuntimeError("train/eval split overlapped")
+    return train, eval_ids
+
+
 def list_local_coc_clips(
     local_dir: Path = LOCAL_PAI_COC,
     chunk_max: int = LOCAL_CHUNK_MAX,

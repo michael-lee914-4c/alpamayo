@@ -17,35 +17,22 @@ import numpy as np
 def replace_pad_token(input_ids: mx.array, new_ids: mx.array, pad_idx: int) -> mx.array:
     """Replace pad tokens in input_ids with new token values (MLX version).
 
-    Args:
-        input_ids: [B, seq_len] token ids
-        new_ids: [B, n_traj_tokens] token ids to insert
-        pad_idx: the pad token id to replace
-
-    Returns:
-        input_ids with pad tokens replaced by trajectory tokens.
+    Matches NVIDIA ``masked_scatter``: pad count must equal ``new_ids`` size.
+    Raises if they differ — do not silently truncate.
     """
-    # Convert to numpy for masked_scatter equivalent
-    ids_np = np.array(input_ids)
-    new_np = np.array(new_ids)
-
-    mask = ids_np == pad_idx
-
-    # Flatten and replace
-    flat = ids_np.flatten()
-    flat_mask = mask.flatten()
-
-    # We need to replace exactly as many pads as we have new_ids
-    # This assumes the number of pads matches the number of new tokens
-    replacement_idx = 0
-    for i in range(len(flat)):
-        if flat_mask[i]:
-            flat[i] = new_np.flatten()[replacement_idx]
-            replacement_idx += 1
-            if replacement_idx >= len(new_np.flatten()):
-                break
-
-    return mx.array(flat.reshape(ids_np.shape))
+    ids_np = np.asarray(input_ids)
+    new_np = np.asarray(new_ids).reshape(-1)
+    mask = ids_np == int(pad_idx)
+    n_pad = int(mask.sum())
+    n_new = int(new_np.size)
+    if n_pad != n_new:
+        raise ValueError(
+            f"replace_pad_token: {n_pad} pad tokens (id={int(pad_idx)}) != "
+            f"{n_new} replacements"
+        )
+    ids_np = ids_np.copy()
+    ids_np[mask] = new_np
+    return mx.array(ids_np)
 
 
 def tokenize_history_trajectory(
@@ -104,26 +91,73 @@ def tokenize_history_trajectory(
     return mx.array(token_ids)
 
 
+def tokenize_future_trajectory(
+    tokenizer: Any,
+    traj_data: dict[str, Any],
+    start_idx: int = 0,
+) -> mx.array:
+    """Tokenize future trajectory pads. NVIDIA ``tokenize_future_trajectory``.
+
+    ``ego_future_xyz`` must be ``[B, n_traj, T, 3]``. Returns
+    ``[B, n_traj * tokens_per_future_traj]`` (128 for Alpamayo-R1-10B).
+    """
+    if traj_data is None or traj_data.get("ego_future_xyz") is None:
+        raise ValueError("tokenize_future_trajectory requires ego_future_xyz")
+    if traj_data.get("ego_future_rot") is None:
+        raise ValueError("tokenize_future_trajectory requires ego_future_rot")
+    if traj_data.get("ego_history_xyz") is None or traj_data.get("ego_history_rot") is None:
+        raise ValueError("tokenize_future_trajectory requires ego history xyz/rot")
+    if tokenizer is None or not hasattr(tokenizer, "encode"):
+        raise AttributeError(
+            "traj_tokenizer must have encode(hist_xyz, hist_rot, fut_xyz, fut_rot)"
+        )
+
+    fut_xyz = np.asarray(traj_data["ego_future_xyz"])
+    hist_xyz = np.asarray(traj_data["ego_history_xyz"])
+    fut_rot = np.asarray(traj_data["ego_future_rot"])
+    hist_rot = np.asarray(traj_data["ego_history_rot"])
+    if fut_xyz.ndim != 4:
+        raise ValueError(
+            f"ego_future_xyz must be 4D [B, n_traj, T, 3], got {fut_xyz.shape}"
+        )
+    if hist_xyz.ndim != 4:
+        raise ValueError(
+            f"ego_history_xyz must be 4D [B, n_traj, T, 3], got {hist_xyz.shape}"
+        )
+    B = int(fut_xyz.shape[0])
+    hist_xyz = hist_xyz.reshape(B * hist_xyz.shape[1], *hist_xyz.shape[2:])
+    hist_rot = hist_rot.reshape(B * hist_rot.shape[1], *hist_rot.shape[2:])
+    fut_xyz = fut_xyz.reshape(B * fut_xyz.shape[1], *fut_xyz.shape[2:])
+    fut_rot = fut_rot.reshape(B * fut_rot.shape[1], *fut_rot.shape[2:])
+    if hist_xyz.shape[0] != fut_xyz.shape[0]:
+        raise ValueError(
+            f"history batch {hist_xyz.shape[0]} != future batch {fut_xyz.shape[0]}"
+        )
+
+    token_ids = tokenizer.encode(
+        hist_xyz=hist_xyz,
+        hist_rot=hist_rot,
+        fut_xyz=fut_xyz,
+        fut_rot=fut_rot,
+    )
+    token_ids = np.asarray(token_ids) + int(start_idx)
+    token_ids = token_ids.reshape(B, -1)
+    return mx.array(token_ids)
+
+
 def fuse_traj_tokens(
     input_ids: mx.array,
     traj_data: dict[str, Any] | None,
     hist_traj_tokenizer: Any,
     hist_token_start_idx: int,
     traj_token_ids: dict[str, int],
+    traj_tokenizer: Any = None,
+    future_token_start_idx: int | None = None,
 ) -> mx.array:
-    """Fuse history trajectory tokens into the input_ids.
+    """Fuse history (and optional future) trajectory tokens into input_ids.
 
-    This is the MLX equivalent of TrajectoryFusionMixin.fuse_traj_tokens.
-
-    Args:
-        input_ids: [B, seq_len] token ids (may contain image_pad tokens)
-        traj_data: dict containing ego_history_xyz / ego_history_rot
-        hist_traj_tokenizer: tokenizer with .encode() (Delta/DiscreteTrajectoryTokenizer)
-        hist_token_start_idx: starting index for history trajectory tokens
-        traj_token_ids: mapping {"history": pad_token_id, ...}
-
-    Returns:
-        input_ids with history trajectory tokens fused in place of pads.
+    Infer passes history only. NVIDIA Stage-1 SFT also replaces
+    ``<|traj_future|>`` pads via ``tokenize_future_trajectory``.
     """
     if (
         traj_data is None
@@ -132,15 +166,34 @@ def fuse_traj_tokens(
     ):
         return input_ids
 
-    # Tokenize history
     hist_idx = tokenize_history_trajectory(
         hist_traj_tokenizer, traj_data, hist_token_start_idx
     )
 
-    # Replace the special history pad token with the generated indices
     pad_idx = traj_token_ids.get("history", -1)
-    if pad_idx >= 0:
-        input_ids = replace_pad_token(input_ids, hist_idx, pad_idx)
+    if pad_idx < 0:
+        raise ValueError("traj_token_ids is missing 'history'")
+    input_ids = replace_pad_token(input_ids, hist_idx, pad_idx)
+
+    has_future = traj_data.get("ego_future_xyz") is not None
+    if has_future:
+        if traj_data.get("ego_future_rot") is None:
+            raise ValueError("ego_future_xyz is set but ego_future_rot is missing")
+        if traj_tokenizer is None:
+            raise AttributeError(
+                "fuse_traj_tokens requires traj_tokenizer when ego_future_* is set"
+            )
+        if future_token_start_idx is None:
+            raise AttributeError(
+                "fuse_traj_tokens requires future_token_start_idx when ego_future_* is set"
+            )
+        future_idx = tokenize_future_trajectory(
+            traj_tokenizer, traj_data, int(future_token_start_idx)
+        )
+        future_pad = traj_token_ids.get("future", -1)
+        if future_pad < 0:
+            raise ValueError("traj_token_ids is missing 'future'")
+        input_ids = replace_pad_token(input_ids, future_idx, future_pad)
 
     return input_ids
 
