@@ -313,6 +313,8 @@ def test_expert_train_mask_is_non_causal_zeros():
 
 
 def test_config_json_and_sft_yamls():
+    if os.environ.get("ALPAMAYO_CI_NO_WEIGHTS") or not _ALPAMAYO_CFG.exists():
+        pytest.skip(f"Alpamayo config.json not on this machine ({_ALPAMAYO_CFG})")
     cfg = json.loads(_ALPAMAYO_CFG.read_text())
     assert cfg["expert_non_causal_attention"] is True
     assert cfg["tokens_per_future_traj"] == 128
@@ -324,6 +326,10 @@ def test_config_json_and_sft_yamls():
     assert DEFAULT_FUTURE_TRAJ_TOKENS == 128
     assert DEFAULT_HISTORY_TRAJ_TOKENS == 48
 
+
+def test_sft_yamls():
+    assert DEFAULT_FUTURE_TRAJ_TOKENS == 128
+    assert DEFAULT_HISTORY_TRAJ_TOKENS == 48
     stage1 = yaml.safe_load(_SFT_STAGE1.read_text())
     assert float(stage1["trainer"]["learning_rate"]) == 1e-5
     assert float(stage1["trainer"]["lr_multiplier"]["vlm.model.visual"]) == 0.1
