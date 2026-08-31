@@ -637,7 +637,7 @@
                     <li>mlx_port/models/expert_mlx.py — expert_non_causal_train_mask zeros (B, 1, T, prefix+T)</li>
                     <li>mlx_port/train_step.py — cfm_expert_forward passes that mask when expert_non_causal_attention (default true)</li>
                     <li>mlx_port/models/alpamayo_r1_mlx.py — bind expert_non_causal_attention from config.json</li>
-                    <li>mlx_port/tests/test_sft_nvidia_parity.py — 12 cases: NVIDIA conversation / label mask / two-mean CE / discrete encode / CFM / crop / position_ids / yaml / hist-offset guard / Qwen template join</li>
+                    <li>mlx_port/tests/test_sft_nvidia_parity.py — 13 cases: NVIDIA conversation / label mask / two-mean CE / discrete encode / CFM / crop / position_ids / yaml / hist-offset guard / Qwen template join; config.json skipped on CI</li>
                     <li>mlx_port/tests/test_train_step.py — stub expert records the zeros mask</li>
                     <li>pyproject.toml mlx-ci — hydra-core / hydra-colorlog / pyyaml so CI can import NVIDIA helpers</li>
                 </ul>
@@ -1252,8 +1252,8 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                             </tr>
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono">PR #15 macos-26 (no weights) · collect</td>
-                                <td class="px-2 py-2 text-emerald-400">PASS (local re-run)</td>
-                                <td class="px-2 py-2">2026-08-31 · first CI: collection ERROR (physical_ai_av). Second: FileNotFoundError on pre-trained/…/config.json. Skip that file on CI; yamls stay. Local re-run after both fixes documented below.</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">2026-08-31 · first CI: collection ERROR (physical_ai_av). Second: FileNotFoundError on pre-trained/…/config.json. After lazy import + skip: both macos-26 jobs pass (1m41s / 1m7s). CodeQL + Analyze pass. No adapters in the PR file list.</td>
                             </tr>
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono">test_profiling.py (2 cases)</td>
