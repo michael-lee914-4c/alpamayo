@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>G4 8-clip 2-epoch curves · Alpamayo MLX</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@600&amp;display=swap');
+        body { font-family: Inter, system-ui, sans-serif; }
+        .font-display { font-family: 'Space Grotesk', Inter, system-ui, sans-serif; }
+        canvas { max-height: 280px; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200">
+    <div class="max-w-5xl mx-auto px-6 py-10 space-y-8">
+        <div>
+            <div class="font-display text-3xl">G4 8-clip 2-epoch</div>
+            <div class="text-sm text-slate-400 mt-1">
+                2026-08-31 · seed 0 · 4/4 · t0=5.1 s · all4 · 2 epochs = 8 Adam steps.
+                <a class="text-cyan-400 hover:underline" href="sft_stage1_small_8clip_2ep.json">stage1 JSON</a>
+                ·
+                <a class="text-cyan-400 hover:underline" href="sft_stage2_small_8clip_2ep.json">stage2 JSON</a>
+                ·
+                <a class="text-cyan-400 hover:underline" href="stage1c_progress.html">stage1c</a>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+            <div class="bg-slate-900 border border-slate-700 rounded-2xl p-4">
+                <div class="text-xs text-slate-500">S1 eval CE</div>
+                <div class="text-lg font-semibold">1.853 → 1.827</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-2xl p-4">
+                <div class="text-xs text-slate-500">S1 train (clip-wise)</div>
+                <div class="text-lg font-semibold">1.822 → 1.801</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-2xl p-4">
+                <div class="text-xs text-slate-500">S2 eval CFM</div>
+                <div class="text-lg font-semibold text-emerald-400">0.260 → 0.180</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-2xl p-4">
+                <div class="text-xs text-slate-500">S2 clip 7744 revisit</div>
+                <div class="text-lg font-semibold text-amber-300">1.989</div>
+            </div>
+        </div>
+
+        <section class="bg-slate-900 border border-slate-700 rounded-3xl p-6">
+            <h2 class="font-semibold text-lg mb-1">Stage 1 · VLM CE</h2>
+            <p class="text-xs text-slate-400 mb-4">Language QLoRA · vision cached · lr 1e-5 · Metal 78.68 GB. Epoch 2 starts at step 4.</p>
+            <canvas id="s1-train"></canvas>
+            <canvas id="s1-eval" class="mt-6"></canvas>
+            <canvas id="s1-revisit" class="mt-6"></canvas>
+        </section>
+
+        <section class="bg-slate-900 border border-slate-700 rounded-3xl p-6">
+            <h2 class="font-semibold text-lg mb-1">Stage 2 · expert CFM</h2>
+            <p class="text-xs text-slate-400 mb-4">VLM frozen · --expert-lora --train-action-proj · lr 1e-4 · Metal 11.66 GB. Clip 77447940 spikes on revisit; eval does not.</p>
+            <canvas id="s2-train"></canvas>
+            <canvas id="s2-eval" class="mt-6"></canvas>
+            <canvas id="s2-revisit" class="mt-6"></canvas>
+        </section>
+
+        <section class="bg-slate-900 border border-slate-700 rounded-3xl p-6">
+            <h2 class="font-semibold text-lg mb-1">Seconds per step</h2>
+            <p class="text-xs text-slate-400 mb-4">Eval is 4 held-out clips after every Adam step (~17.5 s). Stage 1 Adam ~12.5 s; Stage 2 Adam ~4.4 s.</p>
+            <div class="grid md:grid-cols-2 gap-6">
+                <canvas id="s1-time"></canvas>
+                <canvas id="s2-time"></canvas>
+            </div>
+        </section>
+    </div>
+    <script>
+    const ticks = { color: "#94a3b8" };
+    const grid = { color: "#1e293b" };
+    const legend = { labels: { color: "#e2e8f0" } };
+    const common = {
+        responsive: true,
+        plugins: { legend },
+        scales: {
+            x: { ticks, grid, title: { display: true, text: "Adam step", color: "#94a3b8" } },
+            y: { ticks, grid },
+        },
+    };
+    function line(id, labels, datasets, yTitle, min, max) {
+        new Chart(document.getElementById(id), {
+            type: "line",
+            data: { labels, datasets },
+            options: {
+                ...common,
+                scales: {
+                    ...common.scales,
+                    y: {
+                        ticks, grid,
+                        min, max,
+                        title: { display: true, text: yTitle, color: "#94a3b8" },
+                    },
+                },
+            },
+        });
+    }
+    const steps = [0,1,2,3,4,5,6,7];
+    const evalSteps = [-1,0,1,2,3,4,5,6,7];
+    const visit = ["Epoch 1", "Epoch 2"];
+    line("s1-train", steps, [{
+        label: "Train CE (one clip)",
+        data: [1.8220,1.8454,1.9124,2.0257,1.5656,1.6096,1.7350,1.8011],
+        borderColor: "#38bdf8", backgroundColor: "#38bdf8", tension: 0.15,
+    }], "CE", 1.5, 2.1);
+    line("s1-eval", evalSteps, [{
+        label: "Eval mean CE (n=4)",
+        data: [1.8531,1.8552,1.8429,1.8365,1.8344,1.8312,1.8287,1.8262,1.8274],
+        borderColor: "#34d399", backgroundColor: "#34d399", tension: 0.15,
+    }], "CE", 1.82, 1.86);
+    line("s1-revisit", visit, [
+        { label: "77447940…", data: [1.8220,1.5656], borderColor: "#38bdf8", backgroundColor: "#38bdf8" },
+        { label: "b1195c93…", data: [1.8454,1.6096], borderColor: "#a78bfa", backgroundColor: "#a78bfa" },
+        { label: "de3c23c3…", data: [1.9124,1.7350], borderColor: "#f472b6", backgroundColor: "#f472b6" },
+        { label: "2532fb2e…", data: [2.0257,1.8011], borderColor: "#fbbf24", backgroundColor: "#fbbf24" },
+    ], "CE", 1.5, 2.1);
+    line("s2-train", steps, [{
+        label: "Train CFM (one clip)",
+        data: [0.3231,0.2957,0.2362,0.2472,1.9888,0.0980,0.1422,0.2894],
+        borderColor: "#fbbf24", backgroundColor: "#fbbf24", tension: 0.15,
+    }], "CFM MSE", 0, 2.1);
+    line("s2-eval", evalSteps, [{
+        label: "Eval mean CFM (n=4)",
+        data: [0.2599,0.1583,0.1926,0.1567,0.1794,0.2016,0.1652,0.1775,0.1797],
+        borderColor: "#34d399", backgroundColor: "#34d399", tension: 0.15,
+    }], "CFM MSE", 0.14, 0.28);
+    line("s2-revisit", visit, [
+        { label: "77447940…", data: [0.3231,1.9888], borderColor: "#fbbf24", backgroundColor: "#fbbf24" },
+        { label: "b1195c93…", data: [0.2957,0.0980], borderColor: "#38bdf8", backgroundColor: "#38bdf8" },
+        { label: "de3c23c3…", data: [0.2362,0.1422], borderColor: "#a78bfa", backgroundColor: "#a78bfa" },
+        { label: "2532fb2e…", data: [0.2472,0.2894], borderColor: "#f472b6", backgroundColor: "#f472b6" },
+    ], "CFM MSE", 0, 2.1);
+    line("s1-time", steps, [
+        { label: "Adam train (s)", data: [13.194,12.581,13.167,12.001,12.032,12.472,12.262,12.461], borderColor: "#38bdf8", backgroundColor: "#38bdf8" },
+        { label: "Eval n=4 (s)", data: [18.063,17.390,17.642,17.500,17.493,17.487,17.583,17.656], borderColor: "#64748b", backgroundColor: "#64748b" },
+    ], "seconds", 0, 20);
+    line("s2-time", steps, [
+        { label: "Adam train (s)", data: [4.424,4.393,4.390,4.392,4.404,4.393,4.396,4.400], borderColor: "#38bdf8", backgroundColor: "#38bdf8" },
+        { label: "Eval n=4 (s)", data: [17.147,17.146,17.149,17.149,17.156,17.154,17.165,17.147], borderColor: "#64748b", backgroundColor: "#64748b" },
+    ], "seconds", 0, 20);
+    </script>
+</body>
+</html>

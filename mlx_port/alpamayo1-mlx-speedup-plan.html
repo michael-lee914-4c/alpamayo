@@ -411,9 +411,10 @@ nn.quantize(model, group_size=64, bits=4, mode="affine", class_predicate=pred)</
     <p><strong>Done when:</strong> train-step timer does not include autoregressive CoT or a 10-step Euler loop unless the run is RL rollout. NVIDIA Stage-1/2 graphs measured on PAI. LoRA is T4.1.</p>
   </div>
 
-  <div class="task gate">
-    <header><span class="tid">G4</span><span class="tname">Gate</span></header>
-    <p>SFT smoke works. Train step time is in a different regime from 110&nbsp;s infer. Checkpoint can be served as base+adapter (fuse still optional). 2026-08-31 8-clip 2-epoch run (same seed-0 4/4): Stage 1 language QLoRA all4, eval 1.853→1.827, Metal 78.68&nbsp;GB; Stage 2 <code>--expert-lora --train-action-proj</code> on those adapters, eval 0.260→0.180, Metal 11.66&nbsp;GB. JSON: <code>mlx_port/reports/sft_stage1_small_8clip_2ep.json</code> / <code>sft_stage2_small_8clip_2ep.json</code>. Stage timers (same recipe, one clip): Stage 1 Adam 13.7&nbsp;s (fwd_bwd 13.6) · Stage 2 Adam 4.2&nbsp;s · see <code>mlx_port/reports/train_stage_times.json</code>. G4 stays open until the user confirms this run.</p>
+  <div class="task gate signed">
+    <header><span class="tid">G4</span><span class="tname">Gate — signed off 2026-08-31</span></header>
+    <p>User closed G4. SFT smoke works. Train step time is in a different regime from 110&nbsp;s infer (Stage 1 Adam 13.7&nbsp;s, Stage 2 Adam 4.2&nbsp;s). Checkpoint is served as packed base+adapter; fuse stays optional. 2026-08-31 8-clip 2-epoch run (same seed-0 4/4): Stage 1 language QLoRA all4, eval 1.853→1.827, Metal 78.68&nbsp;GB; Stage 2 <code>--expert-lora --train-action-proj</code> on those adapters, eval 0.260→0.180, Metal 11.66&nbsp;GB. JSON: <code>mlx_port/reports/sft_stage1_small_8clip_2ep.json</code> / <code>sft_stage2_small_8clip_2ep.json</code>. Curves: <code>mlx_port/reports/sft_8clip_2ep_curves.html</code>. Stage timers (same recipe, one clip): Stage 1 Adam 13.7&nbsp;s (fwd_bwd 13.6) · Stage 2 Adam 4.2&nbsp;s · see <code>mlx_port/reports/train_stage_times.json</code>.</p>
+    <p class="note">2026-08-31: G4 signed. This is an 8-clip smoke close, not a full 10B finetune. Do not call the infer rollout inside an optimizer step.</p>
   </div>
 
   <h2 id="p5">Phase 5 — Pipeline: stream, speculate, skip FM steps</h2>

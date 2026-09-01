@@ -39,15 +39,15 @@
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Stage Status</div>
                     <div class="text-3xl font-semibold text-sky-400">In Progress</div>
-                    <div class="text-xs text-slate-500 mt-1">G1 signed · G3 signed · P2f done · prefill quant chase closed</div>
+                    <div class="text-xs text-slate-500 mt-1">G1 · G3 · G4 signed · P2f done · prefill quant chase closed</div>
                 </div>
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Key Focus</div>
-                    <div class="font-semibold text-xl text-cyan-400">Train stage timers</div>
+                    <div class="font-semibold text-xl text-cyan-400">G4 signed</div>
                 </div>
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Gate</div>
-                    <div class="font-semibold text-xl text-emerald-400">G1 + G3 signed</div>
+                    <div class="font-semibold text-xl text-emerald-400">G1 + G3 + G4 signed</div>
                 </div>
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Plan</div>
@@ -77,6 +77,28 @@
                 P2f prefill. Default load stays dense bf16. T3.1 and all4
                 stay opt-in memory. Decode W4 (−160&nbsp;ms) remains the only
                 quant speed signal. T3.3 50-clip ADE is optional logging.
+            </p>
+        </div>
+
+        <div class="bg-emerald-950/40 border border-emerald-700 rounded-3xl p-6 mb-8 text-sm text-slate-200 space-y-2">
+            <div class="font-semibold text-emerald-400">G4 signed off (2026-08-31)</div>
+            <p>
+                User closed G4 on the 8-clip 2-epoch Stage 1→2 smoke.
+                Stage 1 language QLoRA (all4, vision frozen): eval
+                1.853→1.827, all four train clips down on revisit, Metal
+                78.68&nbsp;GB. Stage 2 expert QLoRA + dense action I/O on
+                those adapters: eval 0.260→0.180, Metal 11.66&nbsp;GB.
+                Clip 7744 Stage-2 train 0.323→1.989 is finite (the pre-kappa
+                ~11k CFM bug stays closed). Train Adam is 13.7&nbsp;s (Stage 1)
+                / 4.2&nbsp;s (Stage 2) — a different regime from 110&nbsp;s infer.
+                Serve as packed base + adapters; fuse is still optional.
+                Curves:
+                <a class="text-cyan-400 hover:underline" href="sft_8clip_2ep_curves.html">sft_8clip_2ep_curves.html</a>.
+            </p>
+            <p>
+                This is an SFT-smoke close, not a claim that 8 clips are a
+                full finetune. Default load stays dense bf16. Do not call
+                the infer rollout inside an optimizer step.
             </p>
         </div>
 
@@ -255,8 +277,10 @@
                         <li><strong>LoRA vs dense instruction page</strong> (prior increment): <a class="text-cyan-400 hover:underline" href="../doc/train_lora_vs_dense.html">mlx_port/doc/train_lora_vs_dense.html</a> — user how-to for Stage 1 / Stage 2 quantization (QLoRA vs dense). Smoke table and Raises notes removed.</li>
                         <li><strong>Layout</strong> (prior increment): repo-root <code>reports/</code> moved to <code>mlx_port/reports/</code>. The training-options how-to left the progress-report tree and now lives at <a class="text-cyan-400 hover:underline" href="../doc/train_lora_vs_dense.html">mlx_port/doc/train_lora_vs_dense.html</a>. Script defaults resolve those dirs from <code>mlx_port/paths.py</code>. <code>reports/qlora/</code> gitignore is now <code>mlx_port/reports/qlora/</code>.</li>
                         <li><strong>G3 closed</strong> (prior increment): user waived the 0.2&nbsp;m / 50-clip ADE success criterion. Quality is the 2026-08-29 human review of the P2f 5-clip XY / CoC / speed plots (<a class="text-cyan-400 hover:underline" href="traj_sample_5_t06/index.html">traj_sample_5_t06</a>). Heading and scene language hold. Yield/stop overshoot is leftover, not a P2f regression. G3 is a quality close, not a claim that T3.1 / all4 beat P2f prefill. Default load stays dense bf16. T3.3 50-clip ADE is optional logging, not a blocker.</li>
-                        <li><strong>G4 8-clip 2-epoch</strong> (prior increment): first real epoch run. Same seed-0 8-clip 4/4 as the 10-step smokes. <code>--epochs 2</code> → 8 Adam steps (each train clip twice). Stage 1: all4 VLM, language-decoder QLoRA only (vision frozen). Stage 2: load those adapters, freeze the VLM, <code>--expert-lora --train-action-proj</code> (packed expert decoder QLoRA + dense action I/O). Writes to <code>mlx_port/reports/qlora/sft_stage1_small_8clip_2ep/</code> and <code>…/sft_stage2_small_8clip_2ep/</code> so the 10-step smokes stay untouched. G4 stays open until the user confirms the run.</li>
-                        <li><strong>Train stage timers</strong> (this increment): T1.1 analog for SFT. Infer is encode / prefill / decode / FM. Train is tokenize → encode_cache → backbone (+ expert) → <code>fwd_bwd</code> → Adam. No decode, no Euler. <code>sft_lora_update</code> / <code>sft_expert_update</code> <code>mx.eval(loss, grads)</code> before <code>opt.update</code> so backward is not lazy-attributed to Adam. Materialized <code>sft_train_step</code> still binds <code>StageClock</code> for encode / backbone. Prints a <code>[TRAIN]</code> line (same shape as <code>[STAGE]</code>). JSON: <a class="text-cyan-400 hover:underline" href="train_stage_times.json">mlx_port/reports/train_stage_times.json</a>.</li>
+                        <li><strong>G4 8-clip 2-epoch</strong> (prior increment): first real epoch run. Same seed-0 8-clip 4/4 as the 10-step smokes. <code>--epochs 2</code> → 8 Adam steps (each train clip twice). Stage 1: all4 VLM, language-decoder QLoRA only (vision frozen). Stage 2: load those adapters, freeze the VLM, <code>--expert-lora --train-action-proj</code> (packed expert decoder QLoRA + dense action I/O). Writes to <code>mlx_port/reports/qlora/sft_stage1_small_8clip_2ep/</code> and <code>…/sft_stage2_small_8clip_2ep/</code> so the 10-step smokes stay untouched.</li>
+                        <li><strong>Train stage timers</strong> (prior increment): T1.1 analog for SFT. Infer is encode / prefill / decode / FM. Train is tokenize → encode_cache → backbone (+ expert) → <code>fwd_bwd</code> → Adam. No decode, no Euler. <code>sft_lora_update</code> / <code>sft_expert_update</code> <code>mx.eval(loss, grads)</code> before <code>opt.update</code> so backward is not lazy-attributed to Adam. Materialized <code>sft_train_step</code> still binds <code>StageClock</code> for encode / backbone. Prints a <code>[TRAIN]</code> line (same shape as <code>[STAGE]</code>). JSON: <a class="text-cyan-400 hover:underline" href="train_stage_times.json">mlx_port/reports/train_stage_times.json</a>.</li>
+                        <li><strong>G4 2-epoch curves</strong> (prior increment): plotted the 8-clip 2-epoch Stage 1 CE and Stage 2 CFM (train / eval / per-clip revisit / step wall-clock). HTML: <a class="text-cyan-400 hover:underline" href="sft_8clip_2ep_curves.html">sft_8clip_2ep_curves.html</a>.</li>
+                        <li><strong>G4 signed</strong> (this increment): user closed G4 on that 8-clip 2-epoch smoke. SFT works; train Adam is 13.7&nbsp;s / 4.2&nbsp;s vs 110&nbsp;s infer; serve as base+adapter (fuse optional). Docs: this report, <code>PORT.md</code>, <code>alpamayo1-mlx-speedup-plan.html</code>.</li>
                         <li><strong>Expert decoder QLoRA</strong> (prior increment): opt-in <code>--expert-lora</code> wraps the diffusion transformer’s 36×7 <code>q/k/v/o/gate/up/down</code> leaves (252) with mlx_lm <code>LoRALinear</code> rank 8 / scale 20. Default Stage-2 path stays dense full FT. With <code>--expert-lora</code>, the all4 expert stays packed; only expert A/B train. <code>action_in_proj</code> / <code>action_out_proj</code> stay dense and frozen unless <code>--expert-dense</code> also Adam-steps them (packed decoder ints stay frozen). VLM + Stage-1 LoRA stay frozen. Packed expert ints are hashed with the VLM fingerprint. Exclusive with <code>--expert-update</code>. Expert adapters write to <code>mlx_port/reports/qlora/sft_stage2_small/</code> (gitignored); <code>--expert-dense</code> also writes <code>dense.safetensors</code>. 8-clip LoRA-only smoke (same seed-0 4/4): eval 0.198→0.185, Metal 11.72&nbsp;GB, packed <code>1097:9b90d23a…</code> unchanged. 8-clip <code>--expert-dense</code> (same split): eval 0.188→0.219 (spike 0.494), Metal 11.74&nbsp;GB, <code>dense.safetensors</code> 2.6&nbsp;MB / 15 arrays.</li>
                         <li><strong>T4.1</strong> (branch <code>stage1c-t41-qlora</code>): QLoRA on the language decoder and the vision tower. <code>inject_backbone_lora</code> wraps the 36×7 decoder <code>q/k/v/o/gate/up/down</code> leaves (252). Vision scope is <code>--lora-vision full|merger|none</code> (default <code>full</code>): <code>full</code> wraps 27 blocks <code>qkv</code>/<code>proj</code>/<code>fc1</code>/<code>fc2</code> + merger + 3 deepstack (116); <code>merger</code> wraps merger + 3 deepstack only (8); <code>none</code> is language-only. mlx_lm <code>LoRALinear</code> rank 8, scale 20. Conv3D <code>patch_embed</code>, LayerNorms, <code>pos_embed</code>, expert, <code>lm_head</code>, embeddings stay frozen. After <code>model.freeze()</code>, only <code>lora_a</code>/<code>lora_b</code> train (<code>full</code> 736 / 26.2&nbsp;M; <code>merger</code> 520 / 22.4&nbsp;M). Packed <code>QuantizedLinear.weight</code> is hashed before/after the step. Vision LoRA keeps encode on the tape; <code>freeze_vision_features</code> raises if vision adapters are present. <code>--lora</code> requires <code>--stage stage1</code>. <code>--lora-vision</code> requires <code>--lora</code>.</li>
                         <li>VLM W8 / W4 / all4 / nvfp4 were one-shot probes (measured 2026-08-29, then removed from the load path). Affine cannot pack vision <code>mlp.linear_fc2</code> (4304 ≉ 64); nvfp4 gs16 can. Conv3D patch embed never has <code>to_quantized</code>. Expert last dims 2048/8256 are ÷64. Action-in/out stayed dense. Metal nvfp4 is E2M1 + per-group FP8 scales, not Blackwell tensor cores.</li>
@@ -938,6 +962,15 @@
                     <li>mlx_port/reports/train_stage_times.json · train_stage_times_stage1.json · train_stage_times_stage2.json</li>
                     <li>mlx_port/PORT.md · alpamayo1-mlx-speedup-plan.html</li>
                 </ul>
+                <div class="text-[11px] uppercase tracking-wider text-slate-500">G4 2-epoch curves (prior increment)</div>
+                <ul class="text-xs space-y-1 font-mono">
+                    <li>mlx_port/reports/sft_8clip_2ep_curves.html — Stage 1 CE + Stage 2 CFM + step wall-clock</li>
+                </ul>
+                <div class="text-[11px] uppercase tracking-wider text-slate-500">G4 signed (this increment)</div>
+                <ul class="text-xs space-y-1 font-mono">
+                    <li>mlx_port/reports/stage1c_progress.html — G4 signed box + tables</li>
+                    <li>mlx_port/PORT.md · alpamayo1-mlx-speedup-plan.html · alpamayo_mlx_port_plan.html</li>
+                </ul>
                 <div class="text-[11px] uppercase tracking-wider text-slate-500">Prefill quant chase — removed from code</div>
                 <ul class="text-xs space-y-1 font-mono">
                     <li>deleted mlx_port/models/quantize_vlm.py</li>
@@ -963,7 +996,7 @@ PYTHONPATH=src:. /Users/michaellee/Projects/alpamayo/.venv/bin/python \
 # prep 152.8 s · wall 282.6 s · Metal 78.55 GB / RSS 26.15 GB
 # packed fp 593:e56ee262… unchanged
 
-# 2026-08-31 G4 candidate · 8-clip 2-epoch (do not close G4 until user confirms)
+# 2026-08-31 G4 · 8-clip 2-epoch (signed 2026-08-31)
 PYTHONPATH=src:. /Users/michaellee/Projects/alpamayo/.venv/bin/python \
   -m mlx_port.scripts.sft_stage1_small --n-clips 8 --epochs 2 --seed 0 --quantize-all \
   --lora-save-dir mlx_port/reports/qlora/sft_stage1_small_8clip_2ep \
@@ -1701,12 +1734,12 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono">sft_stage1_small.py · 8 clips · --epochs 2</td>
                                 <td class="px-2 py-2 text-emerald-400">PASS</td>
-                                <td class="px-2 py-2">2026-08-31 · same seed-0 4/4. all4 language QLoRA. 8 steps. eval 1.8531→1.8274. Per-clip train down on revisit. ~12.5 s/step. prep 132.9 s · wall 241.0 s · Metal 78.68 / RSS 26.44. Adapters 83 MB / 504 / step=8. JSON: mlx_port/reports/sft_stage1_small_8clip_2ep.json. G4 not signed (awaiting user).</td>
+                                <td class="px-2 py-2">2026-08-31 · same seed-0 4/4. all4 language QLoRA. 8 steps. eval 1.8531→1.8274. Per-clip train down on revisit. ~12.5 s/step. prep 132.9 s · wall 241.0 s · Metal 78.68 / RSS 26.44. Adapters 83 MB / 504 / step=8. JSON: mlx_port/reports/sft_stage1_small_8clip_2ep.json. G4 signed 2026-08-31.</td>
                             </tr>
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono">sft_stage2_small.py · 8 clips · --epochs 2 · --expert-lora --train-action-proj</td>
                                 <td class="px-2 py-2 text-emerald-400">PASS</td>
-                                <td class="px-2 py-2">2026-08-31 · loaded Stage-1 2ep adapters. expert_mode=qlora+action. eval 0.2599→0.1797. Clip 7744 0.323→1.989 finite. ~4.4 s/step. prep 138.2 s · wall 172.4 s · Metal 11.66 / RSS 26.14. Packed 1097:9b90d23a… . adapters 50 MB + dense 2.6 MB. JSON: mlx_port/reports/sft_stage2_small_8clip_2ep.json. G4 not signed (awaiting user).</td>
+                                <td class="px-2 py-2">2026-08-31 · loaded Stage-1 2ep adapters. expert_mode=qlora+action. eval 0.2599→0.1797. Clip 7744 0.323→1.989 finite. ~4.4 s/step. prep 138.2 s · wall 172.4 s · Metal 11.66 / RSS 26.14. Packed 1097:9b90d23a… . adapters 50 MB + dense 2.6 MB. JSON: mlx_port/reports/sft_stage2_small_8clip_2ep.json. G4 signed 2026-08-31.</td>
                             </tr>
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono">train stage timers · unit</td>
@@ -1722,6 +1755,16 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                                 <td class="px-2 py-2 font-mono">time_train_step.py · stage2 G4 clip · --expert-lora --train-action-proj --quantize-all</td>
                                 <td class="px-2 py-2 text-emerald-400">PASS</td>
                                 <td class="px-2 py-2">2026-08-31 · same clip. load 2.86 s · tokenize 12.8 s · encode_cache 1.11 s · fwd encode 0 / backbone 3984 (compiled) / expert 73 / total 4083 · Adam fwd_bwd 4085 / adam 70 / total 4176 · CFM 0.36 · Metal 12.27 / RSS 25.17. Combined: mlx_port/reports/train_stage_times.json.</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">sft_8clip_2ep_curves.html</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">2026-08-31 · plotted from sft_stage1_small_8clip_2ep.json + sft_stage2_small_8clip_2ep.json. Stage 1 eval 1.853→1.827; all four train clips down on revisit. Stage 2 eval 0.260→0.180; clip 7744 train 0.323→1.989 finite. No new training run.</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">G4 close · 8-clip 2-epoch</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">2026-08-31 · user signed G4 on the 8-clip 2-epoch Stage 1→2 smoke. No new training run. Docs: speedup plan + PORT.md + this report. Curves: sft_8clip_2ep_curves.html.</td>
                             </tr>
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono">G3 close · qualitative inspection</td>
@@ -2576,10 +2619,10 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                                 <td class="px-2 py-2 text-emerald-400">signed 2026-08-31</td>
                             </tr>
                             <tr>
-                                <td class="px-2 py-2 font-mono text-sky-300">G4 2-epoch</td>
+                                <td class="px-2 py-2 font-mono text-emerald-300">G4</td>
                                 <td class="px-2 py-2 font-mono">docs + run</td>
                                 <td class="px-2 py-2">8-clip 2-epoch Stage 1 language QLoRA then Stage 2 expert QLoRA + action I/O. Same seed-0 4/4.</td>
-                                <td class="px-2 py-2 text-amber-400">ran · awaiting user to close G4</td>
+                                <td class="px-2 py-2 text-emerald-400">signed 2026-08-31</td>
                             </tr>
                             <tr>
                                 <td class="px-2 py-2 font-mono text-sky-300">Train timers</td>
@@ -2591,7 +2634,7 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                     </table>
                 </div>
                 <p class="text-xs text-slate-500">
-                    G1 and G3 are signed off. Prefill quant chase is closed. Default load is dense bf16; T3.1 and all4 are opt-in memory. NVIDIA public SFT is now the default <code>--from-clip</code> graph: Stage 1 discrete traj-future + <code>im_end</code>, Stage 2 freeze VLM + CFM (non-causal expert attn). Paper 5.2 CoC CE is <code>--teacher-cot</code>. Hist stays at <code>&lt;i0&gt;</code>. Train stages are timed (tokenize / encode_cache / backbone / expert / fwd_bwd / adam). G4 8-clip 2-epoch ran 2026-08-31 and is waiting for user confirmation.
+                    G1, G3, and G4 are signed off. Prefill quant chase is closed. Default load is dense bf16; T3.1 and all4 are opt-in memory. NVIDIA public SFT is now the default <code>--from-clip</code> graph: Stage 1 discrete traj-future + <code>im_end</code>, Stage 2 freeze VLM + CFM (non-causal expert attn). Paper 5.2 CoC CE is <code>--teacher-cot</code>. Hist stays at <code>&lt;i0&gt;</code>. Train stages are timed (tokenize / encode_cache / backbone / expert / fwd_bwd / adam). G4 8-clip 2-epoch signed 2026-08-31.
                     Leftover 1b yield/stop quality is for MLX SFT after Bar B — not a NVIDIA T-match.
                 </p>
             </div>
@@ -2682,7 +2725,8 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                     PAI grad is 11.6&nbsp;s at 66&nbsp;GB Metal; vision <code>full</code>
                     is 24.8&nbsp;s at 107.5&nbsp;GB; vision <code>merger</code> is
                     12.5&nbsp;s at 76.8&nbsp;GB. Bar B did not
-                    wait on G3. G4 (clip SFT + fuse) is still open.
+                    wait on G3. G4 (clip SFT smoke) is signed 2026-08-31;
+                    fuse stays optional.
                     Bar C toward 2&nbsp;s needs a work cut (T5.1 stream KV or
                     T6 student), not fewer bits.
                 </p>
@@ -2731,11 +2775,14 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                 Packed ints unchanged. Encode stays on the tape.
                 Bar B smoke is met. Train stages are now timed like infer
                 (<a class="text-cyan-400 hover:underline" href="train_stage_times.json">train_stage_times.json</a>).
-                The 8-clip 2-epoch Stage 1→2 run finished
-                (JSON under <code>mlx_port/reports/sft_*_8clip_2ep.json</code>).
-                G4 stays open until you confirm that run. Do not call the infer
+                G4 is signed on the 8-clip 2-epoch Stage 1→2 smoke
+                (JSON under <code>mlx_port/reports/sft_*_8clip_2ep.json</code>;
+                curves:
+                <a class="text-cyan-400 hover:underline" href="sft_8clip_2ep_curves.html">sft_8clip_2ep_curves.html</a>).
+                Next work is Phase 5 (stream KV / speculate / skip FM) or a
+                larger SFT, not another G4 smoke. Do not call the infer
                 rollout inside an optimizer step. Default load is dense bf16.
-                T3.1 / all4 are opt-in. G3 is signed.
+                T3.1 / all4 are opt-in. Fuse stays optional.
             </p>
             <div class="mt-4 text-xs font-mono text-indigo-400">
                 mlx_port/reports/stage1c_progress.html · started 2026-08-29 ·

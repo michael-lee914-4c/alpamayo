@@ -5,6 +5,7 @@ encode → prefill → CoC decode → 10-step flow-matching → `action_to_traj`
 
 Gate G1 signed off 2026-08-29 (user). Gate G3 signed off 2026-08-31 (user):
 quality is human inspection of the 5-clip plots, not a 50-clip ADE band.
+Gate G4 signed off 2026-08-31 (user): 8-clip 2-epoch Stage 1→2 SFT smoke.
 Canonical window: P2f greedy e2e,
 encode 1044 · prefill 3645 · decode 856 / 13 tok · FM 630 / 10 steps.
 Dominant = prefill. T3.1 / all4 stay opt-in memory. Do not 4-bit the expert
@@ -265,16 +266,18 @@ leaves / 13.0 M, lr 1e-4, same 4/4. eval 0.198→0.185, train clip-wise
 Packed hash match. `dense.safetensors` 2.6 MB / 15 arrays. JSON:
 `mlx_port/reports/sft_stage2_small_8clip_expert_qlora_dense.json`.
 
-G4 candidate 8-clip 2-epoch (2026-08-31, awaiting user): `--epochs 2` → 8
-Adam steps on the same seed-0 4/4. Stage 1 language QLoRA all4: eval
-1.853→1.827, per-clip train down on revisit, Metal 78.68 GB. Adapters
+G4 signed 2026-08-31 (user): `--epochs 2` → 8 Adam steps on the same
+seed-0 4/4. Stage 1 language QLoRA all4: eval 1.853→1.827, per-clip
+train down on revisit, Metal 78.68 GB. Adapters
 `mlx_port/reports/qlora/sft_stage1_small_8clip_2ep/` (83 MB, step=8).
 Stage 2 loads those adapters, `--expert-lora --train-action-proj`: eval
 0.260→0.180, Metal 11.66 GB, packed `1097:9b90d23a…`. Adapters 50 MB +
 `dense.safetensors` 2.6 MB under
 `mlx_port/reports/qlora/sft_stage2_small_8clip_2ep/`.
 JSON: `mlx_port/reports/sft_stage1_small_8clip_2ep.json`,
-`mlx_port/reports/sft_stage2_small_8clip_2ep.json`. G4 not signed.
+`mlx_port/reports/sft_stage2_small_8clip_2ep.json`. Curves:
+`mlx_port/reports/sft_8clip_2ep_curves.html`. Serve as packed base +
+adapters; fuse is optional.
 
 Train stage wall-clock (2026-08-31, T1.1 analog): same G4 clip
 `77447940…`, t0=5.1 s, seq=3124. Prints a `[TRAIN]` line
