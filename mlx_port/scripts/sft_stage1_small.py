@@ -9,8 +9,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import time
 from pathlib import Path
+
+sys.stdout.reconfigure(line_buffering=True)
 
 import mlx.core as mx
 import mlx.optimizers as optim
@@ -41,10 +44,34 @@ from mlx_port.scripts.time_train_step import (
     _load_model,
     build_pai_train_batch,
 )
-from mlx_port.train_step import sft_train_step
+from mlx_port.paths import REPORTS_DIR
+from mlx_port.train_step import mean_train_times, print_train_table, sft_train_step
 
-REPORT_DEFAULT = Path("/Users/michaellee/Projects/alpamayo/reports/sft_stage1_small_10step.json")
-LORA_SAVE_DEFAULT = Path("/Users/michaellee/Projects/alpamayo/reports/qlora/sft_stage1_small")
+REPORT_DEFAULT = REPORTS_DIR / "sft_stage1_small_10step.json"
+LORA_SAVE_DEFAULT = REPORTS_DIR / "qlora" / "sft_stage1_small"
+DEFAULT_STEPS = 10
+
+
+def resolve_train_steps(
+    *,
+    steps: int | None,
+    epochs: int | None,
+    n_train: int,
+) -> tuple[int, int | None]:
+    """Adam steps from ``--steps`` or ``--epochs`` (one pass = n_train clips)."""
+    if steps is not None and epochs is not None:
+        raise ValueError("--epochs and --steps are exclusive")
+    if n_train < 1:
+        raise ValueError(f"n_train must be >= 1, got {n_train}")
+    if epochs is not None:
+        if int(epochs) < 1:
+            raise ValueError(f"--epochs must be >= 1, got {epochs}")
+        return int(epochs) * int(n_train), int(epochs)
+    if steps is None:
+        steps = DEFAULT_STEPS
+    if int(steps) < 1:
+        raise ValueError(f"--steps must be >= 1, got {steps}")
+    return int(steps), None
 
 
 def select_non_coc_clips(
@@ -79,28 +106,35 @@ def select_non_coc_clips(
     return train, eval_ids
 
 
-def _eval_loss(model: AlpamayoR1MLX, batch: dict) -> float:
+def _eval_loss(model: AlpamayoR1MLX, batch: dict) -> tuple[float, dict]:
     if has_vision_lora(model):
         raise RuntimeError("this smoke freezes the vision tower; do not inject vision LoRA")
     batch = freeze_vision_features(model, batch)
     out = sft_train_step(model, batch, stage="stage1", materialize=True)
-    return float(out.loss.item())
+    return float(out.loss.item()), out.times.as_dict()
 
 
-def _mean_eval(model: AlpamayoR1MLX, batches: list[dict]) -> float:
+def _mean_eval(model: AlpamayoR1MLX, batches: list[dict]) -> tuple[float, dict]:
     if not batches:
         raise ValueError("eval set is empty")
-    losses = [_eval_loss(model, b) for b in batches]
-    return float(sum(losses) / len(losses))
+    losses: list[float] = []
+    times: list[dict] = []
+    for b in batches:
+        loss, t = _eval_loss(model, b)
+        losses.append(loss)
+        times.append(t)
+    return float(sum(losses) / len(losses)), mean_train_times(times)
 
 
 def _prepare_batches(
     model: AlpamayoR1MLX,
     clip_ids: list[str],
     local_dir: Path,
-) -> list[dict]:
+) -> tuple[list[dict], list[dict]]:
     batches = []
+    prep_rows: list[dict] = []
     for clip_id in clip_ids:
+        t0 = time.perf_counter()
         batch, meta = build_pai_train_batch(
             model,
             clip_id,
@@ -108,15 +142,26 @@ def _prepare_batches(
             recipe="stage1",
             t0_us=DEFAULT_STAGE1_T0_US,
         )
+        tokenize_ms = (time.perf_counter() - t0) * 1000.0
         if meta.get("teacher_cot") is not None:
             raise RuntimeError(f"clip {clip_id} unexpectedly has a CoC teacher string")
+        t1 = time.perf_counter()
         batch = freeze_vision_features(model, batch)
+        encode_cache_ms = (time.perf_counter() - t1) * 1000.0
         batches.append(batch)
+        row = {
+            "clip_id": clip_id,
+            "tokenize_ms": tokenize_ms,
+            "encode_cache_ms": encode_cache_ms,
+            "seq": meta["seq"],
+        }
+        prep_rows.append(row)
         print(
             f"[DATA] clip={clip_id} t0_us={meta['t0_us']} seq={meta['seq']} "
-            f"n_ce={meta['n_ce']} n_future={meta['n_future_pads']}"
+            f"n_ce={meta['n_ce']} n_future={meta['n_future_pads']} "
+            f"tokenize_ms={tokenize_ms:.1f} encode_cache_ms={encode_cache_ms:.1f}"
         )
-    return batches
+    return batches, prep_rows
 
 
 def main() -> None:
@@ -129,7 +174,18 @@ def main() -> None:
         default=8,
         help="Even pool, split 50/50. Default 8 (4 train / 4 eval).",
     )
-    parser.add_argument("--steps", type=int, default=10)
+    parser.add_argument(
+        "--steps",
+        type=int,
+        default=None,
+        help="Adam steps. Default 10 if --epochs is unset. Exclusive with --epochs.",
+    )
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=None,
+        help="Full passes over the train split (steps = epochs * n_train). Exclusive with --steps.",
+    )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--lora-rank", type=int, default=8)
     parser.add_argument("--lora-scale", type=float, default=20.0)
@@ -167,8 +223,8 @@ def main() -> None:
     args = parser.parse_args()
     if args.n_clips < 2:
         parser.error("--n-clips must be >= 2")
-    if args.steps < 1:
-        parser.error("--steps must be >= 1")
+    if args.epochs is not None and args.steps is not None:
+        parser.error("--epochs and --steps are exclusive")
     if args.no_lora_save and args.lora_save_every != DEFAULT_SAVE_EVERY:
         parser.error("--no-lora-save and --lora-save-every are exclusive")
     if not args.no_lora_save and args.lora_save_every < 1:
@@ -177,9 +233,17 @@ def main() -> None:
     train_ids, eval_ids = select_non_coc_clips(
         args.local_dir, args.n_clips, args.seed
     )
+    try:
+        args.steps, args.epochs = resolve_train_steps(
+            steps=args.steps, epochs=args.epochs, n_train=len(train_ids)
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
     print(
         f"[SPLIT] n={args.n_clips} train={len(train_ids)} eval={len(eval_ids)} "
-        f"seed={args.seed} exclude_coc=1 t0_us={DEFAULT_STAGE1_T0_US}"
+        f"seed={args.seed} exclude_coc=1 t0_us={DEFAULT_STAGE1_T0_US} "
+        f"steps={args.steps}"
+        + (f" epochs={args.epochs}" if args.epochs is not None else "")
     )
     print(f"[SPLIT] train={train_ids}")
     print(f"[SPLIT] eval={eval_ids}")
@@ -204,8 +268,8 @@ def main() -> None:
         print(f"[LORA] packed_fp={packed_fp0}")
 
     t_prep = time.perf_counter()
-    train_batches = _prepare_batches(model, train_ids, args.local_dir)
-    eval_batches = _prepare_batches(model, eval_ids, args.local_dir)
+    train_batches, train_prep = _prepare_batches(model, train_ids, args.local_dir)
+    eval_batches, eval_prep = _prepare_batches(model, eval_ids, args.local_dir)
     prep_s = time.perf_counter() - t_prep
 
     opt = optim.Adam(learning_rate=args.lora_lr)
@@ -218,9 +282,10 @@ def main() -> None:
     )
     with MemoryMonitor(poll_interval=0.05, label="sft_stage1_small"):
         t0_eval = time.perf_counter()
-        eval0 = _mean_eval(model, eval_batches)
+        eval0, eval0_times = _mean_eval(model, eval_batches)
         eval0_ms = (time.perf_counter() - t0_eval) * 1000.0
         print(f"[EVAL] step=-1 mean={eval0:.4f} n={len(eval_batches)} ms={eval0_ms:.1f}")
+        print_train_table(eval0_times)
         rows.append(
             {
                 "step": -1,
@@ -229,6 +294,7 @@ def main() -> None:
                 "eval_mean": eval0,
                 "train_ms": None,
                 "eval_ms": eval0_ms,
+                "eval_times": eval0_times,
             }
         )
         t_all = time.perf_counter()
@@ -236,25 +302,30 @@ def main() -> None:
             batch = train_batches[i % len(train_batches)]
             clip_id = train_ids[i % len(train_ids)]
             t0 = time.perf_counter()
-            loss = sft_lora_update(model, batch, opt, stage="stage1")
+            upd = sft_lora_update(model, batch, opt, stage="stage1")
             train_ms = (time.perf_counter() - t0) * 1000.0
             t1 = time.perf_counter()
-            ev = _mean_eval(model, eval_batches)
+            ev, ev_times = _mean_eval(model, eval_batches)
             eval_ms = (time.perf_counter() - t1) * 1000.0
+            train_times = upd.times.as_dict()
             rows.append(
                 {
                     "step": i,
                     "train_clip": clip_id,
-                    "train_loss": loss,
+                    "train_loss": upd.loss,
                     "eval_mean": ev,
                     "train_ms": train_ms,
                     "eval_ms": eval_ms,
+                    "train_times": train_times,
+                    "eval_times": ev_times,
                 }
             )
             print(
-                f"[STEP] {i} clip={clip_id} train={loss:.4f} "
+                f"[STEP] {i} clip={clip_id} train={upd.loss:.4f} "
                 f"eval={ev:.4f} train_ms={train_ms:.1f} eval_ms={eval_ms:.1f}"
             )
+            print_train_table(train_times)
+            print_train_table(ev_times)
             completed = i + 1
             if completed in save_at:
                 info = save_lora_adapters(
@@ -291,6 +362,7 @@ def main() -> None:
         "n_clips": args.n_clips,
         "n_train": len(train_ids),
         "n_eval": len(eval_ids),
+        "epochs": args.epochs,
         "steps": args.steps,
         "seed": args.seed,
         "lr": args.lora_lr,
@@ -300,6 +372,8 @@ def main() -> None:
         "train_ids": train_ids,
         "eval_ids": eval_ids,
         "prep_s": prep_s,
+        "prep_train": train_prep,
+        "prep_eval": eval_prep,
         "wall_s": wall_s,
         "loss0": train_losses[0],
         "lossN": train_losses[-1],

@@ -22,6 +22,7 @@ from alpamayo_r1.load_physical_aiavdataset import load_physical_aiavdataset
 from mlx_port.gt_eval import clean_pred_coc, list_local_coc_clips, load_clip_gt, score_coc
 from mlx_port.inference import generate_top_k_coc, sample_n_coc
 from mlx_port.models.alpamayo_r1_mlx import AlpamayoR1MLX
+from mlx_port.paths import REPORTS_DIR
 from mlx_port.processor import (
     DEFAULT_NUM_FRAMES,
     alpamayo_apply_chat_template,
@@ -31,7 +32,7 @@ from mlx_port.processor import (
 
 LOCAL_DIR = Path("/Volumes/MicronSSD/pai_coc")
 CHECKPOINT = Path("/Users/michaellee/Projects/alpamayo/pre-trained/Alpamayo-R1-10B")
-REPORT_DIR = Path("/Users/michaellee/Projects/alpamayo/reports/coc_sample_5")
+REPORT_DIR = REPORTS_DIR / "coc_sample_5"
 SEED = 42
 N_CLIPS = 5
 CAM_NAMES = {
@@ -516,7 +517,7 @@ def main() -> None:
         "--report-dir",
         type=Path,
         default=REPORT_DIR,
-        help="Write HTML/JSON here (default: reports/coc_sample_5)",
+        help="Write HTML/JSON here (default: mlx_port/reports/coc_sample_5)",
     )
     parser.add_argument(
         "--no-reuse",

@@ -94,7 +94,7 @@
                     <div class="bg-slate-950 border border-slate-700 rounded-2xl p-4 md:col-span-2">
                         <div class="text-xs uppercase tracking-wider text-slate-400 mb-2">Action expert minADE — Stage 1b (closed)</div>
                         <div class="text-slate-300">Stage 1’s CoC-only path did not require <code>pred_xyz</code>. Stage 1b now returns physical <code>(1, 1, 1, 64, 3)</code> (greedy minADE 3.89 m; 5-clip mean 7.85 m). Yield/stop quality is leftover on that page.</div>
-                        <div class="mt-2 text-xs text-slate-500">See <a class="text-cyan-400 hover:underline" href="stage1b_progress.html">reports/stage1b_progress.html</a>.</div>
+                        <div class="mt-2 text-xs text-slate-500">See <a class="text-cyan-400 hover:underline" href="stage1b_progress.html">mlx_port/reports/stage1b_progress.html</a>.</div>
                     </div>
                 </div>
             </div>
@@ -382,9 +382,9 @@ PYTHONPATH=src:. .venv/bin/python -m pytest mlx_port/tests/test_end_to_end_infer
 PYTHONPATH=src:. .venv/bin/python mlx_port/scripts/run_local_coc_sample.py
 PYTHONPATH=src:. .venv/bin/python mlx_port/scripts/run_local_coc_sample.py \
   --mode samples --k 3 --temperature 0.6 --top-p 0.98 \
-  --report-dir reports/coc_sample_5_t06 --no-reuse
+  --report-dir mlx_port/reports/coc_sample_5_t06 --no-reuse
 PYTHONPATH=src:. .venv/bin/python mlx_port/scripts/eval_coc_grok.py \
-  --results reports/coc_sample_5_t06/results.json</pre>
+  --results mlx_port/reports/coc_sample_5_t06/results.json</pre>
                 <div class="text-xs text-slate-400 space-y-1">
                     <div>Parity: <code>test_tokenizer_id_parity</code> · <code>test_delta_tokenizer</code> · <code>test_hf_rope_index</code> · <code>test_conv3d_layout</code> · <code>test_nucleus_sampling</code> · <code>test_inference_row7</code> (HF EOS + traj delay)</div>
                     <div>GT: <code>test_gt_eval</code> (Jaccard is not the quality metric; cleanup + ADE layout only)</div>
@@ -425,16 +425,16 @@ PYTHONPATH=src:. .venv/bin/python mlx_port/scripts/eval_coc_grok.py \
             <ol class="list-decimal list-inside space-y-2 text-sm text-slate-300">
                 <li>
                     Stage 1 and 1b are closed. Next is
-                    <a class="text-cyan-400 hover:underline" href="../mlx_port/alpamayo1-mlx-speedup-plan.html">Stage 1c</a>
+                    <a class="text-cyan-400 hover:underline" href="../alpamayo1-mlx-speedup-plan.html">Stage 1c</a>
                     (runtime / train-step speed). Leftover yield/stop quality stays on
-                    <a class="text-cyan-400 hover:underline" href="stage1b_progress.html">reports/stage1b_progress.html</a>.
+                    <a class="text-cyan-400 hover:underline" href="stage1b_progress.html">mlx_port/reports/stage1b_progress.html</a>.
                 </li>
                 <li class="text-slate-500">
                     Stages 2–3 remain blocked on 1c. Do not re-enable temporal grouping on greedy e2e. Do not mask <code>&lt;|im_end|&gt;</code>.
                 </li>
             </ol>
             <div class="mt-4 text-xs font-mono text-indigo-400">
-                reports/stage1_progress.html · closed 2026-08-28 ·
+                mlx_port/reports/stage1_progress.html · closed 2026-08-28 ·
                 <a class="text-cyan-400 hover:underline" href="stage1b_progress.html">stage 1b (closed)</a> ·
                 <a class="text-cyan-400 hover:underline" href="stage1_debug_notes.html">historical debug</a>
             </div>

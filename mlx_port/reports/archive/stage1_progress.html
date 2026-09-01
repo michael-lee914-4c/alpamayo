@@ -152,7 +152,7 @@
                         <div class="mt-4 text-xs text-emerald-400">
                             Extraction script: <span class="font-mono">mlx_port/extract_random_front_wide.py</span><br>
                             Test script that uses the image: <span class="font-mono">mlx_port/tests/test_full_alpamayo_inference.py</span> (run via <span class="font-mono">pytest</span>)<br>
-                            Run on host → saves <span class="font-mono">reports/stage1_test_image_front_wide.png</span>
+                            Run on host → saves <span class="font-mono">mlx_port/reports/stage1_test_image_front_wide.png</span>
                         </div>
                     </div>
                     <div class="bg-slate-950 border border-slate-700 rounded-2xl p-4 flex items-center justify-center">
@@ -1204,7 +1204,7 @@ phys = denormalize_trajectory(traj.reshape(-1,2), expert)</pre>
                 <div>40. ✓ Moved the full end-to-end PAI-COC inference (real 16-camera data + history injection + VLM CoC + Expert 64-waypoint FlowMatching) into <code>tests/test_pai_coc_inference.py</code> as <code>test_pai_coc_full_end_to_end</code>. The test is now the canonical location for the complete pipeline, with easy parametrization for ablation studies. The original script <code>test_inference_pai_coc.py</code> is retained only as a convenience entry point.</div>
                 <div>41. ✓ Ran the new pytest suite <code>mlx_port/tests/test_pai_coc_inference.py</code> (3 parametrized cases). All 3 tests <strong>PASSED</strong> in 39.9 seconds. Configurations tested: <code>deterministic_simple_generation</code>, <code>deterministic_two_stage_processor</code>, <code>sampling_two_stage_processor</code>. No functional failures — only unrelated deprecation warnings from Hugging Face / SWIG. This confirms the full end-to-end pipeline (VLM + history injection + Expert + FlowMatching) is stable under pytest.</div>
             </div>
-            <div class="mt-4 text-xs font-mono text-indigo-400">Report: reports/stage1_progress.html (living document)</div>
+            <div class="mt-4 text-xs font-mono text-indigo-400">Report: mlx_port/reports/stage1_progress.html (living document)</div>
         </div>
     </div>
 </body>

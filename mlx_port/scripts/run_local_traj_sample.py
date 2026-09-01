@@ -27,6 +27,7 @@ from mlx_port.gt_eval import (
 )
 from mlx_port.inference import sample_trajectories_from_data_with_vlm_rollout
 from mlx_port.models.alpamayo_r1_mlx import AlpamayoR1MLX
+from mlx_port.paths import REPORTS_DIR
 from mlx_port.processor import DEFAULT_NUM_FRAMES, get_processor
 from mlx_port.scripts.run_local_coc_sample import (
     CAM_NAMES,
@@ -48,7 +49,7 @@ from mlx_port.traj_sample_plot_utils import (
     quant_path_label,
 )
 
-# Same five clips as reports/coc_sample_5_t06 (seed 42, skip t0 < 1.6s).
+# Same five clips as mlx_port/reports/coc_sample_5_t06 (seed 42, skip t0 < 1.6s).
 CLIP_IDS = [
     "faff17c7-4572-472a-be28-0f035bb88a37",
     "8e83f069-5fc5-4329-8589-4527de19d03e",
@@ -56,7 +57,7 @@ CLIP_IDS = [
     "8e06f83c-4de6-4cde-82ab-4a747645f80a",
     "36cb5485-5c56-48c5-8219-90095851d627",
 ]
-REPORT_DIR = Path("/Users/michaellee/Projects/alpamayo/reports/traj_sample_5_t06")
+REPORT_DIR = REPORTS_DIR / "traj_sample_5_t06"
 SEED = 42
 NVIDIA_TEMPERATURE = 0.6
 NVIDIA_TOP_P = 0.98

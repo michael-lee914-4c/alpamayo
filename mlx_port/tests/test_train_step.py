@@ -14,19 +14,29 @@ from mlx_port.scripts.time_train_step import _event_coc, _image_batch_from_token
 from mlx_port.models.expert_mlx import expert_non_causal_train_mask
 from mlx_port.train_step import (
     IGNORE_INDEX,
+    TRAIN_DOMINANT,
+    TRAIN_MS_KEYS,
+    TrainStepTimes,
     append_traj_future_start,
     apply_labels_mask,
+    assert_stage2_trainables,
     drop_n_traj_group,
     get_role_eos_mask,
     labels_mask_between,
     assert_train_graph,
     cfm_expert_forward,
     expert_train_position_ids,
+    freeze_vlm,
+    mean_train_times,
+    prepare_stage2_trainables,
+    print_train_table,
+    sft_expert_update,
     sft_stage1_labels_mask,
     sft_train_step,
     shifted_cross_entropy,
     stage1_two_mean_ce,
     traj_future_keep_len,
+    unfreeze_expert,
 )
 
 
@@ -456,7 +466,16 @@ def test_time_train_step_from_clip_in_help():
     )
     if proc.returncode != 0:
         raise AssertionError(proc.stderr)
-    for flag in ("--from-clip", "--teacher-cot", "--expert-update"):
+    for flag in (
+        "--from-clip",
+        "--teacher-cot",
+        "--expert-update",
+        "--expert-bf16",
+        "--expert-lora",
+        "--train-action-proj",
+        "--t0-us",
+        "--report",
+    ):
         if flag not in proc.stdout:
             raise AssertionError(f"{flag} missing from help")
 
@@ -492,6 +511,165 @@ def test_time_train_step_expert_update_requires_stage2():
     assert "stage2" in err
 
 
+def test_time_train_step_expert_update_all4_requires_expert_bf16():
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "mlx_port.scripts.time_train_step",
+            "--expert-update",
+            "--stage",
+            "stage2",
+            "--quantize-all",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode == 0:
+        raise AssertionError(
+            "expected non-zero exit when --expert-update --quantize-all has no --expert-bf16"
+        )
+    err = (proc.stderr or "") + (proc.stdout or "")
+    assert "expert-bf16" in err
+
+
+def test_time_train_step_expert_lora_requires_stage2():
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "mlx_port.scripts.time_train_step",
+            "--expert-lora",
+            "--stage",
+            "stage1",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode == 0:
+        raise AssertionError("expected non-zero exit when --expert-lora is not stage2")
+    err = (proc.stderr or "") + (proc.stdout or "")
+    assert "stage2" in err
+
+
+def test_time_train_step_expert_lora_exclusive_with_expert_update():
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "mlx_port.scripts.time_train_step",
+            "--expert-lora",
+            "--expert-update",
+            "--stage",
+            "stage2",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode == 0:
+        raise AssertionError("expected non-zero exit when --expert-lora and --expert-update")
+    err = (proc.stderr or "") + (proc.stdout or "")
+    assert "exclusive" in err
+
+
+def test_time_train_step_expert_lora_exclusive_with_lora():
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "mlx_port.scripts.time_train_step",
+            "--expert-lora",
+            "--lora",
+            "--stage",
+            "stage2",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode == 0:
+        raise AssertionError("expected non-zero exit when --expert-lora and --lora")
+    err = (proc.stderr or "") + (proc.stdout or "")
+    assert "exclusive" in err or "stage1" in err
+
+
+def test_time_train_step_train_action_proj_requires_expert_lora():
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "mlx_port.scripts.time_train_step",
+            "--train-action-proj",
+            "--stage",
+            "stage2",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode == 0:
+        raise AssertionError(
+            "expected non-zero exit when --train-action-proj has no --expert-lora"
+        )
+    err = (proc.stderr or "") + (proc.stdout or "")
+    assert "expert-lora" in err
+
+
+def test_time_train_step_rejects_renamed_dense_flags():
+    for old, new in (
+        ("--dense-expert", "--expert-bf16"),
+        ("--expert-dense", "--train-action-proj"),
+    ):
+        proc = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "mlx_port.scripts.time_train_step",
+                old,
+                "--stage",
+                "stage2",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        if proc.returncode == 0:
+            raise AssertionError(f"expected non-zero exit for renamed {old}")
+        err = (proc.stderr or "") + (proc.stdout or "")
+        if new not in err:
+            raise AssertionError(f"{old} should mention {new}: {err}")
+
+
+def test_freeze_vlm_then_unfreeze_expert_leaves_no_vlm_trainables():
+    import mlx.nn as nn
+    from mlx.utils import tree_flatten
+
+    from mlx_port.lora import inject_backbone_lora
+    from mlx_port.tests.test_lora import TinyHost
+
+    class Host(TinyHost):
+        def __init__(self):
+            super().__init__(n=2, d=32)
+            self.action_in_proj = nn.Linear(32, 32, bias=False)
+            self.action_out_proj = nn.Linear(32, 32, bias=False)
+
+    host = Host()
+    inject_backbone_lora(host, rank=4, expected_layers=2, vision=False)
+    freeze_vlm(host)
+    unfreeze_expert(host)
+    assert_stage2_trainables(host)
+    flat = dict(tree_flatten(host.trainable_parameters()))
+    assert not any(k.startswith("vlm.") for k in flat)
+    assert any(k.startswith("expert.") for k in flat)
+    assert any(k.startswith("action_in_proj.") for k in flat)
+    packed = nn.QuantizedLinear.from_linear(host.expert, group_size=32, bits=4)
+    host.expert = packed
+    host.expert.unfreeze()
+    try:
+        assert_stage2_trainables(host)
+    except RuntimeError as exc:
+        assert "QuantizedLinear" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError for packed expert")
+
+
 def test_time_train_step_rejects_exclusive_quant_flags():
     proc = subprocess.run(
         [
@@ -508,3 +686,198 @@ def test_time_train_step_rejects_exclusive_quant_flags():
         raise AssertionError("expected non-zero exit when both quant flags are set")
     err = (proc.stderr or "") + (proc.stdout or "")
     assert "exclusive" in err
+
+
+def test_sft_expert_update_qlora_leaves_packed_expert_frozen():
+    import mlx.optimizers as optim
+    from mlx.utils import tree_flatten
+
+    from mlx_port.lora import (
+        assert_only_lora_trainable,
+        inject_expert_lora,
+        packed_weight_fingerprint,
+    )
+    from mlx_port.tests.test_lora import TinyStage2Host, _quantize_expert_leaves
+
+    mx.random.seed(0)
+    host = TinyStage2Host(n_vlm=1, n_expert=1, d=32)
+    host.action_in_proj = ActionInProj(
+        in_dims=(4, 2),
+        out_dim=32,
+        num_enc_layers=1,
+        hidden_size=32,
+    )
+    host.action_out_proj = ActionOutProj(32, 2)
+    host.diffusion = FlowMatching(x_dims=(4, 2), train_timestep_sampler="uniform")
+    host.traj_token_ids = {"future_start": 7}
+    host.expert_non_causal_attention = True
+    _quantize_expert_leaves(host)
+    inject_expert_lora(host, rank=4, expected_layers=1)
+    prepare_stage2_trainables(host)
+    assert_only_lora_trainable(host)
+    fp0 = packed_weight_fingerprint(host)
+    before = {k: np.array(v) for k, v in tree_flatten(host.trainable_parameters())}
+    opt = optim.Adam(learning_rate=1e-3)
+    ids = mx.array([[1, 2, 7, 4]], dtype=mx.int32)
+    action = mx.zeros((1, 4, 2), dtype=mx.float32)
+    loss = sft_expert_update(host, {"input_ids": ids, "action": action}, opt)
+    assert np.isfinite(loss.loss)
+    assert packed_weight_fingerprint(host) == fp0
+    after = {k: np.array(v) for k, v in tree_flatten(host.trainable_parameters())}
+    moved = [k for k in before if not np.allclose(before[k], after[k], atol=0.0)]
+    if not moved:
+        raise AssertionError("expert LoRA A/B did not move after sft_expert_update")
+    assert all("lora_" in k and k.startswith("expert.") for k in moved)
+    assert_only_lora_trainable(host)
+    assert_stage2_trainables(host)
+
+
+def test_sft_expert_update_train_action_proj_moves_action_proj():
+    import mlx.optimizers as optim
+    from mlx.utils import tree_flatten
+
+    from mlx_port.lora import (
+        inject_expert_lora,
+        packed_weight_fingerprint,
+    )
+    from mlx_port.tests.test_lora import TinyStage2Host, _quantize_expert_leaves
+
+    mx.random.seed(1)
+    host = TinyStage2Host(n_vlm=1, n_expert=1, d=32)
+    host.action_in_proj = ActionInProj(
+        in_dims=(4, 2),
+        out_dim=32,
+        num_enc_layers=1,
+        hidden_size=32,
+    )
+    host.action_out_proj = ActionOutProj(32, 2)
+    host.diffusion = FlowMatching(x_dims=(4, 2), train_timestep_sampler="uniform")
+    host.traj_token_ids = {"future_start": 7}
+    host.expert_non_causal_attention = True
+    _quantize_expert_leaves(host)
+    inject_expert_lora(host, rank=4, expected_layers=1)
+    prepare_stage2_trainables(host, train_action_proj=True)
+    fp0 = packed_weight_fingerprint(host)
+    action_in0 = np.array(host.action_in_proj.norm.weight)
+    lora0 = {
+        k: np.array(v)
+        for k, v in tree_flatten(host.trainable_parameters())
+        if "lora_" in k
+    }
+    opt = optim.Adam(learning_rate=1e-2)
+    ids = mx.array([[1, 2, 7, 4]], dtype=mx.int32)
+    action = mx.ones((1, 4, 2), dtype=mx.float32) * 0.1
+    loss = sft_expert_update(
+        host, {"input_ids": ids, "action": action}, opt, train_action_proj=True
+    )
+    assert np.isfinite(loss.loss)
+    assert packed_weight_fingerprint(host) == fp0
+    if np.allclose(action_in0, np.array(host.action_in_proj.norm.weight)):
+        raise AssertionError("action_in_proj did not move with train_action_proj")
+    lora1 = {
+        k: np.array(v)
+        for k, v in tree_flatten(host.trainable_parameters())
+        if "lora_" in k
+    }
+    if all(np.allclose(lora0[k], lora1[k]) for k in lora0):
+        raise AssertionError("expert LoRA A/B did not move with train_action_proj")
+    assert_stage2_trainables(host)
+
+
+def test_prepare_stage2_train_action_proj_requires_expert_lora():
+    from mlx_port.tests.test_lora import TinyStage2Host
+
+    host = TinyStage2Host(n_vlm=1, n_expert=1, d=32)
+    try:
+        prepare_stage2_trainables(host, train_action_proj=True)
+    except RuntimeError as exc:
+        assert "expert LoRA" in str(exc)
+    else:
+        raise AssertionError(
+            "expected RuntimeError when train_action_proj has no expert LoRA"
+        )
+
+
+def test_train_step_times_as_dict_names_dominant():
+    times = TrainStepTimes(
+        encode_ms=100.0,
+        backbone_ms=800.0,
+        expert_ms=50.0,
+        loss_ms=10.0,
+        fwd_bwd_ms=0.0,
+        adam_ms=0.0,
+        total_ms=960.0,
+        n_vlm_forwards=1,
+    ).as_dict()
+    for key in TRAIN_MS_KEYS:
+        assert key in times
+    assert times["dominant_stage"] == "backbone"
+    assert times["dominant_stage"] in TRAIN_DOMINANT
+    assert times["total_ms"] == 960.0
+    assert times["dtype"] == "bfloat16"
+    print_train_table(times)
+
+
+def test_mean_train_times_is_arithmetic_mean():
+    a = TrainStepTimes(backbone_ms=100.0, fwd_bwd_ms=200.0, total_ms=300.0).as_dict()
+    b = TrainStepTimes(backbone_ms=300.0, fwd_bwd_ms=400.0, total_ms=700.0).as_dict()
+    mid = mean_train_times([a, b])
+    assert mid["backbone_ms"] == 200.0
+    assert mid["fwd_bwd_ms"] == 300.0
+    assert mid["dominant_stage"] == "fwd_bwd"
+
+
+def test_mean_train_times_rejects_empty():
+    try:
+        mean_train_times([])
+    except ValueError as exc:
+        assert "at least one" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for an empty trial list")
+
+
+def test_sft_expert_update_returns_fwd_bwd_and_adam_times():
+    import mlx.optimizers as optim
+
+    from mlx_port.lora import inject_expert_lora
+    from mlx_port.tests.test_lora import TinyStage2Host, _quantize_expert_leaves
+
+    mx.random.seed(2)
+    host = TinyStage2Host(n_vlm=1, n_expert=1, d=32)
+    host.action_in_proj = ActionInProj(
+        in_dims=(4, 2),
+        out_dim=32,
+        num_enc_layers=1,
+        hidden_size=32,
+    )
+    host.action_out_proj = ActionOutProj(32, 2)
+    host.diffusion = FlowMatching(x_dims=(4, 2), train_timestep_sampler="uniform")
+    host.traj_token_ids = {"future_start": 7}
+    host.expert_non_causal_attention = True
+    _quantize_expert_leaves(host)
+    inject_expert_lora(host, rank=4, expected_layers=1)
+    prepare_stage2_trainables(host)
+    opt = optim.Adam(learning_rate=1e-3)
+    ids = mx.array([[1, 2, 7, 4]], dtype=mx.int32)
+    action = mx.zeros((1, 4, 2), dtype=mx.float32)
+    out = sft_expert_update(host, {"input_ids": ids, "action": action}, opt)
+    assert np.isfinite(out.loss)
+    assert out.times.fwd_bwd_ms > 0.0
+    assert out.times.adam_ms >= 0.0
+    assert out.times.total_ms >= out.times.fwd_bwd_ms
+    assert out.times.n_vlm_forwards == 1
+    assert out.times.n_expert_forwards == 1
+    table = out.times.as_dict()
+    assert table["dominant_stage"] in TRAIN_DOMINANT
+
+
+def test_time_train_step_t0_us_requires_from_clip():
+    proc = subprocess.run(
+        [sys.executable, "-m", "mlx_port.scripts.time_train_step", "--t0-us", "5100000"],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode == 0:
+        raise AssertionError("expected non-zero exit for --t0-us without --from-clip")
+    if "requires --from-clip" not in (proc.stderr + proc.stdout):
+        raise AssertionError(proc.stderr)

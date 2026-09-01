@@ -1,0 +1,137 @@
+{
+  "recipe": "stage2",
+  "exclude_coc": true,
+  "t0_us": 5100000,
+  "lora_vision": "none",
+  "lora_adapter_dir": "/Users/michaellee/Projects/alpamayo/mlx_port/reports/qlora/sft_stage1_small",
+  "lora_adapter_step": 10,
+  "expert_lora": true,
+  "expert_dense": true,
+  "expert_lora_rank": 8,
+  "expert_lora_scale": 20.0,
+  "n_expert_wrapped": 252,
+  "expert_lora_save_dir": "/Users/michaellee/Projects/alpamayo/mlx_port/reports/qlora/sft_stage2_small_dense",
+  "n_clips": 8,
+  "n_train": 4,
+  "n_eval": 4,
+  "steps": 10,
+  "seed": 0,
+  "lr": 0.0001,
+  "path": "all4 W4 VLM+expert",
+  "flags": {
+    "lm": "affine-4-gs64",
+    "vision": "affine-4-gs64",
+    "expert": "affine-4-gs64"
+  },
+  "train_ids": [
+    "77447940-31f4-4230-a4e8-ad106de5ee5c",
+    "b1195c93-50fb-45a9-8511-9afde3b778ed",
+    "de3c23c3-8742-4ffe-b613-bfc2cb6e33cc",
+    "2532fb2e-5068-44f6-9f64-2256d852d51d"
+  ],
+  "eval_ids": [
+    "e55eeb5e-c957-408f-a640-a0466ae766b4",
+    "76865f45-5f9e-432c-b29c-038111a20aad",
+    "f52e773d-09ef-4abf-8399-735216e21387",
+    "6707ab59-3e79-4c37-b41d-9c4baf28b292"
+  ],
+  "prep_s": 185.3491403751541,
+  "wall_s": 217.949884041911,
+  "loss0": 1.7542178630828857,
+  "lossN": 0.29001787304878235,
+  "eval0": 0.1878933710977435,
+  "evalN": 0.21943922014907002,
+  "rows": [
+    {
+      "step": -1,
+      "train_clip": null,
+      "train_loss": null,
+      "eval_mean": 0.1878933710977435,
+      "train_ms": null,
+      "eval_ms": 17529.15370790288
+    },
+    {
+      "step": 0,
+      "train_clip": "77447940-31f4-4230-a4e8-ad106de5ee5c",
+      "train_loss": 1.7542178630828857,
+      "eval_mean": 0.2692571999505162,
+      "train_ms": 4522.886249935254,
+      "eval_ms": 17359.23287505284
+    },
+    {
+      "step": 1,
+      "train_clip": "b1195c93-50fb-45a9-8511-9afde3b778ed",
+      "train_loss": 0.42202723026275635,
+      "eval_mean": 0.20929262414574623,
+      "train_ms": 4430.702499812469,
+      "eval_ms": 17330.328834010288
+    },
+    {
+      "step": 2,
+      "train_clip": "de3c23c3-8742-4ffe-b613-bfc2cb6e33cc",
+      "train_loss": 0.31792038679122925,
+      "eval_mean": 0.23438183777034283,
+      "train_ms": 4501.355750020593,
+      "eval_ms": 17330.683457897976
+    },
+    {
+      "step": 3,
+      "train_clip": "2532fb2e-5068-44f6-9f64-2256d852d51d",
+      "train_loss": 0.9442843794822693,
+      "eval_mean": 0.1994372121989727,
+      "train_ms": 4432.961417129263,
+      "eval_ms": 17344.13683298044
+    },
+    {
+      "step": 4,
+      "train_clip": "77447940-31f4-4230-a4e8-ad106de5ee5c",
+      "train_loss": 0.449209988117218,
+      "eval_mean": 0.22121224785223603,
+      "train_ms": 4439.089999999851,
+      "eval_ms": 17333.779125008732
+    },
+    {
+      "step": 5,
+      "train_clip": "b1195c93-50fb-45a9-8511-9afde3b778ed",
+      "train_loss": 0.21000969409942627,
+      "eval_mean": 0.1383347800001502,
+      "train_ms": 4431.019249837846,
+      "eval_ms": 17332.091375021264
+    },
+    {
+      "step": 6,
+      "train_clip": "de3c23c3-8742-4ffe-b613-bfc2cb6e33cc",
+      "train_loss": 0.1989753097295761,
+      "eval_mean": 0.2572374287992716,
+      "train_ms": 4444.023125106469,
+      "eval_ms": 17325.248416978866
+    },
+    {
+      "step": 7,
+      "train_clip": "2532fb2e-5068-44f6-9f64-2256d852d51d",
+      "train_loss": 0.2687983214855194,
+      "eval_mean": 0.4942574333399534,
+      "train_ms": 4435.996916145086,
+      "eval_ms": 17348.069875035435
+    },
+    {
+      "step": 8,
+      "train_clip": "77447940-31f4-4230-a4e8-ad106de5ee5c",
+      "train_loss": 2.5281848907470703,
+      "eval_mean": 0.3510852511972189,
+      "train_ms": 4436.785707948729,
+      "eval_ms": 17337.919916957617
+    },
+    {
+      "step": 9,
+      "train_clip": "b1195c93-50fb-45a9-8511-9afde3b778ed",
+      "train_loss": 0.29001787304878235,
+      "eval_mean": 0.21943922014907002,
+      "train_ms": 4446.306125028059,
+      "eval_ms": 17366.146290907636
+    }
+  ],
+  "metal_gb": 11.737890438,
+  "rss_gb": 26.183778304,
+  "packed_fp": "1097:9b90d23ae732b55ba759b77f428be7a6f2c6e02d74e9feb8f7404c18c32b0170"
+}

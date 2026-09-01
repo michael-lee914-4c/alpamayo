@@ -1,0 +1,88 @@
+{
+  "clip_id": "77447940-31f4-4230-a4e8-ad106de5ee5c",
+  "t0_us": 5100000,
+  "seq": 3124,
+  "path": "all4 W4 VLM+expert",
+  "measured": "2026-08-31",
+  "note": "One-clip G4 recipe. Infer P2f is encode/prefill/decode/FM. Train has no decode and no Euler. Vision is freeze_vision_features (encode_cache) then stop-grad. Adam splits value_and_grad (mx.eval loss+grads) from opt.update.",
+  "infer_p2f_greedy": {
+    "encode_ms": 1044,
+    "prefill_ms": 3645,
+    "decode_ms": 856,
+    "decode_tok": 13,
+    "fm_ms": 630,
+    "fm_steps": 10,
+    "dominant_stage": "prefill"
+  },
+  "stage1": {
+    "recipe": "language QLoRA, vision cached, all4",
+    "load_ms": 743.5,
+    "tokenize_ms": 15215.1,
+    "encode_cache_ms": 1110.8,
+    "fwd": {
+      "encode_ms": 0.0,
+      "backbone_ms": 4278.5,
+      "expert_ms": 0.0,
+      "loss_ms": 72.7,
+      "total_ms": 4362.6,
+      "dominant_stage": "backbone",
+      "compiled_prefill": false
+    },
+    "adam": {
+      "fwd_bwd_ms": 13592.0,
+      "adam_ms": 62.9,
+      "total_ms": 13659.1,
+      "dominant_stage": "fwd_bwd"
+    },
+    "metal_gb": 78.54,
+    "rss_gb": 24.61,
+    "json": "mlx_port/reports/train_stage_times_stage1.json"
+  },
+  "stage2": {
+    "recipe": "expert QLoRA + train-action-proj, VLM frozen, all4",
+    "load_ms": 2862.9,
+    "tokenize_ms": 12833.8,
+    "encode_cache_ms": 1112.5,
+    "fwd": {
+      "encode_ms": 0.0,
+      "backbone_ms": 3983.8,
+      "expert_ms": 73.1,
+      "loss_ms": 0.0,
+      "total_ms": 4083.1,
+      "dominant_stage": "backbone",
+      "compiled_prefill": true
+    },
+    "adam": {
+      "fwd_bwd_ms": 4084.7,
+      "adam_ms": 69.5,
+      "total_ms": 4176.1,
+      "dominant_stage": "fwd_bwd"
+    },
+    "metal_gb": 12.27,
+    "rss_gb": 25.17,
+    "json": "mlx_port/reports/train_stage_times_stage2.json"
+  },
+  "sft_8clip_2ep_pipeline": {
+    "n_train": 4,
+    "n_eval": 4,
+    "steps": 8,
+    "stage1": {
+      "prep_s": 132.9,
+      "wall_s": 241.0,
+      "mean_train_ms": 12521,
+      "mean_eval_ms": 17572,
+      "eval_is_4_clips": true,
+      "metal_gb": 78.68,
+      "json": "mlx_port/reports/sft_stage1_small_8clip_2ep.json"
+    },
+    "stage2": {
+      "prep_s": 138.2,
+      "wall_s": 172.4,
+      "mean_train_ms": 4399,
+      "mean_eval_ms": 17151,
+      "eval_is_4_clips": true,
+      "metal_gb": 11.66,
+      "json": "mlx_port/reports/sft_stage2_small_8clip_2ep.json"
+    }
+  }
+}

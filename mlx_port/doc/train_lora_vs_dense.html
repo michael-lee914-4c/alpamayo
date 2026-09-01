@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LoRA vs Dense Training • Alpamayo MLX</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@600&amp;display=swap');
+        body { font-family: 'Inter', system-ui, sans-serif; }
+        .font-display { font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif; }
+        html { scroll-behavior: smooth; }
+        .cell-frozen { background: #1e293b; color: #94a3b8; }
+        .cell-lora { background: #083344; color: #67e8f9; }
+        .cell-dense { background: #422006; color: #fbbf24; }
+        .cell-off { background: #0f172a; color: #475569; }
+        figure img { width: 100%; height: auto; display: block; }
+        pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200">
+    <nav class="border-b border-slate-800 bg-slate-900/95 sticky top-0 z-50 backdrop-blur">
+        <div class="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
+            <div class="font-display text-lg tracking-tight">LoRA vs Dense</div>
+            <a class="text-xs text-cyan-400 hover:underline" href="../reports/stage1c_progress.html">Stage 1c</a>
+        </div>
+    </nav>
+
+    <div class="max-w-5xl mx-auto px-6 py-8 space-y-10">
+        <header>
+            <h1 class="font-display text-4xl tracking-tight">
+                Train the VLM with LoRA.<br>
+                <span class="text-amber-400">Train the expert three ways.</span>
+            </h1>
+            <p class="mt-3 text-sm text-slate-400 max-w-2xl">
+                Sequential SFT. Stage 1 updates VLM adapters. Stage 2 freezes them and updates the action expert.
+                Packed <code>QuantizedLinear.weight</code> never Adam-steps.
+            </p>
+        </header>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+            <div class="bg-slate-900 border border-slate-700 rounded-2xl p-4">
+                <div class="text-slate-500 uppercase tracking-wider text-[10px] mb-1">VLM</div>
+                <div class="font-semibold text-cyan-300">LoRA only</div>
+                <div class="text-slate-400 mt-1">No full VLM FT exists.</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-2xl p-4">
+                <div class="text-slate-500 uppercase tracking-wider text-[10px] mb-1">Load expert as bf16</div>
+                <div class="font-mono text-amber-300">--expert-bf16</div>
+                <div class="text-slate-400 mt-1">Required for <code>--expert-update</code> + all4.</div>
+            </div>
+            <div class="bg-slate-900 border border-slate-700 rounded-2xl p-4">
+                <div class="text-slate-500 uppercase tracking-wider text-[10px] mb-1">Adam action I/O</div>
+                <div class="font-mono text-violet-300">--train-action-proj</div>
+                <div class="text-slate-400 mt-1">Requires <code>--expert-lora</code>. Not a 2.3B FT.</div>
+            </div>
+        </div>
+
+        <div class="grid md:grid-cols-[1fr_auto_1fr] gap-3 items-stretch text-xs">
+            <div class="bg-cyan-950/30 border border-cyan-800 rounded-2xl p-4">
+                <div class="text-cyan-400 font-semibold">SFT Stage 1</div>
+                <div class="text-slate-300 mt-1">VLM CE · mlx_lm <code>LoRALinear</code> on the language decoder</div>
+            </div>
+            <div class="flex items-center justify-center text-slate-500 px-2">
+                <div class="text-center">
+                    <div class="text-[10px] uppercase tracking-wider">reload + freeze VLM</div>
+                    <div class="hidden md:block text-lg">→</div>
+                    <div class="md:hidden text-lg">↓</div>
+                </div>
+            </div>
+            <div class="bg-amber-950/30 border border-amber-800 rounded-2xl p-4">
+                <div class="text-amber-400 font-semibold">SFT Stage 2</div>
+                <div class="text-slate-300 mt-1">expert CFM · full FT, QLoRA, or QLoRA + action</div>
+            </div>
+        </div>
+
+        <figure class="rounded-3xl overflow-hidden border border-slate-800">
+            <img src="train_lora_vs_dense/train-arch.png" alt="VLM on the left, action expert on the right, KV crop between them">
+            <figcaption class="px-4 py-3 text-xs text-slate-500 bg-slate-900">
+                What each stage owns. Cyan VLM is Stage 1. Amber expert + action I/O is Stage 2.
+            </figcaption>
+        </figure>
+
+        <section>
+            <h2 class="font-display text-2xl mb-3">Stage 2 — what QLoRA wraps</h2>
+            <figure class="rounded-3xl overflow-hidden border border-slate-800 mb-3">
+                <img src="train_lora_vs_dense/train-qlora-target.png" alt="mlx_lm LoRALinear on expert q k v o gate up down, action projections not wrapped">
+            </figure>
+            <p class="text-xs text-slate-400 mb-6">
+                <code>--expert-lora</code> replaces the expert’s 36×7
+                <code>q/k/v/o/gate/up/down</code> with mlx_lm <code>LoRALinear</code>
+                (rank 8, scale 20). That is QLoRA: packed
+                <code>QuantizedLinear</code> stays frozen; only the
+                <code>LoRALinear</code> adapters train.
+                <code>action_in_proj</code> / <code>action_out_proj</code> are never wrapped.
+            </p>
+            <h3 class="font-display text-xl mb-3">Pick one mode</h3>
+            <figure class="rounded-3xl overflow-hidden border border-slate-800 mb-4">
+                <img src="train_lora_vs_dense/train-modes.png" alt="Three Stage 2 modes: full FT, QLoRA, QLoRA plus action projections">
+            </figure>
+            <div class="overflow-auto">
+                <table class="w-full text-xs text-left border-separate border-spacing-1">
+                    <thead class="text-[10px] uppercase tracking-wider text-slate-500">
+                        <tr>
+                            <th class="px-2 py-1"></th>
+                            <th class="px-2 py-1 text-amber-300">A · full FT</th>
+                            <th class="px-2 py-1 text-cyan-300">B · QLoRA</th>
+                            <th class="px-2 py-1 text-violet-300">C · QLoRA + action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="px-2 py-2 text-slate-500">Flag</td>
+                            <td class="px-2 py-2 font-mono">(default) / --expert-update --expert-bf16</td>
+                            <td class="px-2 py-2 font-mono">--expert-lora</td>
+                            <td class="px-2 py-2 font-mono">--expert-lora --train-action-proj</td>
+                        </tr>
+                        <tr>
+                            <td class="px-2 py-2 text-slate-500">Expert decoder</td>
+                            <td class="cell-dense rounded-lg px-2 py-2">Adam <code>Linear</code> · bf16</td>
+                            <td class="cell-frozen rounded-lg px-2 py-2">packed <code>QuantizedLinear</code></td>
+                            <td class="cell-frozen rounded-lg px-2 py-2">packed <code>QuantizedLinear</code></td>
+                        </tr>
+                        <tr>
+                            <td class="px-2 py-2 text-slate-500"><code>LoRALinear</code> adapters</td>
+                            <td class="cell-off rounded-lg px-2 py-2">none</td>
+                            <td class="cell-lora rounded-lg px-2 py-2">train 252 leaves</td>
+                            <td class="cell-lora rounded-lg px-2 py-2">train 252 leaves</td>
+                        </tr>
+                        <tr>
+                            <td class="px-2 py-2 text-slate-500">action I/O</td>
+                            <td class="cell-dense rounded-lg px-2 py-2">Adam</td>
+                            <td class="cell-frozen rounded-lg px-2 py-2">frozen</td>
+                            <td class="cell-dense rounded-lg px-2 py-2">Adam · 15 arrays</td>
+                        </tr>
+                        <tr>
+                            <td class="px-2 py-2 text-slate-500">Metal</td>
+                            <td class="px-2 py-2">32 GB</td>
+                            <td class="px-2 py-2">12 GB</td>
+                            <td class="px-2 py-2">12 GB</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="font-display text-2xl mb-3">Stage 1 — VLM LoRA scope</h2>
+            <div class="grid md:grid-cols-3 gap-3 text-xs">
+                <div class="bg-slate-900 border border-cyan-800 rounded-2xl p-4">
+                    <div class="font-semibold text-cyan-300">language</div>
+                    <div class="text-slate-400 mt-1">252 leaves · 21.8M · vision stop-grad</div>
+                    <div class="font-mono text-[11px] text-slate-500 mt-2">sft_stage1_small.py</div>
+                </div>
+                <div class="bg-slate-900 border border-sky-800 rounded-2xl p-4">
+                    <div class="font-semibold text-sky-300">+ merger</div>
+                    <div class="text-slate-400 mt-1">8 extra leaves · encode on tape</div>
+                    <div class="font-mono text-[11px] text-slate-500 mt-2">--lora --lora-vision merger</div>
+                </div>
+                <div class="bg-slate-900 border border-indigo-800 rounded-2xl p-4">
+                    <div class="font-semibold text-indigo-300">+ full vision</div>
+                    <div class="text-slate-400 mt-1">116 extra · ~107 GB Metal</div>
+                    <div class="font-mono text-[11px] text-slate-500 mt-2">--lora --lora-vision full</div>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="font-display text-2xl mb-3">Commands</h2>
+            <pre class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-xs text-cyan-300 overflow-auto">.venv/bin/python -m mlx_port.scripts.sft_stage1_small --n-clips 8 --steps 10 --seed 0 --quantize-all
+
+.venv/bin/python -m mlx_port.scripts.sft_stage2_small --n-clips 8 --steps 10 --seed 0 --quantize-all
+.venv/bin/python -m mlx_port.scripts.sft_stage2_small --expert-lora --n-clips 8 --steps 10 --seed 0
+.venv/bin/python -m mlx_port.scripts.sft_stage2_small --expert-lora --train-action-proj \
+  --expert-lora-save-dir mlx_port/reports/qlora/sft_stage2_small_dense --n-clips 8 --steps 10 --seed 0</pre>
+            <pre class="mt-3 bg-slate-950 border border-slate-800 rounded-2xl p-4 text-xs text-slate-300 overflow-auto"># one-step timer
+--stage stage1 --lora --lora-vision none --quantize-all
+--stage stage2 --expert-update --quantize-all --expert-bf16
+--stage stage2 --expert-lora --quantize-all
+--stage stage2 --expert-lora --train-action-proj --quantize-all</pre>
+        </section>
+
+        <section>
+            <h2 class="font-display text-2xl mb-3">Saves</h2>
+            <div class="text-xs text-slate-400 space-y-1 font-mono">
+                <div>Stage 1 → mlx_port/reports/qlora/sft_stage1_small/adapters.safetensors</div>
+                <div>Mode A → nothing (2.3B not written)</div>
+                <div>Mode B → mlx_port/reports/qlora/sft_stage2_small/adapters.safetensors</div>
+                <div>Mode C → …/sft_stage2_small_dense/adapters + dense.safetensors</div>
+            </div>
+        </section>
+    </div>
+</body>
+</html>

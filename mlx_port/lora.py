@@ -1,4 +1,4 @@
-"""T4.1: QLoRA on the language decoder and the vision tower. Packed ints stay frozen.
+"""T4.1: QLoRA on the language decoder, vision tower, and (opt-in) expert decoder.
 
 Language: walks ``vlm.language_model.model.layers`` (unwraps CompiledPrefillLayer)
 and replaces q/k/v/o/gate/up/down with mlx_lm ``LoRALinear``.
@@ -6,9 +6,14 @@ and replaces q/k/v/o/gate/up/down with mlx_lm ``LoRALinear``.
 Vision ``scope="full"``: every block ``qkv`` / ``proj`` / ``linear_fc1`` /
 ``linear_fc2`` (27×), plus ``merger`` and the 3 deepstack mergers.
 ``scope="merger"``: ``merger`` + 3 deepstack only (blocks stay frozen).
-Conv3D ``patch_embed``, LayerNorms, ``pos_embed``, expert, ``lm_head``, and
-token embeddings are not wrapped. After freeze, only ``lora_a`` / ``lora_b``
-are trainable.
+Conv3D ``patch_embed``, LayerNorms, ``pos_embed``, ``lm_head``, and
+token embeddings are not wrapped.
+
+Expert (``inject_expert_lora``): same 36×7 decoder leaves under
+``expert.language_model.model.layers``. ``action_in_proj`` / ``action_out_proj``
+stay dense (not LoRA-wrapped). After freeze, only expert ``lora_a`` /
+``lora_b`` train unless Stage-2 ``train_action_proj`` also Adam-steps
+action in/out. Packed ``QuantizedLinear.weight`` stays frozen.
 
 When vision LoRA is present, encode stays on the tape. Language-only LoRA
 still encodes once and ``stop_gradient``s.
@@ -17,6 +22,7 @@ still encodes once and ``stop_gradient``s.
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +32,12 @@ from mlx.utils import tree_flatten, tree_unflatten
 from mlx_lm.tuner.lora import LoRALinear
 
 from mlx_port.models.compiled_backbone import uninstall_compiled_prefill
-from mlx_port.train_step import sft_train_step
+from mlx_port.train_step import (
+    TrainStepTimes,
+    TrainUpdateOutput,
+    run_value_and_grad_update,
+    sft_train_step,
+)
 
 LORA_LEAVES = (
     "q_proj",
@@ -48,6 +59,7 @@ DEFAULT_SCALE = 20.0
 DEFAULT_VISION_SCOPE = "full"
 ADAPTER_WEIGHTS_NAME = "adapters.safetensors"
 ADAPTER_CONFIG_NAME = "adapter_config.json"
+DENSE_WEIGHTS_NAME = "dense.safetensors"
 DEFAULT_SAVE_EVERY = 10
 
 
@@ -73,6 +85,47 @@ def _language_layers(model: Any) -> list[Any]:
     if not layers:
         raise ValueError("language_model.model.layers is missing")
     return list(layers)
+
+
+def _expert_layers(model: Any) -> list[Any]:
+    expert = getattr(model, "expert", None)
+    if expert is None:
+        raise ValueError("inject_expert_lora requires model.expert")
+    layers = getattr(expert, "layers", None)
+    if layers:
+        try:
+            return list(layers)
+        except TypeError as exc:
+            raise ValueError(
+                "inject_expert_lora: expert.layers is not a layer list"
+            ) from exc
+    lm = getattr(expert, "language_model", None)
+    if lm is None or not hasattr(lm, "model"):
+        raise ValueError(
+            "inject_expert_lora requires expert.layers or "
+            "expert.language_model.model.layers"
+        )
+    layers = getattr(lm.model, "layers", None)
+    if not layers:
+        raise ValueError("expert.language_model.model.layers is missing")
+    return list(layers)
+
+
+def _maybe_expert_layers(model: Any) -> list[Any]:
+    expert = getattr(model, "expert", None)
+    if expert is None:
+        return []
+    layers = getattr(expert, "layers", None)
+    if layers:
+        try:
+            return list(layers)
+        except TypeError:
+            return []
+    lm = getattr(expert, "language_model", None)
+    if lm is None or not hasattr(lm, "model"):
+        return []
+    layers = getattr(lm.model, "layers", None)
+    return list(layers) if layers else []
 
 
 def _vision_tower(model: Any) -> Any:
@@ -339,6 +392,146 @@ def inject_backbone_lora(
     }
 
 
+def has_expert_lora(model: Any) -> bool:
+    expert = getattr(model, "expert", None)
+    if expert is None or not hasattr(expert, "named_modules"):
+        return False
+    for _, mod in expert.named_modules():
+        if isinstance(mod, LoRALinear):
+            return True
+    return False
+
+
+def freeze_expert_base_unfreeze_lora(
+    model: Any, *, train_action_proj: bool = False
+) -> None:
+    """Freeze packed expert; unfreeze expert LoRA A/B. Optionally Adam action in/out."""
+    expert = getattr(model, "expert", None)
+    if expert is None or not hasattr(expert, "freeze"):
+        raise RuntimeError("freeze_expert_base_unfreeze_lora: model.expert is missing")
+    expert.freeze()
+    n = 0
+    for _, mod in expert.named_modules():
+        if isinstance(mod, LoRALinear):
+            mod.unfreeze(keys=["lora_a", "lora_b"])
+            if hasattr(mod, "linear") and mod.linear is not None:
+                mod.linear.freeze()
+            n += 1
+    if n < 1:
+        raise RuntimeError("freeze_expert_base_unfreeze_lora found no LoRALinear")
+    for name in ("action_in_proj", "action_out_proj"):
+        mod = getattr(model, name, None)
+        if mod is None:
+            if train_action_proj:
+                raise RuntimeError(f"train_action_proj requires model.{name}")
+            continue
+        if not hasattr(mod, "freeze") or not hasattr(mod, "unfreeze"):
+            raise RuntimeError(f"model.{name} has no freeze/unfreeze")
+        if train_action_proj:
+            mod.unfreeze()
+        else:
+            mod.freeze()
+
+
+def unfreeze_action_proj(model: Any) -> None:
+    """Adam-step leftover dense action in/out. Packed QuantizedLinear stays frozen."""
+    freeze_expert_base_unfreeze_lora(model, train_action_proj=True)
+
+
+def inject_expert_lora(
+    model: Any,
+    *,
+    rank: int = DEFAULT_RANK,
+    scale: float = DEFAULT_SCALE,
+    dropout: float = 0.0,
+    expected_layers: int | None = EXPECTED_DECODER_LAYERS,
+    freeze: bool = True,
+) -> dict[str, int]:
+    """Wrap expert decoder q/k/v/o/gate/up/down. Action in/out stay dense.
+
+    Does not call ``model.freeze()`` — VLM (and any Stage-1 LoRA) stay as they
+    are. ``freeze=True`` freezes the expert subtree and action proj, then
+    unfreezes expert ``lora_a`` / ``lora_b`` only.
+    """
+    if rank < 1:
+        raise ValueError(f"LoRA rank must be >= 1, got {rank}")
+    layers = _expert_layers(model)
+    if expected_layers is not None and len(layers) != int(expected_layers):
+        raise RuntimeError(
+            f"expected {expected_layers} expert decoder layers, got {len(layers)}"
+        )
+
+    n_wrapped = 0
+    for i, layer in enumerate(layers):
+        inner = decoder_layer_inner(layer)
+        n = _wrap_module_leaves(
+            inner,
+            LORA_LEAVES,
+            rank=rank,
+            scale=scale,
+            dropout=dropout,
+            where=f"expert layer {i}",
+        )
+        if n != len(LORA_LEAVES):
+            raise RuntimeError(
+                f"expert layer {i} expected {len(LORA_LEAVES)} LoRA leaves "
+                f"{LORA_LEAVES}, got {n}"
+            )
+        n_wrapped += n
+
+    expect = len(layers) * len(LORA_LEAVES)
+    if n_wrapped != expect:
+        raise RuntimeError(
+            f"wrapped {n_wrapped} expert decoder leaves, expected {expect}"
+        )
+
+    for name in ("action_in_proj", "action_out_proj"):
+        mod = getattr(model, name, None)
+        if isinstance(mod, LoRALinear):
+            raise RuntimeError(f"{name} must stay unwrapped (not a decoder leaf)")
+        if mod is not None and hasattr(mod, "named_modules"):
+            for path, inner in mod.named_modules():
+                if isinstance(inner, LoRALinear):
+                    raise RuntimeError(
+                        f"{name}.{path} must stay unwrapped (not a decoder leaf)"
+                    )
+
+    if freeze:
+        freeze_expert_base_unfreeze_lora(model)
+        n_train = 0
+        n_elem = 0
+        for key, val in tree_flatten(model.trainable_parameters()):
+            if not key.startswith("expert."):
+                continue
+            if "lora_a" not in key and "lora_b" not in key:
+                raise RuntimeError(
+                    f"expert trainable set must be LoRA A/B only; got {key}"
+                )
+            n_train += 1
+            n_elem += int(val.size)
+        if n_train != n_wrapped * 2:
+            raise RuntimeError(
+                f"expected {n_wrapped * 2} expert LoRA arrays, got {n_train}"
+            )
+        print(
+            f"[LORA] wrapped {n_wrapped} expert decoder leaves rank={rank} "
+            f"trainable={n_train} arrays / {n_elem} elems (lora_a/b only; "
+            "action in/out dense + frozen)"
+        )
+        return {
+            "n_wrapped": n_wrapped,
+            "n_trainable": n_train,
+            "n_elements": n_elem,
+            "rank": int(rank),
+            "scale": float(scale),
+        }
+    return {
+        "n_wrapped": n_wrapped,
+        "rank": int(rank),
+        "scale": float(scale),
+    }
+
+
 def freeze_base_unfreeze_lora(model: Any) -> None:
     """Freeze every parameter, then unfreeze only LoRA A/B."""
     model.freeze()
@@ -374,13 +567,34 @@ def count_trainable_elements(model: Any) -> int:
     return sum(int(v.size) for _, v in tree_flatten(model.trainable_parameters()))
 
 
-def lora_trainable_weights(model: Any) -> dict[str, mx.array]:
-    """LoRA A/B only. Raises if the trainable set is empty or includes a base weight."""
-    assert_only_lora_trainable(model)
-    weights = dict(tree_flatten(model.trainable_parameters()))
+def lora_adapter_weights(model: Any) -> dict[str, mx.array]:
+    """Trainable LoRA A/B only. Ignores leftover dense trainables (action proj)."""
+    weights = {
+        k: v
+        for k, v in tree_flatten(model.trainable_parameters())
+        if "lora_a" in k or "lora_b" in k
+    }
     if not weights:
         raise RuntimeError("no LoRA parameters to save")
     return weights
+
+
+def dense_trainable_weights(model: Any) -> dict[str, mx.array]:
+    """Trainable non-LoRA arrays (action in/out). Raises if the set is empty."""
+    weights = {
+        k: v
+        for k, v in tree_flatten(model.trainable_parameters())
+        if "lora_a" not in k and "lora_b" not in k
+    }
+    if not weights:
+        raise RuntimeError("no dense trainable parameters to save")
+    return weights
+
+
+def lora_trainable_weights(model: Any) -> dict[str, mx.array]:
+    """LoRA A/B only. Raises if the trainable set is empty or includes a base weight."""
+    assert_only_lora_trainable(model)
+    return lora_adapter_weights(model)
 
 
 def lora_save_steps(n_steps: int, every: int) -> list[int]:
@@ -400,6 +614,31 @@ def lora_save_steps(n_steps: int, every: int) -> list[int]:
     return steps
 
 
+def save_dense_trainables(
+    model: Any,
+    directory: str | Path,
+    *,
+    step: int,
+) -> dict[str, Any]:
+    """Overwrite ``dense.safetensors`` with trainable non-LoRA arrays (action in/out)."""
+    if int(step) < 1:
+        raise ValueError(f"step must be >= 1 (completed steps), got {step}")
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    weights = dense_trainable_weights(model)
+    mx.eval(*weights.values())
+    path = directory / DENSE_WEIGHTS_NAME
+    mx.save_safetensors(str(path), weights)
+    print(f"[DENSE] saved step={int(step)} n_arrays={len(weights)} → {path}")
+    return {
+        "directory": str(directory),
+        "path": str(path),
+        "n_arrays": len(weights),
+        "n_elements": int(sum(int(v.size) for v in weights.values())),
+        "step": int(step),
+    }
+
+
 def save_lora_adapters(
     model: Any,
     directory: str | Path,
@@ -409,17 +648,22 @@ def save_lora_adapters(
     scale: float,
     vision_scope: str,
     extra: dict[str, Any] | None = None,
+    allow_extra_trainables: bool = False,
 ) -> dict[str, Any]:
     """Overwrite ``adapters.safetensors`` with the current LoRA A/B.
 
     Same filename every save. Packed ``QuantizedLinear.weight`` is not written.
-    Raises if the trainable set is not LoRA A/B only.
+    Raises if the trainable set is not LoRA A/B only, unless
+    ``allow_extra_trainables`` (Stage-2 LoRA + dense action proj).
     """
     if int(step) < 1:
         raise ValueError(f"step must be >= 1 (completed steps), got {step}")
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
-    weights = lora_trainable_weights(model)
+    if allow_extra_trainables:
+        weights = lora_adapter_weights(model)
+    else:
+        weights = lora_trainable_weights(model)
     mx.eval(*weights.values())
     path = directory / ADAPTER_WEIGHTS_NAME
     mx.save_safetensors(str(path), weights)
@@ -496,7 +740,7 @@ def has_vision_lora(model: Any) -> bool:
 
 
 def packed_weight_fingerprint(model: Any) -> str:
-    """Hash of every QuantizedLinear.weight under the language decoder and vision tower."""
+    """Hash of every QuantizedLinear.weight under language, vision, and expert decoders."""
     import hashlib
 
     import numpy as np
@@ -514,6 +758,13 @@ def packed_weight_fingerprint(model: Any) -> str:
     tower = getattr(vlm, "vision_tower", None) if vlm is not None else None
     if tower is not None and hasattr(tower, "named_modules"):
         for _, mod in tower.named_modules():
+            linear = getattr(mod, "linear", mod)
+            if isinstance(linear, nn.QuantizedLinear):
+                digest.update(np.asarray(linear.weight).tobytes())
+                n += 1
+    for layer in _maybe_expert_layers(model):
+        inner = decoder_layer_inner(layer)
+        for _, mod in inner.named_modules():
             linear = getattr(mod, "linear", mod)
             if isinstance(linear, nn.QuantizedLinear):
                 digest.update(np.asarray(linear.weight).tobytes())
@@ -568,9 +819,11 @@ def sft_lora_update(
     batch: dict[str, Any],
     optimizer: Any,
     stage: str = "stage1",
-) -> float:
+) -> TrainUpdateOutput:
     """One Stage-1 (or other) train step + Adam update on LoRA only."""
+    t_all = time.perf_counter()
     assert_only_lora_trainable(model)
+    encode_cache_ms = 0.0
     if has_vision_lora(model):
         if (
             batch.get("cached_image_features") is not None
@@ -581,12 +834,25 @@ def sft_lora_update(
                 "encode must stay on the tape"
             )
     else:
+        already = batch.get("cached_image_features") is not None
+        t_enc = time.perf_counter()
         batch = freeze_vision_features(model, batch)
+        if not already:
+            encode_cache_ms = (time.perf_counter() - t_enc) * 1000.0
 
     def loss_fn(m: Any) -> mx.array:
         return sft_train_step(m, batch, stage=stage, materialize=False).loss
 
-    loss, grads = nn.value_and_grad(model, loss_fn)(model)
-    optimizer.update(model, grads)
-    mx.eval(loss, model.parameters(), optimizer.state)
-    return float(loss.item())
+    loss, fwd_bwd_ms, adam_ms = run_value_and_grad_update(model, loss_fn, optimizer)
+    n_expert = 0 if stage == "stage1" else 1
+    return TrainUpdateOutput(
+        loss=loss,
+        times=TrainStepTimes(
+            encode_cache_ms=encode_cache_ms,
+            fwd_bwd_ms=fwd_bwd_ms,
+            adam_ms=adam_ms,
+            total_ms=(time.perf_counter() - t_all) * 1000.0,
+            n_vlm_forwards=1,
+            n_expert_forwards=n_expert,
+        ),
+    )

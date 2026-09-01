@@ -1,0 +1,71 @@
+{
+  "stage": "stage2",
+  "path": "all4 W4 VLM+expert",
+  "flags": {
+    "lm": "affine-4-gs64",
+    "vision": "affine-4-gs64",
+    "expert": "affine-4-gs64"
+  },
+  "seq": 3124,
+  "load_ms": 2862.8672908525914,
+  "tokenize_ms": 12833.772459067404,
+  "encode_cache_ms": 1112.5405828934163,
+  "fwd": {
+    "tokenize_ms": 0.0,
+    "encode_cache_ms": 0.0,
+    "encode_ms": 0.0,
+    "backbone_ms": 3983.8,
+    "expert_ms": 73.1,
+    "loss_ms": 0.0,
+    "fwd_bwd_ms": 0.0,
+    "adam_ms": 0.0,
+    "total_ms": 4083.1,
+    "dominant_stage": "backbone",
+    "n_vlm_forwards": 1,
+    "n_expert_forwards": 1,
+    "n_euler_steps": 0,
+    "n_decode_tokens": 0,
+    "compiled": {
+      "encode": false,
+      "prefill": true,
+      "decode": false,
+      "fm": false
+    },
+    "quantized": {
+      "lm": "affine-4-gs64",
+      "vision": "affine-4-gs64",
+      "expert": "affine-4-gs64"
+    },
+    "dtype": "bfloat16"
+  },
+  "adam": {
+    "tokenize_ms": 0.0,
+    "encode_cache_ms": 0.0,
+    "encode_ms": 0.0,
+    "backbone_ms": 0.0,
+    "expert_ms": 0.0,
+    "loss_ms": 0.0,
+    "fwd_bwd_ms": 4084.7,
+    "adam_ms": 69.5,
+    "total_ms": 4176.1,
+    "dominant_stage": "fwd_bwd",
+    "n_vlm_forwards": 1,
+    "n_expert_forwards": 1,
+    "n_euler_steps": 0,
+    "n_decode_tokens": 0,
+    "compiled": {
+      "encode": false,
+      "prefill": true,
+      "decode": false,
+      "fm": false
+    },
+    "quantized": {
+      "lm": "affine-4-gs64",
+      "vision": "affine-4-gs64",
+      "expert": "affine-4-gs64"
+    },
+    "dtype": "bfloat16"
+  },
+  "metal_gb": 12.27075344,
+  "rss_gb": 25.16926464
+}

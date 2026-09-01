@@ -126,9 +126,9 @@
   ],
   "metal_gb": 78.677098554,
   "rss_gb": 26.391527424,
-  "lora_save_dir": "/Users/michaellee/Projects/alpamayo/reports/qlora/sft_stage1_small",
+  "lora_save_dir": "/Users/michaellee/Projects/alpamayo/mlx_port/reports/qlora/sft_stage1_small",
   "lora_save_every": 10,
   "lora_snapshots": [
-    "/Users/michaellee/Projects/alpamayo/reports/qlora/sft_stage1_small/adapters.safetensors"
+    "/Users/michaellee/Projects/alpamayo/mlx_port/reports/qlora/sft_stage1_small/adapters.safetensors"
   ]
 }

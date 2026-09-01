@@ -22,17 +22,51 @@ from mlx_port.models.expert_mlx import (
     expert_non_causal_train_mask,
     trim_cache,
 )
-from mlx_port.stage_timers import StageClock, bind_clock
+from mlx_port.stage_timers import StageClock, bind_clock, compiled_flags, quantized_flags
 
 IGNORE_INDEX = -100
 TRAIN_STAGES = ("stage1", "stage2", "joint")
+TRAIN_MS_KEYS = (
+    "tokenize_ms",
+    "encode_cache_ms",
+    "encode_ms",
+    "backbone_ms",
+    "expert_ms",
+    "loss_ms",
+    "fwd_bwd_ms",
+    "adam_ms",
+)
+TRAIN_DOMINANT = (
+    "tokenize",
+    "encode_cache",
+    "encode",
+    "backbone",
+    "expert",
+    "loss",
+    "fwd_bwd",
+    "adam",
+    "python-overhead",
+)
 
 
 @dataclass
 class TrainStepTimes:
+    """Wall-clock for one train forward or one Adam step.
+
+    Infer is encode / prefill / decode / FM. Train has no decode and no
+    Euler loop. A materialized forward is encode + backbone (+ expert).
+    An Adam step is ``value_and_grad`` (fwd+bwd) then ``opt.update``.
+    ``encode_cache`` is ``freeze_vision_features`` when vision is off the tape.
+    """
+
+    tokenize_ms: float = 0.0
+    encode_cache_ms: float = 0.0
     encode_ms: float = 0.0
     backbone_ms: float = 0.0
     expert_ms: float = 0.0
+    loss_ms: float = 0.0
+    fwd_bwd_ms: float = 0.0
+    adam_ms: float = 0.0
     total_ms: float = 0.0
     n_vlm_forwards: int = 0
     n_expert_forwards: int = 0
@@ -40,16 +74,112 @@ class TrainStepTimes:
     n_decode_tokens: int = 0
 
     def as_dict(self) -> dict[str, Any]:
-        return {
-            "encode_ms": self.encode_ms,
-            "backbone_ms": self.backbone_ms,
-            "expert_ms": self.expert_ms,
-            "total_ms": self.total_ms,
-            "n_vlm_forwards": self.n_vlm_forwards,
-            "n_expert_forwards": self.n_expert_forwards,
-            "n_euler_steps": self.n_euler_steps,
-            "n_decode_tokens": self.n_decode_tokens,
+        stages = {
+            "tokenize": float(self.tokenize_ms),
+            "encode_cache": float(self.encode_cache_ms),
+            "encode": float(self.encode_ms),
+            "backbone": float(self.backbone_ms),
+            "expert": float(self.expert_ms),
+            "loss": float(self.loss_ms),
+            "fwd_bwd": float(self.fwd_bwd_ms),
+            "adam": float(self.adam_ms),
         }
+        accounted = sum(stages.values())
+        total = float(self.total_ms) if self.total_ms > 0.0 else accounted
+        overhead = max(0.0, total - accounted)
+        stages["python-overhead"] = overhead
+        dominant = max(stages, key=stages.get)
+        if stages[dominant] <= 0.0:
+            dominant = "python-overhead"
+        return {
+            "tokenize_ms": round(self.tokenize_ms, 1),
+            "encode_cache_ms": round(self.encode_cache_ms, 1),
+            "encode_ms": round(self.encode_ms, 1),
+            "backbone_ms": round(self.backbone_ms, 1),
+            "expert_ms": round(self.expert_ms, 1),
+            "loss_ms": round(self.loss_ms, 1),
+            "fwd_bwd_ms": round(self.fwd_bwd_ms, 1),
+            "adam_ms": round(self.adam_ms, 1),
+            "total_ms": round(total, 1),
+            "dominant_stage": dominant,
+            "n_vlm_forwards": int(self.n_vlm_forwards),
+            "n_expert_forwards": int(self.n_expert_forwards),
+            "n_euler_steps": int(self.n_euler_steps),
+            "n_decode_tokens": int(self.n_decode_tokens),
+            "compiled": compiled_flags(),
+            "quantized": quantized_flags(),
+            "dtype": "bfloat16",
+        }
+
+
+@dataclass
+class TrainUpdateOutput:
+    loss: float
+    times: TrainStepTimes
+
+
+def print_train_table(times: dict[str, Any]) -> None:
+    print(
+        "[TRAIN] "
+        f"tokenize_ms={times['tokenize_ms']:.1f}  "
+        f"encode_cache_ms={times['encode_cache_ms']:.1f}  "
+        f"encode_ms={times['encode_ms']:.1f}  "
+        f"backbone_ms={times['backbone_ms']:.1f}  "
+        f"expert_ms={times['expert_ms']:.1f}  "
+        f"loss_ms={times['loss_ms']:.1f}  "
+        f"fwd_bwd_ms={times['fwd_bwd_ms']:.1f}  "
+        f"adam_ms={times['adam_ms']:.1f}  "
+        f"total_ms={times['total_ms']:.1f}  "
+        f"dominant={times['dominant_stage']}"
+    )
+
+
+def mean_train_times(trials: list[dict[str, Any]]) -> dict[str, Any]:
+    """Mean of train-stage ms. Recomputes dominant from the means."""
+    if not trials:
+        raise ValueError("mean_train_times requires at least one trial")
+    out = dict(trials[0])
+    keys = TRAIN_MS_KEYS + ("total_ms",)
+    for key in keys:
+        out[key] = round(float(sum(t[key] for t in trials) / len(trials)), 1)
+    stages = {
+        "tokenize": out["tokenize_ms"],
+        "encode_cache": out["encode_cache_ms"],
+        "encode": out["encode_ms"],
+        "backbone": out["backbone_ms"],
+        "expert": out["expert_ms"],
+        "loss": out["loss_ms"],
+        "fwd_bwd": out["fwd_bwd_ms"],
+        "adam": out["adam_ms"],
+    }
+    dominant = max(stages, key=stages.get)
+    if stages[dominant] <= 0.0:
+        dominant = "python-overhead"
+    out["dominant_stage"] = dominant
+    return out
+
+
+def run_value_and_grad_update(
+    model: Any,
+    loss_fn: Any,
+    optimizer: Any,
+) -> tuple[float, float, float]:
+    """Adam step with a host barrier between VJP and ``opt.update``.
+
+    MLX is lazy: without ``mx.eval(loss, grads)`` the backward is attributed
+    to the later ``mx.eval(parameters)``. Same numerics as a single eval.
+    """
+    if model is None or loss_fn is None or optimizer is None:
+        raise ValueError("run_value_and_grad_update requires model, loss_fn, optimizer")
+    t0 = time.perf_counter()
+    loss, grads = nn.value_and_grad(model, loss_fn)(model)
+    mx.eval(loss, grads)
+    fwd_bwd_ms = (time.perf_counter() - t0) * 1000.0
+    t1 = time.perf_counter()
+    optimizer.update(model, grads)
+    mx.eval(model.parameters(), optimizer.state)
+    adam_ms = (time.perf_counter() - t1) * 1000.0
+    return float(loss.item()), fwd_bwd_ms, adam_ms
 
 
 @dataclass
@@ -341,7 +471,7 @@ def _stop_gradient_cache(cache: Any) -> None:
 
 
 def freeze_vlm(model: Any) -> None:
-    """Freeze the VLM for Stage 2 (train expert only)."""
+    """Freeze the VLM for Stage 2, including any LoRA A/B inside it."""
     if model is None:
         raise ValueError("freeze_vlm requires a model")
     vlm = _vlm_of(model)
@@ -351,8 +481,21 @@ def freeze_vlm(model: Any) -> None:
         raise RuntimeError("VLM has no freeze()")
 
 
+def unfreeze_expert(model: Any) -> None:
+    """Unfreeze the diffusion expert and action projections for Stage 2."""
+    if model is None:
+        raise ValueError("unfreeze_expert requires a model")
+    for name in ("expert", "action_in_proj", "action_out_proj"):
+        mod = getattr(model, name, None)
+        if mod is None:
+            raise RuntimeError(f"unfreeze_expert: model.{name} is missing")
+        if not hasattr(mod, "unfreeze"):
+            raise RuntimeError(f"unfreeze_expert: model.{name} has no unfreeze()")
+        mod.unfreeze()
+
+
 def assert_stage2_trainables(model: Any) -> None:
-    """VLM frozen; expert / action proj trainable; no packed QuantizedLinear.weight."""
+    """VLM frozen; expert LoRA or dense expert/action trainable; no packed weight."""
     from mlx.utils import tree_flatten
 
     flat = dict(tree_flatten(model.trainable_parameters()))
@@ -382,22 +525,55 @@ def assert_stage2_trainables(model: Any) -> None:
                 )
 
 
+def prepare_stage2_trainables(model: Any, *, train_action_proj: bool = False) -> None:
+    """Freeze VLM. Dense FT unfreezes expert+action; LoRA unfreezes A/B, optionally action."""
+    from mlx_port.lora import (
+        assert_only_lora_trainable,
+        freeze_expert_base_unfreeze_lora,
+        has_expert_lora,
+    )
+
+    freeze_vlm(model)
+    if has_expert_lora(model):
+        freeze_expert_base_unfreeze_lora(
+            model, train_action_proj=bool(train_action_proj)
+        )
+        if not train_action_proj:
+            assert_only_lora_trainable(model)
+    else:
+        if train_action_proj:
+            raise RuntimeError(
+                "train_action_proj requires expert LoRA; use unfreeze_expert for full FT"
+            )
+        unfreeze_expert(model)
+    assert_stage2_trainables(model)
+
+
 def sft_expert_update(
     model: Any,
     batch: dict[str, Any],
     optimizer: Any,
-) -> float:
-    """One Stage-2 CFM step. VLM stays frozen. Packed expert weights raise."""
-    freeze_vlm(model)
-    assert_stage2_trainables(model)
+    *,
+    train_action_proj: bool = False,
+) -> TrainUpdateOutput:
+    """One Stage-2 CFM step. VLM (and VLM LoRA) stay frozen. Packed expert weights raise."""
+    t_all = time.perf_counter()
+    prepare_stage2_trainables(model, train_action_proj=train_action_proj)
 
     def loss_fn(m: Any) -> mx.array:
         return sft_train_step(m, batch, stage="stage2", materialize=False).loss
 
-    loss, grads = nn.value_and_grad(model, loss_fn)(model)
-    optimizer.update(model, grads)
-    mx.eval(loss, model.parameters(), optimizer.state)
-    return float(loss.item())
+    loss, fwd_bwd_ms, adam_ms = run_value_and_grad_update(model, loss_fn, optimizer)
+    return TrainUpdateOutput(
+        loss=loss,
+        times=TrainStepTimes(
+            fwd_bwd_ms=fwd_bwd_ms,
+            adam_ms=adam_ms,
+            total_ms=(time.perf_counter() - t_all) * 1000.0,
+            n_vlm_forwards=1,
+            n_expert_forwards=1,
+        ),
+    )
 
 
 def _crop_cache_to_future_start(cache: Any, input_ids: mx.array, future_start_id: int) -> None:
@@ -654,6 +830,7 @@ def sft_train_step(
     n_future = 0
     n_others = 0
     expert_times = TrainStepTimes()
+    t_ce = time.perf_counter()
     if stage in ("stage1", "joint"):
         can_split = (
             getattr(model, "future_token_start_idx", None) is not None
@@ -668,6 +845,9 @@ def sft_train_step(
             )
         else:
             vlm_ce = shifted_cross_entropy(logits, labels)
+        if materialize and vlm_ce is not None:
+            mx.eval(vlm_ce)
+    loss_ms = (time.perf_counter() - t_ce) * 1000.0
 
     if stage in ("stage2", "joint"):
         if stage == "stage2":
@@ -703,6 +883,7 @@ def sft_train_step(
         encode_ms=vlm_times.encode_ms,
         backbone_ms=vlm_times.backbone_ms,
         expert_ms=expert_times.expert_ms,
+        loss_ms=loss_ms,
         total_ms=(time.perf_counter() - t_all) * 1000.0,
         n_vlm_forwards=vlm_times.n_vlm_forwards,
         n_expert_forwards=expert_times.n_expert_forwards,

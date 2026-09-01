@@ -39,21 +39,128 @@
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Stage Status</div>
                     <div class="text-3xl font-semibold text-sky-400">In Progress</div>
-                    <div class="text-xs text-slate-500 mt-1">G1 signed · P2f done · prefill quant chase closed</div>
+                    <div class="text-xs text-slate-500 mt-1">G1 signed · G3 signed · P2f done · prefill quant chase closed</div>
                 </div>
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Key Focus</div>
-                    <div class="font-semibold text-xl text-cyan-400">PR #15 CI + merge</div>
+                    <div class="font-semibold text-xl text-cyan-400">Train stage timers</div>
                 </div>
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Gate</div>
-                    <div class="font-semibold text-xl text-emerald-400">G1 signed off</div>
+                    <div class="font-semibold text-xl text-emerald-400">G1 + G3 signed</div>
                 </div>
                 <div>
                     <div class="text-xs uppercase tracking-[1.5px] text-slate-500 mb-1">Plan</div>
-                    <a class="text-cyan-400 hover:underline text-sm" href="../mlx_port/alpamayo1-mlx-speedup-plan.html">alpamayo1-mlx-speedup-plan.html</a>
+                    <div class="space-y-1">
+                        <a class="text-cyan-400 hover:underline text-sm" href="../alpamayo1-mlx-speedup-plan.html">alpamayo1-mlx-speedup-plan.html</a>
+                        <div><a class="text-violet-400 hover:underline text-sm" href="../doc/train_lora_vs_dense.html">train_lora_vs_dense.html</a></div>
+                    </div>
                 </div>
             </div>
+        </div>
+
+        <div class="bg-emerald-950/40 border border-emerald-700 rounded-3xl p-6 mb-8 text-sm text-slate-200 space-y-2">
+            <div class="font-semibold text-emerald-400">G3 signed off (2026-08-31)</div>
+            <p>
+                User closed G3. The original 0.2&nbsp;m ADE band on a frozen
+                50-clip slice is <strong>not required</strong>. Quality is
+                confirmed by human inspection of the P2f 5-clip plots
+                (XY, CoC, speed) at
+                <a class="text-cyan-400 hover:underline" href="traj_sample_5_t06/index.html">mlx_port/reports/traj_sample_5_t06/</a>
+                — reviewed 2026-08-29. Heading and scene language hold
+                (clip 0 left turn, clip 4 lateral miss gone). Yield/stop
+                overshoot is leftover, not a P2f regression. Recorded
+                minADE numbers stay in the tables; they are not a pass/fail.
+            </p>
+            <p>
+                This is a quality close. It does not claim T3.1 / all4 beat
+                P2f prefill. Default load stays dense bf16. T3.1 and all4
+                stay opt-in memory. Decode W4 (−160&nbsp;ms) remains the only
+                quant speed signal. T3.3 50-clip ADE is optional logging.
+            </p>
+        </div>
+
+        <div class="bg-sky-950/40 border border-sky-700 rounded-3xl p-6 mb-8 text-sm text-slate-200 space-y-3">
+            <div class="font-semibold text-sky-300">Train pipeline vs infer (2026-08-31)</div>
+            <p class="text-xs">
+                Same G4 clip <code>77447940…</code>, t0=5.1&nbsp;s, seq=3124, 16×[1,20,36], all4.
+                Infer P2f is the signed greedy window. Train is language-only Stage 1
+                then expert QLoRA + action I/O Stage 2. Vision is encoded once
+                (<code>freeze_vision_features</code>) and stop-grad’d — encode is not on
+                the Adam tape.
+            </p>
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs text-left">
+                    <thead class="text-slate-400 uppercase tracking-wider">
+                        <tr class="border-b border-slate-700">
+                            <th class="px-2 py-2">Stage</th>
+                            <th class="px-2 py-2">Infer P2f</th>
+                            <th class="px-2 py-2">Train S1 fwd / Adam</th>
+                            <th class="px-2 py-2">Train S2 fwd / Adam</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-slate-300 font-mono">
+                        <tr class="border-b border-slate-800/80">
+                            <td class="px-2 py-2 text-slate-400">tokenize</td>
+                            <td class="px-2 py-2">—</td>
+                            <td class="px-2 py-2">15.2 s (once / clip)</td>
+                            <td class="px-2 py-2">12.8 s (once / clip)</td>
+                        </tr>
+                        <tr class="border-b border-slate-800/80">
+                            <td class="px-2 py-2 text-slate-400">encode</td>
+                            <td class="px-2 py-2">1044 ms</td>
+                            <td class="px-2 py-2">1111 ms cache, then 0</td>
+                            <td class="px-2 py-2">1113 ms cache, then 0</td>
+                        </tr>
+                        <tr class="border-b border-slate-800/80">
+                            <td class="px-2 py-2 text-slate-400">prefill / backbone</td>
+                            <td class="px-2 py-2">3645 ms (compiled)</td>
+                            <td class="px-2 py-2">4279 ms (eager)</td>
+                            <td class="px-2 py-2">3984 ms (compiled, frozen)</td>
+                        </tr>
+                        <tr class="border-b border-slate-800/80">
+                            <td class="px-2 py-2 text-slate-400">decode</td>
+                            <td class="px-2 py-2">856 ms / 13 tok</td>
+                            <td class="px-2 py-2">0 (teacher-force)</td>
+                            <td class="px-2 py-2">0</td>
+                        </tr>
+                        <tr class="border-b border-slate-800/80">
+                            <td class="px-2 py-2 text-slate-400">FM / expert</td>
+                            <td class="px-2 py-2">630 ms / 10 Euler</td>
+                            <td class="px-2 py-2">0 (CE only)</td>
+                            <td class="px-2 py-2">73 ms / 1 CFM</td>
+                        </tr>
+                        <tr class="border-b border-slate-800/80">
+                            <td class="px-2 py-2 text-slate-400">fwd+bwd</td>
+                            <td class="px-2 py-2">—</td>
+                            <td class="px-2 py-2 font-semibold text-amber-300">13592 ms</td>
+                            <td class="px-2 py-2">4085 ms (≈ fwd; VLM stop-grad)</td>
+                        </tr>
+                        <tr class="border-b border-slate-800/80">
+                            <td class="px-2 py-2 text-slate-400">Adam</td>
+                            <td class="px-2 py-2">—</td>
+                            <td class="px-2 py-2">63 ms</td>
+                            <td class="px-2 py-2">70 ms</td>
+                        </tr>
+                        <tr>
+                            <td class="px-2 py-2 text-slate-400">dominant</td>
+                            <td class="px-2 py-2 text-amber-300">prefill</td>
+                            <td class="px-2 py-2 text-amber-300">fwd_bwd</td>
+                            <td class="px-2 py-2 text-amber-300">fwd_bwd ≈ backbone</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-xs">
+                Stage 1 Adam is ~3× the materialized forward: backward through
+                language LoRA at seq=3124. Stage 2 Adam matches the forward
+                (4.08 vs 4.18&nbsp;s) because KV is <code>stop_gradient</code> — the
+                VLM still runs for cache, the expert backward is cheap.
+                The 8-clip 2-epoch <em>script</em> wall is dominated by eval
+                (4 clips × backbone after every Adam step): Stage 1
+                prep 133&nbsp;s + loop 241&nbsp;s (8×12.5 train + 8×17.5 eval);
+                Stage 2 prep 138&nbsp;s + loop 172&nbsp;s (8×4.4 train + 8×17.1 eval).
+            </p>
         </div>
 
         <div class="bg-emerald-950/40 border border-emerald-700 rounded-3xl p-6 mb-8 text-sm text-slate-200 space-y-2">
@@ -107,7 +214,7 @@
                 (4.79 + 1.19&nbsp;GiB). Exclusive with T3.1.
                 Leftover
                 <code>ALPAMAYO_QUANT=vlm8|vlm4|nvfp4</code> raises.
-                None of these beat P2f prefill. G3 is not signed.
+                None of these beat P2f prefill. G3 signed 2026-08-31 on qualitative inspection (ADE band waived).
             </p>
         </div>
 
@@ -138,10 +245,19 @@
                         <li><strong>NVIDIA SFT recipe</strong> (prior increment): public <code>sft_stage1</code> then <code>sft_stage2</code>. Stage 1 CE is discrete traj-future + assistant <code>&lt;|im_end|&gt;</code> — not CoC. <code>create_message(sft_stage="stage1")</code> matches <code>vla_processor.yaml</code> (<code>components_order=[image, traj_history, prompt, traj_future]</code>, user “output the future trajectory.”, 128 <code>&lt;|traj_future|&gt;</code> pads). <code>fuse_traj_tokens</code> replaces those pads via <code>DiscreteTrajectoryTokenizerMLX</code> (64×2 action bins, <code>num_bins=3000</code>, <code>dims=[-10,10]</code>). <code>labels_mask</code> is the traj span plus assistant <code>im_end</code> (131 tokens). Loss is NVIDIA’s two means (future-traj + others). Stage 2 freezes the VLM (<code>stop_gradient</code> on KV), one CFM draw, one expert forward. <code>--expert-update</code> Adam-steps the expert; packed <code>QuantizedLinear.weight</code> raises. Infer history fusion is unchanged (hist still at <code>&lt;i0&gt;</code>; NVIDIA SFT would offset hist by 3000 — we keep the signed infer rows so Stage-2 KV matches infer). <code>--from-clip</code> default is this recipe. <code>--teacher-cot</code> keeps paper 5.2 CoC CE.</li>
                         <li><strong>NVIDIA Stage 1/2 SFT parity</strong> (prior increment): side-by-side against <code>finetune/sft</code> + <code>src/alpamayo_r1</code>. Stage-1 user content is now NVIDIA’s three parts (images, hist text, prompt text). Qwen’s chat template concatenates the two text items with no separator — same tokens as the old joined string. Stage 2 train now passes a zeros additive mask <code>(B, 1, T, prefix+T)</code> when <code>expert_non_causal_attention</code> (config default true). mlx_vlm builds a <em>causal</em> mask when <code>mask is None</code>; NVIDIA Stage 2 train is <code>is_causal=False</code>, <code>attention_mask=None</code>. Hist offset stays at <code>&lt;i0&gt;</code>. Optimizer stays QLoRA (not dense VLM + 0.1× vision LR). Suite: <code>test_sft_nvidia_parity.py</code>.</li>
                         <li><strong>Small-scale Stage-1 smoke</strong> (prior increment): 8 non-CoC PAI clips, 50/50 split (4/4), language-decoder QLoRA only (252 leaves / 21.8&nbsp;M), vision encode once and <code>stop_gradient</code>, all4, lr 1e-5, 10 Adam steps. t0 is NVIDIA default keyframe 5.1&nbsp;s — not a CoC event. CoC IDs (1740, including the greedy eval clip) are excluded and the split is asserted disjoint. Script: <code>mlx_port/scripts/sft_stage1_small.py</code>.</li>
-                        <li><strong>30-clip Stage-1 smoke</strong> (prior increment): same recipe, <code>--n-clips 30</code> → 15/15. Same seed 0, all4, language QLoRA, vision frozen, 10 steps, lr 1e-5, t0=5.1&nbsp;s. Report: <code>reports/sft_stage1_small_30clip.json</code> (does not overwrite the 8-clip JSON). Ten steps see 10 of 15 train clips (no revisit). Eval mean is over 15 held-out clips every step. That run did <em>not</em> write LoRA weights (they were discarded on exit).</li>
-                        <li><strong>QLoRA adapter save</strong> (prior increment): <code>save_lora_adapters</code> overwrites one file, <code>adapters.safetensors</code>, plus <code>adapter_config.json</code> (step field updates). No per-step filenames. Packed ints are not written. Default <code>--lora-save-every 10</code>; the last step is always written to that same file. <code>--no-lora-save</code> disables. Default dir: <code>reports/qlora/sft_stage1_small</code>. Load is <code>load_lora_adapters</code> after inject; key-set mismatch raises. Trained A/B stay local: <code>reports/qlora/</code> is gitignored and is not in PR <a class="text-cyan-400 hover:underline" href="https://github.com/michael-lee914-4c/alpamayo/pull/15">#15</a>.</li>
+                        <li><strong>30-clip Stage-1 smoke</strong> (prior increment): same recipe, <code>--n-clips 30</code> → 15/15. Same seed 0, all4, language QLoRA, vision frozen, 10 steps, lr 1e-5, t0=5.1&nbsp;s. Report: <code>mlx_port/reports/sft_stage1_small_30clip.json</code> (does not overwrite the 8-clip JSON). Ten steps see 10 of 15 train clips (no revisit). Eval mean is over 15 held-out clips every step. That run did <em>not</em> write LoRA weights (they were discarded on exit).</li>
+                        <li><strong>QLoRA adapter save</strong> (prior increment): <code>save_lora_adapters</code> overwrites one file, <code>adapters.safetensors</code>, plus <code>adapter_config.json</code> (step field updates). No per-step filenames. Packed ints are not written. Default <code>--lora-save-every 10</code>; the last step is always written to that same file. <code>--no-lora-save</code> disables. Default dir: <code>mlx_port/reports/qlora/sft_stage1_small</code>. Load is <code>load_lora_adapters</code> after inject; key-set mismatch raises. Trained A/B stay local: <code>mlx_port/reports/qlora/</code> is gitignored and is not in PR <a class="text-cyan-400 hover:underline" href="https://github.com/michael-lee914-4c/alpamayo/pull/15">#15</a>.</li>
                         <li><strong>PR #15 CI collection</strong> (this increment): <code>macos-26 (no weights)</code> failed at collection. <code>test_sft_stage1_small.py</code> and <code>test_train_step.py</code> imported <code>time_train_step</code>, which imported <code>load_physical_aiavdataset</code> and <code>run_local_coc_sample</code> at module load. CI does not install <code>physical_ai_av</code>. Fix: lazy-import the NVIDIA PAI loader inside <code>build_pai_train_batch</code>; default <code>--local-dir</code> is now <code>gt_eval.LOCAL_PAI_COC</code>.</li>
-                        <li><strong>PR #15 CI config.json</strong> (this increment): second <code>macos-26</code> fail was <code>test_config_json_and_sft_yamls</code> reading <code>pre-trained/Alpamayo-R1-10B/config.json</code> (not on CI). Skip that file when <code>ALPAMAYO_CI_NO_WEIGHTS</code> or missing. Repo SFT yamls still run as <code>test_sft_yamls</code>.</li>
+                        <li><strong>PR #15 CI config.json</strong> (prior increment): second <code>macos-26</code> fail was <code>test_config_json_and_sft_yamls</code> reading <code>pre-trained/Alpamayo-R1-10B/config.json</code> (not on CI). Skip that file when <code>ALPAMAYO_CI_NO_WEIGHTS</code> or missing. Repo SFT yamls still run as <code>test_sft_yamls</code>.</li>
+                        <li><strong>Stage-2 CFM smoke</strong> (prior increment): freeze the Stage-1 language QLoRA VLM (load <code>mlx_port/reports/qlora/sft_stage1_small</code>, then <code>vlm.freeze()</code> including A/B). Train the 2.3B diffusion expert + action in/out with one CFM draw (NVIDIA <code>sft_stage2</code>, lr 1e-4). Same 8 non-CoC clips / seed 0 / t0=5.1&nbsp;s as Stage 1. all4 VLM stays packed; expert is dense bf16 (<code>quantize_expert=False</code>). Packed expert cannot Adam-step. No Euler, no CoC decode. Script: <code>mlx_port/scripts/sft_stage2_small.py</code>.</li>
+                        <li><strong>Kappa recovery</strong> (prior increment): first 8-clip Stage-2 run had CFM ~11424 on clip <code>77447940…</code> every revisit. Cause: MLX <code>traj_to_action</code> used <code>kappa = dtheta / (s + 1e-8)</code>, which explodes at near-zero speed. NVIDIA uses regularized <code>solve_xs_eq_y</code> (<code>_theta_v_a_to_kappa</code>). After the match, that clip’s action is in [−1.31, 4.04] and train CFM is 0.35. First-run JSON kept as <code>mlx_port/reports/sft_stage2_small_8clip_pre_kappa.json</code>.</li>
+                        <li><strong>Flag rename</strong> (prior increment): <code>--dense-expert</code> (load expert as bf16) and <code>--expert-dense</code> (Adam leftover action I/O) were anagrams. Replaced by <code>--expert-bf16</code> and <code>--train-action-proj</code>. Old names are hidden and error with the new name. Python kwarg is <code>train_action_proj</code>.</li>
+                        <li><strong>LoRA vs dense instruction page</strong> (prior increment): <a class="text-cyan-400 hover:underline" href="../doc/train_lora_vs_dense.html">mlx_port/doc/train_lora_vs_dense.html</a> — user how-to for Stage 1 / Stage 2 quantization (QLoRA vs dense). Smoke table and Raises notes removed.</li>
+                        <li><strong>Layout</strong> (prior increment): repo-root <code>reports/</code> moved to <code>mlx_port/reports/</code>. The training-options how-to left the progress-report tree and now lives at <a class="text-cyan-400 hover:underline" href="../doc/train_lora_vs_dense.html">mlx_port/doc/train_lora_vs_dense.html</a>. Script defaults resolve those dirs from <code>mlx_port/paths.py</code>. <code>reports/qlora/</code> gitignore is now <code>mlx_port/reports/qlora/</code>.</li>
+                        <li><strong>G3 closed</strong> (prior increment): user waived the 0.2&nbsp;m / 50-clip ADE success criterion. Quality is the 2026-08-29 human review of the P2f 5-clip XY / CoC / speed plots (<a class="text-cyan-400 hover:underline" href="traj_sample_5_t06/index.html">traj_sample_5_t06</a>). Heading and scene language hold. Yield/stop overshoot is leftover, not a P2f regression. G3 is a quality close, not a claim that T3.1 / all4 beat P2f prefill. Default load stays dense bf16. T3.3 50-clip ADE is optional logging, not a blocker.</li>
+                        <li><strong>G4 8-clip 2-epoch</strong> (prior increment): first real epoch run. Same seed-0 8-clip 4/4 as the 10-step smokes. <code>--epochs 2</code> → 8 Adam steps (each train clip twice). Stage 1: all4 VLM, language-decoder QLoRA only (vision frozen). Stage 2: load those adapters, freeze the VLM, <code>--expert-lora --train-action-proj</code> (packed expert decoder QLoRA + dense action I/O). Writes to <code>mlx_port/reports/qlora/sft_stage1_small_8clip_2ep/</code> and <code>…/sft_stage2_small_8clip_2ep/</code> so the 10-step smokes stay untouched. G4 stays open until the user confirms the run.</li>
+                        <li><strong>Train stage timers</strong> (this increment): T1.1 analog for SFT. Infer is encode / prefill / decode / FM. Train is tokenize → encode_cache → backbone (+ expert) → <code>fwd_bwd</code> → Adam. No decode, no Euler. <code>sft_lora_update</code> / <code>sft_expert_update</code> <code>mx.eval(loss, grads)</code> before <code>opt.update</code> so backward is not lazy-attributed to Adam. Materialized <code>sft_train_step</code> still binds <code>StageClock</code> for encode / backbone. Prints a <code>[TRAIN]</code> line (same shape as <code>[STAGE]</code>). JSON: <a class="text-cyan-400 hover:underline" href="train_stage_times.json">mlx_port/reports/train_stage_times.json</a>.</li>
+                        <li><strong>Expert decoder QLoRA</strong> (prior increment): opt-in <code>--expert-lora</code> wraps the diffusion transformer’s 36×7 <code>q/k/v/o/gate/up/down</code> leaves (252) with mlx_lm <code>LoRALinear</code> rank 8 / scale 20. Default Stage-2 path stays dense full FT. With <code>--expert-lora</code>, the all4 expert stays packed; only expert A/B train. <code>action_in_proj</code> / <code>action_out_proj</code> stay dense and frozen unless <code>--expert-dense</code> also Adam-steps them (packed decoder ints stay frozen). VLM + Stage-1 LoRA stay frozen. Packed expert ints are hashed with the VLM fingerprint. Exclusive with <code>--expert-update</code>. Expert adapters write to <code>mlx_port/reports/qlora/sft_stage2_small/</code> (gitignored); <code>--expert-dense</code> also writes <code>dense.safetensors</code>. 8-clip LoRA-only smoke (same seed-0 4/4): eval 0.198→0.185, Metal 11.72&nbsp;GB, packed <code>1097:9b90d23a…</code> unchanged. 8-clip <code>--expert-dense</code> (same split): eval 0.188→0.219 (spike 0.494), Metal 11.74&nbsp;GB, <code>dense.safetensors</code> 2.6&nbsp;MB / 15 arrays.</li>
                         <li><strong>T4.1</strong> (branch <code>stage1c-t41-qlora</code>): QLoRA on the language decoder and the vision tower. <code>inject_backbone_lora</code> wraps the 36×7 decoder <code>q/k/v/o/gate/up/down</code> leaves (252). Vision scope is <code>--lora-vision full|merger|none</code> (default <code>full</code>): <code>full</code> wraps 27 blocks <code>qkv</code>/<code>proj</code>/<code>fc1</code>/<code>fc2</code> + merger + 3 deepstack (116); <code>merger</code> wraps merger + 3 deepstack only (8); <code>none</code> is language-only. mlx_lm <code>LoRALinear</code> rank 8, scale 20. Conv3D <code>patch_embed</code>, LayerNorms, <code>pos_embed</code>, expert, <code>lm_head</code>, embeddings stay frozen. After <code>model.freeze()</code>, only <code>lora_a</code>/<code>lora_b</code> train (<code>full</code> 736 / 26.2&nbsp;M; <code>merger</code> 520 / 22.4&nbsp;M). Packed <code>QuantizedLinear.weight</code> is hashed before/after the step. Vision LoRA keeps encode on the tape; <code>freeze_vision_features</code> raises if vision adapters are present. <code>--lora</code> requires <code>--stage stage1</code>. <code>--lora-vision</code> requires <code>--lora</code>.</li>
                         <li>VLM W8 / W4 / all4 / nvfp4 were one-shot probes (measured 2026-08-29, then removed from the load path). Affine cannot pack vision <code>mlp.linear_fc2</code> (4304 ≉ 64); nvfp4 gs16 can. Conv3D patch embed never has <code>to_quantized</code>. Expert last dims 2048/8256 are ÷64. Action-in/out stayed dense. Metal nvfp4 is E2M1 + per-group FP8 scales, not Blackwell tensor cores.</li>
                     </ul>
@@ -151,6 +267,24 @@
                     <p class="text-xs">
                         G1 exists so the first cut is named. It was prefill at 32k tokens;
                         P2f cut that work. Phase 3 is now allowed on the language tower only.
+                    </p>
+                    <p class="text-xs mt-2">
+                        <strong class="text-slate-200">Why G3 dropped the ADE band.</strong>
+                        User confirmed the 5-clip plots by eye. Unseeded one-clip minADE
+                        and a 50-clip 0.2&nbsp;m band are not the quality gate.
+                        T=0.6 ADE tables stay as records, not rankings.
+                    </p>
+                    <p class="text-xs mt-2">
+                        <strong class="text-slate-200">Why train timers are not the infer clock.</strong>
+                        Infer <code>StageClock</code> evals logits at encode / prefill / decode
+                        boundaries. Binding that clock inside <code>nn.value_and_grad</code>
+                        would <code>mx.eval</code> on the tape (forbidden). Adam therefore
+                        evals <code>loss, grads</code> then <code>parameters, opt.state</code>
+                        — two host barriers, same numerics. Encode vs backbone still
+                        comes from a materialized forward (eval / <code>time_train_step</code>
+                        <code>[TRAIN-FWD]</code>). Decode and 10-step FM are not train
+                        stages. The 8-clip script wall is mostly eval (4 clips after
+                        every step), not the Adam step itself.
                     </p>
                     <p class="text-xs mt-2">
                         <strong class="text-slate-200">Why P2e compile did not cut prefill (−48&nbsp;ms on 58.1&nbsp;s).</strong>
@@ -218,8 +352,81 @@
                         Saves are A/B only, every 10 completed steps plus the
                         last step, always to the same
                         <code>adapters.safetensors</code> under
-                        <code>reports/qlora/</code>. Packed all4 weights stay
+                        <code>mlx_port/reports/qlora/</code>. Packed all4 weights stay
                         in <code>pre-trained/…/mlx_all4/</code>.
+                    </p>
+                    <p class="text-xs mt-2">
+                        <strong class="text-slate-200">Why expert QLoRA is opt-in, not the default.</strong>
+                        Default all4 load packs the expert. Packed
+                        <code>QuantizedLinear.weight</code> cannot Adam-step, so
+                        the smoked Stage-2 path loads a dense bf16 expert and
+                        full-FT it. <code>--expert-lora</code> is the way to
+                        train a <em>packed</em> expert: same 36×7 recipe as
+                        language QLoRA. Action in/out are ~1.35&nbsp;M and sit
+                        outside the decoder; they stay dense + frozen so the
+                        trainable set is A/B only and
+                        <code>save_lora_adapters</code> stays clean. This is
+                        not a full 10B finetune and not G4. 8-clip
+                        <code>--expert-lora</code> sanity (2026-08-31): same
+                        4/4 / seed 0 / t0=5.1&nbsp;s / lr 1e-4. First-step
+                        train CFM 1.45 (packed expert ≠ dense 0.35). Eval
+                        0.198→0.185 with a mid-run spike to 0.340. Clip 7744
+                        stays hard (1.45 / 2.31 / 1.53) but finite — kappa is
+                        fine. Metal 11.72&nbsp;GB vs dense FT 32.26. Packed
+                        fingerprint held. Adapters 50&nbsp;MB / 504 arrays.
+                    </p>
+                    <p class="text-xs mt-2">
+                        <strong class="text-slate-200">Why --train-action-proj is a separate flag.</strong>
+                        QLoRA of the packed decoder cannot Adam-step
+                        <code>QuantizedLinear.weight</code>. Action in/out never
+                        packed (~1.35&nbsp;M) and are the CFM I/O. Default
+                        <code>--expert-lora</code> keeps them frozen so the
+                        trainable set is A/B only. <code>--train-action-proj</code>
+                        (was <code>--expert-dense</code>) is the regular update of
+                        those leftover dense modules, same Adam LR. Decoder packed
+                        ints stay frozen. Save writes A/B to
+                        <code>adapters.safetensors</code> and action weights to
+                        <code>dense.safetensors</code>. Not a full 2.3B FT and
+                        not G4. 8-clip sanity (2026-08-31): eval 0.188→0.219
+                        with a spike to 0.494. Train clip-wise 1.75→0.29.
+                        Clip 7744 is 1.75 / 0.45 / 2.53 — not monotonic.
+                        Packed <code>1097:9b90d23a…</code> matches the
+                        LoRA-only run. Metal 11.74&nbsp;GB (same class as
+                        LoRA-only 11.72). Adapters 50&nbsp;MB + dense 2.6&nbsp;MB
+                        under <code>mlx_port/reports/qlora/sft_stage2_small_dense/</code>.
+                    </p>
+                    <p class="text-xs mt-2">
+                        <strong class="text-slate-200">Why Stage 2 trains a dense expert.</strong>
+                        <code>sft_expert_update</code> raises on packed
+                        <code>QuantizedLinear.weight</code>. The Stage-1
+                        adapters wrap an all4 language tower, so the VLM stays
+                        all4 + frozen LoRA. The 2.3B expert loads from the
+                        dense Alpamayo safetensors (bf16). NVIDIA Stage-2 LR
+                        is <code>sft_base</code> 1e-4. Eval CFM uses a fixed
+                        RNG seed so the held-out mean is comparable across
+                        steps (same noise / t draws).
+                    </p>
+                    <p class="text-xs mt-2">
+                        <strong class="text-slate-200">Why clip 7744 CFM was ~11k.</strong>
+                        Stage-1 discrete bins clamp to [−10, 10]. Stage-2 CFM
+                        uses continuous normalized accel/curvature. Dividing
+                        heading change by near-zero arc length is not NVIDIA’s
+                        solver. After <code>solve_xs_eq_y</code>, all eight
+                        clips sit in about [−4.5, 4.6]. 10 Adam steps at 1e-4
+                        did <em>not</em> lower held-out CFM (0.202→0.310).
+                        That is a short smoke, not G4.
+                    </p>
+                    <p class="text-xs mt-2">
+                        <strong class="text-slate-200">Why the first Stage-2 run hit CFM ~11k on clip 7744.</strong>
+                        MLX <code>traj_to_action</code> recovered curvature as
+                        <code>dtheta / (s + 1e-8)</code>. Near-zero speed
+                        explodes kappa. NVIDIA uses
+                        <code>_theta_v_a_to_kappa</code>:
+                        <code>solve_xs_eq_y(s=dt·v+½dt²a, y=dtheta, w_smooth2=1)</code>.
+                        After that match, clip 7744 action is
+                        <code>[-1.31, 4.04]</code> and train CFM is 0.35 (not 11424).
+                        The first JSON is kept as
+                        <code>mlx_port/reports/sft_stage2_small_8clip_pre_kappa.json</code>.
                     </p>
                     <p class="text-xs mt-2">
                         <strong class="text-slate-200">Why Stage 2 train must pass an explicit zeros mask.</strong>
@@ -531,7 +738,7 @@
                 <ul class="text-xs space-y-1 font-mono">
                     <li>mlx_port/PORT.md</li>
                     <li>mlx_port/alpamayo_mlx_port_plan.html · mlx_port/alpamayo1-mlx-speedup-plan.html</li>
-                    <li>reports/stage1c_progress.html</li>
+                    <li>mlx_port/reports/stage1c_progress.html</li>
                 </ul>
                 <div class="text-[11px] uppercase tracking-wider text-slate-500">P1a #7 (timers)</div>
                 <ul class="text-xs space-y-1 font-mono">
@@ -581,7 +788,7 @@
                     <li>mlx_port/vlm_loader.py — resize lm_head with embed so packed load can assign 155697 rows</li>
                     <li>mlx_port/scripts/save_quantized_lm.py — write {alpamayo}/mlx_lm4 (no expert)</li>
                     <li>mlx_port/tests/test_quantize_lm.py — tiny save/load, incomplete pair raises, spec mismatch raises</li>
-                    <li>.gitignore — ignore jpg/png under <code>reports/traj_sample_5_t06*</code> (keep HTML/JSON)</li>
+                    <li>.gitignore — ignore jpg/png under <code>mlx_port/reports/traj_sample_5_t06*</code> (keep HTML/JSON)</li>
                 </ul>
                 <div class="text-[11px] uppercase tracking-wider text-slate-500">all4 (this increment)</div>
                 <ul class="text-xs space-y-1 font-mono">
@@ -647,20 +854,89 @@
                     <li>mlx_port/scripts/time_train_step.py — build_pai_train_batch(t0_us=) for non-CoC keyframes</li>
                     <li>mlx_port/scripts/sft_stage1_small.py — language QLoRA, vision frozen, 10 steps, eval mean every step</li>
                     <li>mlx_port/tests/test_sft_stage1_small.py — 5 cases: split, no CoC leak, recipe=coc rejects t0_us</li>
-                    <li>reports/sft_stage1_small_10step.json — 2026-08-31 run</li>
-                    <li>reports/sft_stage1_small_10step.svg — train CE + zoomed eval mean</li>
-                    <li>reports/sft_stage1_small_30clip.json — 30-clip 15/15 run</li>
-                    <li>reports/sft_stage1_small_30clip.svg — train CE + zoomed eval mean</li>
+                    <li>mlx_port/reports/sft_stage1_small_10step.json — 2026-08-31 run</li>
+                    <li>mlx_port/reports/sft_stage1_small_10step.svg — train CE + zoomed eval mean</li>
+                    <li>mlx_port/reports/sft_stage1_small_30clip.json — 30-clip 15/15 run</li>
+                    <li>mlx_port/reports/sft_stage1_small_30clip.svg — train CE + zoomed eval mean</li>
                     <li>mlx_port/profiling.py — mx.get_active_memory (mx.metal.get_active_memory is deprecated)</li>
                     <li>mlx_port/tests/test_profiling.py — no DeprecationWarning from the meters</li>
                     <li>mlx_port/lora.py — save_lora_adapters / load_lora_adapters / lora_save_steps</li>
                     <li>mlx_port/scripts/sft_stage1_small.py — --lora-save-dir / --lora-save-every 10 / --no-lora-save</li>
                     <li>mlx_port/scripts/time_train_step.py — same save flags with --lora</li>
-                    <li>reports/sft_stage1_small_8clip_save.json — 8-clip save sanity</li>
-                    <li>reports/qlora/sft_stage1_small/adapters.safetensors — overwritten A/B after step 10 (local only; gitignored)</li>
-                    <li>.gitignore — reports/qlora/</li>
+                    <li>mlx_port/reports/sft_stage1_small_8clip_save.json — 8-clip save sanity</li>
+                    <li>mlx_port/reports/qlora/sft_stage1_small/adapters.safetensors — overwritten A/B after step 10 (local only; gitignored)</li>
+                    <li>.gitignore — mlx_port/reports/qlora/</li>
                     <li>mlx_port/scripts/time_train_step.py — lazy-import load_physical_aiavdataset; --local-dir from gt_eval.LOCAL_PAI_COC (CI can collect tests)</li>
                     <li>mlx_port/tests/test_sft_nvidia_parity.py — skip config.json on CI; test_sft_yamls always runs</li>
+                </ul>
+                <div class="text-[11px] uppercase tracking-wider text-slate-500">Stage-2 CFM (prior increment)</div>
+                <ul class="text-xs space-y-1 font-mono">
+                    <li>mlx_port/train_step.py — unfreeze_expert; sft_expert_update freezes VLM/LoRA then unfreezes expert + action proj</li>
+                    <li>mlx_port/models/alpamayo_r1_mlx.py — quantize_expert=False keeps dense bf16 expert under all4 VLM</li>
+                    <li>mlx_port/scripts/time_train_step.py — --dense-expert; --expert-update --quantize-all requires it</li>
+                    <li>mlx_port/scripts/sft_stage2_small.py — 8-clip 4/4, load Stage-1 adapters, Adam CFM, no expert checkpoint write</li>
+                    <li>mlx_port/tests/test_sft_stage2_small.py — same seed-0 split as Stage 1; adapters required</li>
+                    <li>mlx_port/traj_sample_plot_utils.py — "all4 W4 VLM + dense expert" stamp</li>
+                    <li>mlx_port/models/alpamayo_r1_mlx.py — traj_to_action kappa uses NVIDIA solve_xs_eq_y (not dtheta/s)</li>
+                    <li>mlx_port/tests/test_traj_to_action_numerical.py — stopped-car kappa stays finite (&lt;20)</li>
+                    <li>mlx_port/reports/sft_stage2_small_8clip.json — 8-clip CFM after kappa fix</li>
+                    <li>mlx_port/reports/sft_stage2_small_8clip_pre_kappa.json — first run, clip 7744 CFM ~11k</li>
+                </ul>
+                <div class="text-[11px] uppercase tracking-wider text-slate-500">Expert decoder QLoRA (this increment)</div>
+                <ul class="text-xs space-y-1 font-mono">
+                    <li>mlx_port/lora.py — inject_expert_lora / freeze_expert_base_unfreeze_lora(train_action_proj); save_dense_trainables</li>
+                    <li>mlx_port/train_step.py — prepare_stage2_trainables / sft_expert_update train_action_proj=</li>
+                    <li>mlx_port/scripts/sft_stage2_small.py — --expert-lora / --train-action-proj; old --expert-dense errors</li>
+                    <li>mlx_port/scripts/time_train_step.py — --expert-bf16 / --train-action-proj; old --dense-expert / --expert-dense error</li>
+                    <li>mlx_port/tests/test_lora.py — train_action_proj unfreezes action in/out; save A/B + dense.safetensors</li>
+                    <li>mlx_port/tests/test_train_step.py — --expert-bf16 required with --expert-update --quantize-all; --train-action-proj requires --expert-lora</li>
+                    <li>mlx_port/tests/test_sft_stage2_small.py — help lists --train-action-proj; old --expert-dense rejected</li>
+                    <li>mlx_port/doc/train_lora_vs_dense.html — picture-first flag guide</li>
+                    <li>mlx_port/doc/train_lora_vs_dense/*.png — architecture / QLoRA target / modes</li>
+                    <li>mlx_port/PORT.md — Stage-2 default vs --expert-lora; 8-clip QLoRA numbers</li>
+                    <li>mlx_port/tests/test_analytical_unicycle.py — kappa ridge tolerance 2e-3 (NVIDIA solve_xs_eq_y; was 1e-5 / 1e-3)</li>
+                    <li>mlx_port/reports/sft_stage2_small_8clip_expert_qlora.json — 8-clip --expert-lora CFM</li>
+                    <li>mlx_port/reports/sft_stage2_small_8clip_expert_qlora_dense.json — 8-clip --expert-lora --expert-dense CFM</li>
+                    <li>mlx_port/reports/qlora/sft_stage2_small/adapters.safetensors — LoRA-only 50 MB, 504 arrays (local only; gitignored)</li>
+                    <li>mlx_port/reports/qlora/sft_stage2_small_dense/ — adapters 50 MB + dense.safetensors 2.6 MB / 15 arrays</li>
+                    <li>mlx_port/doc/train_lora_vs_dense.html — illustrated Stage-1 / Stage-2 LoRA vs dense vs mixture guide (prior increment)</li>
+                </ul>
+                <div class="text-[11px] uppercase tracking-wider text-slate-500">Layout (this increment)</div>
+                <ul class="text-xs space-y-1 font-mono">
+                    <li>reports/ → mlx_port/reports/ (progress HTML, smoke JSON/SVG, traj/CoC sample trees, qlora adapters)</li>
+                    <li>mlx_port/doc/train_lora_vs_dense.html + images — user how-to lifted out of reports</li>
+                    <li>mlx_port/paths.py — REPORTS_DIR / DOC_DIR for script defaults</li>
+                    <li>mlx_port/scripts/sft_stage1_small.py · sft_stage2_small.py · time_train_step.py · run_local_*.py · eval_coc_grok.py — defaults use REPORTS_DIR</li>
+                    <li>mlx_port/tests/test_paths.py · test_single_image_coc.py</li>
+                    <li>.gitignore — mlx_port/reports/qlora/ and generated jpg/png</li>
+                    <li>.cursor/rules/stage-progress-protocol.mdc — template / progress paths under mlx_port/reports/</li>
+                    <li>mlx_port/PORT.md · alpamayo_mlx_port_plan.html · alpamayo1-mlx-speedup-plan.html</li>
+                </ul>
+                <div class="text-[11px] uppercase tracking-wider text-slate-500">G3 close (this increment)</div>
+                <ul class="text-xs space-y-1 font-mono">
+                    <li>mlx_port/alpamayo1-mlx-speedup-plan.html — G3 signed; T3.3 ADE fail-if waived</li>
+                    <li>mlx_port/PORT.md — G3 quality = 5-clip human inspection</li>
+                    <li>mlx_port/alpamayo_mlx_port_plan.html — G3 signed in the Stage 1c phase list</li>
+                    <li>mlx_port/reports/stage1c_progress.html — this increment</li>
+                </ul>
+                <div class="text-[11px] uppercase tracking-wider text-slate-500">G4 8-clip 2-epoch (prior increment)</div>
+                <ul class="text-xs space-y-1 font-mono">
+                    <li>mlx_port/scripts/sft_stage1_small.py · sft_stage2_small.py — --epochs (exclusive with --steps; steps = epochs * n_train)</li>
+                    <li>mlx_port/tests/test_sft_stage1_small.py · test_sft_stage2_small.py — resolve_train_steps; --epochs + --steps rejected</li>
+                    <li>mlx_port/reports/sft_stage1_small_8clip_2ep.json — Stage-1 language QLoRA, all4, 2 epochs</li>
+                    <li>mlx_port/reports/qlora/sft_stage1_small_8clip_2ep/ — Stage-1 adapters (does not overwrite the 10-step smoke)</li>
+                    <li>mlx_port/reports/sft_stage2_small_8clip_2ep.json — Stage-2 --expert-lora --train-action-proj, 2 epochs</li>
+                    <li>mlx_port/reports/qlora/sft_stage2_small_8clip_2ep/ — expert adapters + dense.safetensors</li>
+                </ul>
+                <div class="text-[11px] uppercase tracking-wider text-slate-500">Train stage timers (this increment)</div>
+                <ul class="text-xs space-y-1 font-mono">
+                    <li>mlx_port/train_step.py — TrainStepTimes tokenize/encode_cache/loss/fwd_bwd/adam; print_train_table; mean_train_times; run_value_and_grad_update; sft_expert_update → TrainUpdateOutput</li>
+                    <li>mlx_port/lora.py — sft_lora_update returns times; encode_cache timed when freeze_vision runs</li>
+                    <li>mlx_port/scripts/sft_stage1_small.py · sft_stage2_small.py — prep tokenize vs encode_cache; [TRAIN] per step; JSON train_times / eval_times</li>
+                    <li>mlx_port/scripts/time_train_step.py — --t0-us --report; [TRAIN-FWD] then Adam table</li>
+                    <li>mlx_port/tests/test_train_step.py · test_lora.py — as_dict dominant; mean_train_times; update returns fwd_bwd+adam</li>
+                    <li>mlx_port/reports/train_stage_times.json · train_stage_times_stage1.json · train_stage_times_stage2.json</li>
+                    <li>mlx_port/PORT.md · alpamayo1-mlx-speedup-plan.html</li>
                 </ul>
                 <div class="text-[11px] uppercase tracking-wider text-slate-500">Prefill quant chase — removed from code</div>
                 <ul class="text-xs space-y-1 font-mono">
@@ -686,6 +962,27 @@ PYTHONPATH=src:. /Users/michaellee/Projects/alpamayo/.venv/bin/python \
 # eval-1 2.0874 · train 3.9860→2.2214 · eval 2.0874→2.0165
 # prep 152.8 s · wall 282.6 s · Metal 78.55 GB / RSS 26.15 GB
 # packed fp 593:e56ee262… unchanged
+
+# 2026-08-31 G4 candidate · 8-clip 2-epoch (do not close G4 until user confirms)
+PYTHONPATH=src:. /Users/michaellee/Projects/alpamayo/.venv/bin/python \
+  -m mlx_port.scripts.sft_stage1_small --n-clips 8 --epochs 2 --seed 0 --quantize-all \
+  --lora-save-dir mlx_port/reports/qlora/sft_stage1_small_8clip_2ep \
+  --report mlx_port/reports/sft_stage1_small_8clip_2ep.json
+# 4/4 · steps=8 · language 252 LoRA · vision frozen · all4
+# per-clip revisit: 1.822→1.566, 1.845→1.610, 1.912→1.735, 2.026→1.801
+# eval 1.8531→1.8274 · prep 132.9 s · wall 241.0 s · Metal 78.68 / RSS 26.44
+# adapters 83 MB / 504 · step=8
+
+PYTHONPATH=src:. /Users/michaellee/Projects/alpamayo/.venv/bin/python \
+  -m mlx_port.scripts.sft_stage2_small --n-clips 8 --epochs 2 --seed 0 --quantize-all \
+  --expert-lora --train-action-proj \
+  --lora-adapter-dir mlx_port/reports/qlora/sft_stage1_small_8clip_2ep \
+  --expert-lora-save-dir mlx_port/reports/qlora/sft_stage2_small_8clip_2ep \
+  --report mlx_port/reports/sft_stage2_small_8clip_2ep.json
+# same 4/4 · Stage-1 adapters step=8 · expert_mode=qlora+action · 252 expert LoRA
+# eval 0.2599→0.1797 · clip 7744 train 0.323→1.989 (hard, finite) · ~4.4 s/step
+# prep 138.2 s · wall 172.4 s · Metal 11.66 / RSS 26.14
+# packed 1097:9b90d23a… · adapters 50 MB + dense.safetensors 2.6 MB
 
                 </pre>
                 <div class="overflow-auto">
@@ -715,12 +1012,12 @@ PYTHONPATH=src:. /Users/michaellee/Projects/alpamayo/.venv/bin/python \
                     <img src="sft_stage1_small_10step.svg" alt="Stage-1 smoke train CE and zoomed eval mean" class="w-full rounded-2xl border border-slate-800 mb-4"/>
                     <p class="text-xs text-slate-500 mb-4">
                         Train CE is clip-wise (sawtooth). Eval is zoomed to 2.00–2.10 so the 2.087→2.012 drop is visible.
-                        Source: <code>reports/sft_stage1_small_10step.json</code>.
+                        Source: <code>mlx_port/reports/sft_stage1_small_10step.json</code>.
                     </p>
                     <pre class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-xs text-cyan-300 overflow-auto mb-4"># 2026-08-31 30-clip Stage-1 language QLoRA (no CoC)
 PYTHONPATH=src:. /Users/michaellee/Projects/alpamayo/.venv/bin/python \
   -m mlx_port.scripts.sft_stage1_small --n-clips 30 --steps 10 --seed 0 --quantize-all \
-  --report reports/sft_stage1_small_30clip.json
+  --report mlx_port/reports/sft_stage1_small_30clip.json
 # 15/15 split · t0=5.1s · 252 decoder LoRA · vision stop-grad · all4
 # eval-1 2.7382 · train 2.6517→2.8431 (10 distinct clips, no revisit)
 # eval 2.7382→2.4952 (down every step, −0.243)
@@ -753,7 +1050,113 @@ PYTHONPATH=src:. /Users/michaellee/Projects/alpamayo/.venv/bin/python \
                     <img src="sft_stage1_small_30clip.svg" alt="30-clip Stage-1 smoke train CE and zoomed eval mean" class="w-full rounded-2xl border border-slate-800 mb-4"/>
                     <p class="text-xs text-slate-500 mb-4">
                         Train CE is one unseen clip per step (no revisit). Eval mean (n=15) falls every step.
-                        Source: <code>reports/sft_stage1_small_30clip.json</code>.
+                        Source: <code>mlx_port/reports/sft_stage1_small_30clip.json</code>.
+                    </p>
+                    <pre class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-xs text-cyan-300 overflow-auto mb-4"># 2026-08-31 Stage-2 CFM · freeze Stage-1 LoRA VLM · dense expert
+PYTHONPATH=src:. /Users/michaellee/Projects/alpamayo/.venv/bin/python \
+  -m mlx_port.scripts.sft_stage2_small --n-clips 8 --steps 10 --seed 0 --quantize-all
+# 4/4 · t0=5.1s · adapters step=10 · lr 1e-4 · all4 VLM + dense expert
+# eval-1 0.2023 · train 0.350→2.165 (clip-wise) · eval 0.202→0.310
+# ~4.8 s/step · prep 147.5 s · wall 223.7 s · Metal 32.26 / RSS 33.89
+# packed VLM 593:e56ee262… unchanged
+                    </pre>
+                    <table class="w-full text-left text-xs mb-4">
+                        <thead class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
+                            <tr>
+                                <th class="px-2 py-2">Step</th>
+                                <th class="px-2 py-2">Train clip</th>
+                                <th class="px-2 py-2">Train CFM</th>
+                                <th class="px-2 py-2">Eval mean (n=4)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-slate-300 font-mono">
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">−1</td><td class="px-2 py-2">—</td><td class="px-2 py-2">—</td><td class="px-2 py-2">0.2023</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">0</td><td class="px-2 py-2">77447940…</td><td class="px-2 py-2">0.3503</td><td class="px-2 py-2">0.2112</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">1</td><td class="px-2 py-2">b1195c93…</td><td class="px-2 py-2">0.4798</td><td class="px-2 py-2">0.2094</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">2</td><td class="px-2 py-2">de3c23c3…</td><td class="px-2 py-2">0.2957</td><td class="px-2 py-2">0.2505</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">3</td><td class="px-2 py-2">2532fb2e…</td><td class="px-2 py-2">0.3835</td><td class="px-2 py-2">0.4084</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">4</td><td class="px-2 py-2">77447940…</td><td class="px-2 py-2">0.8302</td><td class="px-2 py-2">0.4112</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">5</td><td class="px-2 py-2">b1195c93…</td><td class="px-2 py-2">1.9235</td><td class="px-2 py-2">0.4036</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">6</td><td class="px-2 py-2">de3c23c3…</td><td class="px-2 py-2">0.3220</td><td class="px-2 py-2">0.2788</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">7</td><td class="px-2 py-2">2532fb2e…</td><td class="px-2 py-2">0.5942</td><td class="px-2 py-2">0.2983</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">8</td><td class="px-2 py-2">77447940…</td><td class="px-2 py-2">3.0641</td><td class="px-2 py-2">0.3362</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">9</td><td class="px-2 py-2">b1195c93…</td><td class="px-2 py-2">2.1651</td><td class="px-2 py-2">0.3098</td></tr>
+                        </tbody>
+                    </table>
+                    <p class="text-xs text-slate-500 mb-4">
+                        Train CFM is clip-wise (and a new t/noise draw each step). Eval uses a fixed RNG so the four held-out draws stay comparable. 10 steps did not beat eval-1. Source: <code>mlx_port/reports/sft_stage2_small_8clip.json</code>.
+                    </p>
+                    <pre class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-xs text-cyan-300 overflow-auto mb-4"># 2026-08-31 Stage-2 CFM · --expert-lora · packed all4 expert
+PYTHONPATH=src:. /Users/michaellee/Projects/alpamayo/.venv/bin/python \
+  -m mlx_port.scripts.sft_stage2_small --expert-lora --n-clips 8 --steps 10 --seed 0 --quantize-all
+# 4/4 · t0=5.1s · adapters step=10 · lr 1e-4 · 252 expert LoRA / 13.0 M
+# path=all4 W4 VLM+expert · packed 1097:9b90d23a… unchanged
+# eval-1 0.1979 · train 1.448→0.194 (clip-wise) · eval 0.198→0.185
+# ~4.4 s/step · prep 152.6 s · wall 217.5 s · Metal 11.72 / RSS 26.31
+# adapters 50 MB / 504 arrays → mlx_port/reports/qlora/sft_stage2_small/
+                    </pre>
+                    <table class="w-full text-left text-xs mb-4">
+                        <thead class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
+                            <tr>
+                                <th class="px-2 py-2">Step</th>
+                                <th class="px-2 py-2">Train clip</th>
+                                <th class="px-2 py-2">Train CFM</th>
+                                <th class="px-2 py-2">Eval mean (n=4)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-slate-300 font-mono">
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">−1</td><td class="px-2 py-2">—</td><td class="px-2 py-2">—</td><td class="px-2 py-2">0.1979</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">0</td><td class="px-2 py-2">77447940…</td><td class="px-2 py-2">1.4480</td><td class="px-2 py-2">0.1566</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">1</td><td class="px-2 py-2">b1195c93…</td><td class="px-2 py-2">0.3068</td><td class="px-2 py-2">0.1348</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">2</td><td class="px-2 py-2">de3c23c3…</td><td class="px-2 py-2">0.1755</td><td class="px-2 py-2">0.3024</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">3</td><td class="px-2 py-2">2532fb2e…</td><td class="px-2 py-2">1.7411</td><td class="px-2 py-2">0.3398</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">4</td><td class="px-2 py-2">77447940…</td><td class="px-2 py-2">2.3136</td><td class="px-2 py-2">0.3239</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">5</td><td class="px-2 py-2">b1195c93…</td><td class="px-2 py-2">0.1611</td><td class="px-2 py-2">0.1677</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">6</td><td class="px-2 py-2">de3c23c3…</td><td class="px-2 py-2">0.1593</td><td class="px-2 py-2">0.2013</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">7</td><td class="px-2 py-2">2532fb2e…</td><td class="px-2 py-2">0.3630</td><td class="px-2 py-2">0.1942</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">8</td><td class="px-2 py-2">77447940…</td><td class="px-2 py-2">1.5343</td><td class="px-2 py-2">0.2192</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">9</td><td class="px-2 py-2">b1195c93…</td><td class="px-2 py-2">0.1941</td><td class="px-2 py-2">0.1847</td></tr>
+                        </tbody>
+                    </table>
+                    <p class="text-xs text-slate-500 mb-4">
+                        Packed expert first-step CFM 1.45 is not the dense 0.35 — all4 expert ≠ bf16 expert. Eval uses the same fixed RNG as the dense smoke. Mid-run spike 0.340, end 0.185 (below eval-1). Clip 7744 does not drop monotonically. Not G4. Source: <code>mlx_port/reports/sft_stage2_small_8clip_expert_qlora.json</code>.
+                    </p>
+                    <pre class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-xs text-cyan-300 overflow-auto mb-4"># 2026-08-31 Stage-2 CFM · then --expert-dense, now --train-action-proj
+PYTHONPATH=src:. /Users/michaellee/Projects/alpamayo/.venv/bin/python \
+  -m mlx_port.scripts.sft_stage2_small --expert-lora --expert-dense \
+  --n-clips 8 --steps 10 --seed 0 --quantize-all \
+  --expert-lora-save-dir mlx_port/reports/qlora/sft_stage2_small_dense
+# 4/4 · t0=5.1s · lr 1e-4 · 252 expert LoRA + action in/out
+# path=all4 W4 VLM+expert · packed 1097:9b90d23a… unchanged
+# eval-1 0.1879 · train 1.754→0.290 (clip-wise) · eval 0.188→0.219
+# ~4.4 s/step · prep 185.3 s · wall 217.9 s · Metal 11.74 / RSS 26.18
+# adapters 50 MB / 504 + dense.safetensors 2.6 MB / 15 arrays
+                    </pre>
+                    <table class="w-full text-left text-xs mb-4">
+                        <thead class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
+                            <tr>
+                                <th class="px-2 py-2">Step</th>
+                                <th class="px-2 py-2">Train clip</th>
+                                <th class="px-2 py-2">Train CFM</th>
+                                <th class="px-2 py-2">Eval mean (n=4)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-slate-300 font-mono">
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">−1</td><td class="px-2 py-2">—</td><td class="px-2 py-2">—</td><td class="px-2 py-2">0.1879</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">0</td><td class="px-2 py-2">77447940…</td><td class="px-2 py-2">1.7542</td><td class="px-2 py-2">0.2693</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">1</td><td class="px-2 py-2">b1195c93…</td><td class="px-2 py-2">0.4220</td><td class="px-2 py-2">0.2093</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">2</td><td class="px-2 py-2">de3c23c3…</td><td class="px-2 py-2">0.3179</td><td class="px-2 py-2">0.2344</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">3</td><td class="px-2 py-2">2532fb2e…</td><td class="px-2 py-2">0.9443</td><td class="px-2 py-2">0.1994</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">4</td><td class="px-2 py-2">77447940…</td><td class="px-2 py-2">0.4492</td><td class="px-2 py-2">0.2212</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">5</td><td class="px-2 py-2">b1195c93…</td><td class="px-2 py-2">0.2100</td><td class="px-2 py-2">0.1383</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">6</td><td class="px-2 py-2">de3c23c3…</td><td class="px-2 py-2">0.1990</td><td class="px-2 py-2">0.2572</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">7</td><td class="px-2 py-2">2532fb2e…</td><td class="px-2 py-2">0.2688</td><td class="px-2 py-2">0.4943</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">8</td><td class="px-2 py-2">77447940…</td><td class="px-2 py-2">2.5282</td><td class="px-2 py-2">0.3511</td></tr>
+                            <tr class="border-b border-slate-800/80"><td class="px-2 py-2">9</td><td class="px-2 py-2">b1195c93…</td><td class="px-2 py-2">0.2900</td><td class="px-2 py-2">0.2194</td></tr>
+                        </tbody>
+                    </table>
+                    <p class="text-xs text-slate-500 mb-4">
+                        Same 4/4 as LoRA-only. Eval-1 0.188 is not a bit-identical replay of 0.198 (extra trainable graph). End 0.219 is above eval-1; spike 0.494 at step 7. Clip 7744 1.75→0.45→2.53. Packed hash matches LoRA-only. Not G4. Source: <code>mlx_port/reports/sft_stage2_small_8clip_expert_qlora_dense.json</code>.
                     </p>
                 </div>
                 <pre class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-xs text-cyan-300 overflow-auto"># 2026-08-31 CI-equivalent after lazy PAI import (PR #15)
@@ -877,7 +1280,7 @@ PYTHONPATH=src:. ALPAMAYO_STAGE_TIMERS=1 \
 # 2026-08-29 20:27 · 5-clip T=0.6 traj sample after P2f
 PYTHONPATH=src:. /Users/michaellee/Projects/alpamayo/.venv/bin/python \
   mlx_port/scripts/run_local_traj_sample.py \
-  --report-dir reports/traj_sample_5_t06 --no-reuse
+  --report-dir mlx_port/reports/traj_sample_5_t06 --no-reuse
 # all 5 clips tokens=3006 · 16×[1,20,36] · wrote index.html · ~119 s wall
 
 # 2026-08-29 20:50 · T3.1 unit tests
@@ -974,7 +1377,7 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
 PYTHONPATH=src:. ALPAMAYO_QUANT=none \
   /Users/michaellee/Projects/alpamayo/.venv/bin/python \
   mlx_port/scripts/run_local_traj_sample.py \
-  --report-dir reports/traj_sample_5_t06_bf16 --no-reuse
+  --report-dir mlx_port/reports/traj_sample_5_t06_bf16 --no-reuse
 # [QUANT] language tower dense bf16 · tokens=3006 · 16×[1,20,36]
 # path=bf16 flags lm/vision/expert=bf16 · wrote index.html · 115 s wall
 # mean minADE 4.562 m (matches signed P2f 4.56)
@@ -982,7 +1385,7 @@ PYTHONPATH=src:. ALPAMAYO_QUANT=none \
 PYTHONPATH=src:. ALPAMAYO_QUANT=lm4 \
   /Users/michaellee/Projects/alpamayo/.venv/bin/python \
   mlx_port/scripts/run_local_traj_sample.py \
-  --report-dir reports/traj_sample_5_t06_t31 --no-reuse --quantize-lm
+  --report-dir mlx_port/reports/traj_sample_5_t06_t31 --no-reuse --quantize-lm
 # [QUANT] language tower affine-4-gs64: 252 QuantizedLinear, kept dense lm_head + embed_tokens
 # tokens=3006 · 16×[1,20,36] · path=T3.1 W4 LM · 106 s wall
 # mean minADE 4.240 m · CoC same on clips 2–4
@@ -1024,7 +1427,7 @@ PYTHONPATH=src:. ALPAMAYO_STAGE_TIMERS=1 ALPAMAYO_QUANT=lm4 \
 PYTHONPATH=src:. ALPAMAYO_QUANT=lm4 \
   /Users/michaellee/Projects/alpamayo/.venv/bin/python \
   mlx_port/scripts/run_local_traj_sample.py \
-  --report-dir reports/traj_sample_5_t06_t31_disk --no-reuse --quantize-lm
+  --report-dir mlx_port/reports/traj_sample_5_t06_t31_disk --no-reuse --quantize-lm
 # loaded 351/750 VLM, skipped 399 language keys
 # [QUANT] loaded affine-4-gs64 from mlx_lm4/: 252 QuantizedLinear
 # tokens=3006 · 16×[1,20,36] · path=T3.1 W4 LM · 96.9 s wall
@@ -1055,7 +1458,7 @@ PYTHONPATH=src:. ALPAMAYO_STAGE_TIMERS=1 ALPAMAYO_QUANT=all4 \
 PYTHONPATH=src:. ALPAMAYO_QUANT=all4 \
   /Users/michaellee/Projects/alpamayo/.venv/bin/python \
   mlx_port/scripts/run_local_traj_sample.py \
-  --report-dir reports/traj_sample_5_t06_all4_disk --no-reuse --quantize-all
+  --report-dir mlx_port/reports/traj_sample_5_t06_all4_disk --no-reuse --quantize-all
 # disk load · tokens=3006 · 16×[1,20,36] · path=all4 W4 VLM+expert · 122.4 s wall
 # mean minADE 3.18 m · clip0 Metal 9.66 GB / RSS 27.87 GB
 
@@ -1256,6 +1659,91 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                                 <td class="px-2 py-2">2026-08-31 · first CI: collection ERROR (physical_ai_av). Second: FileNotFoundError on pre-trained/…/config.json. After lazy import + skip: both macos-26 jobs pass (1m41s / 1m7s). CodeQL + Analyze pass. No adapters in the PR file list.</td>
                             </tr>
                             <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">sft_stage2_small.py · 8 clips · dtheta/s kappa</td>
+                                <td class="px-2 py-2 text-rose-400">FAIL (target scale)</td>
+                                <td class="px-2 py-2">2026-08-31 · same 4/4 split. Clip 77447940 train CFM 11424 / 11372 / 11213 every revisit. Eval 0.191→0.905 (spike 16.07). Metal 32.17 / RSS 33.90. JSON: mlx_port/reports/sft_stage2_small_8clip_pre_kappa.json.</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">sft_stage2_small.py · 8 clips · NVIDIA kappa</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">2026-08-31 · actions in [−4.48, 4.60]. train 0.350→2.165 (clip-wise). eval 0.202→0.310 (fixed eval RNG; no drop in 10 steps). ~4.8 s/step. prep 147.5 s · wall 223.7 s · Metal 32.26 / RSS 33.89. Packed VLM 593:e56ee262… unchanged. JSON: mlx_port/reports/sft_stage2_small_8clip.json.</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">test_sft_stage2_small.py + kappa unit</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">Same seed-0 8-clip ids as Stage 1. Missing adapters raise. Stopped-car kappa finite. --expert-bf16 required with --expert-update --quantize-all. Help lists --expert-lora / --train-action-proj. Old --expert-dense errors.</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">test_lora.py + test_train_step.py · expert QLoRA</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">2026-08-31 · TinyStage2Host 2×7=14 wraps. Action in/out and VLM stay Linear. inject_backbone_lora still skips expert. Linear expert / wrong layer count / double wrap raise. Packed expert fingerprint unchanged after Adam. save/load writes expert.* only; VLM adapter file key-set mismatch raises. --expert-lora requires stage2; exclusive with --expert-update and --lora. sft_expert_update on packed expert moves A/B only.</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">test_analytical_unicycle.py · NVIDIA kappa ridge</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">2026-08-31 · after solve_xs_eq_y, recovered kappa 0.1485 vs 0.150 (err 1.48e-3) and combined mean 1.68e-3. Bounds now 2e-3. First not-slow run failed these two; re-run 223 passed / 5 deselected.</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">mlx_port/tests -m "not slow"</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">2026-08-31 · 223 passed, 5 deselected · 58.22 s.</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">sft_stage2_small.py · 8 clips · --expert-lora</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">2026-08-31 · all4 VLM+expert · 252 expert LoRA / 13.0 M · lr 1e-4 · same 4/4. eval 0.1979→0.1847 (spike 0.340). train 1.448→0.194 clip-wise. ~4.4 s/step. prep 152.6 s · wall 217.5 s · Metal 11.72 / RSS 26.31. Packed 1097:9b90d23a… unchanged. Adapters 50 MB / 504 arrays / step=10. JSON: mlx_port/reports/sft_stage2_small_8clip_expert_qlora.json.</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">--epochs CLI</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">2026-08-31 · resolve_train_steps(epochs=2, n_train=4)=8. --epochs + --steps exclusive. test_sft_stage1_small + test_sft_stage2_small: 15 passed · 1 deselected · 23.79 s.</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">sft_stage1_small.py · 8 clips · --epochs 2</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">2026-08-31 · same seed-0 4/4. all4 language QLoRA. 8 steps. eval 1.8531→1.8274. Per-clip train down on revisit. ~12.5 s/step. prep 132.9 s · wall 241.0 s · Metal 78.68 / RSS 26.44. Adapters 83 MB / 504 / step=8. JSON: mlx_port/reports/sft_stage1_small_8clip_2ep.json. G4 not signed (awaiting user).</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">sft_stage2_small.py · 8 clips · --epochs 2 · --expert-lora --train-action-proj</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">2026-08-31 · loaded Stage-1 2ep adapters. expert_mode=qlora+action. eval 0.2599→0.1797. Clip 7744 0.323→1.989 finite. ~4.4 s/step. prep 138.2 s · wall 172.4 s · Metal 11.66 / RSS 26.14. Packed 1097:9b90d23a… . adapters 50 MB + dense 2.6 MB. JSON: mlx_port/reports/sft_stage2_small_8clip_2ep.json. G4 not signed (awaiting user).</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">train stage timers · unit</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">2026-08-31 · TrainStepTimes.as_dict dominant=backbone; mean_train_times arithmetic mean; sft_expert_update / sft_lora_update return fwd_bwd_ms&gt;0 + adam_ms. --t0-us / --report in help; --t0-us requires --from-clip. test_train_step + test_lora + test_sft_stage1_small + test_sft_stage2_small + test_stage_timers: 100 passed · 61.88 s.</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">time_train_step.py · stage1 G4 clip · --lora --lora-vision none --quantize-all</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">2026-08-31 · clip 77447940 t0=5.1 s seq=3124. load 0.74 s · tokenize 15.2 s · encode_cache 1.11 s · fwd encode 0 / backbone 4279 / loss 73 / total 4363 · Adam fwd_bwd 13592 / adam 63 / total 13659 · CE 1.822 · Metal 78.54 / RSS 24.61. Eager (compile uninstalled). JSON: mlx_port/reports/train_stage_times_stage1.json.</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">time_train_step.py · stage2 G4 clip · --expert-lora --train-action-proj --quantize-all</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">2026-08-31 · same clip. load 2.86 s · tokenize 12.8 s · encode_cache 1.11 s · fwd encode 0 / backbone 3984 (compiled) / expert 73 / total 4083 · Adam fwd_bwd 4085 / adam 70 / total 4176 · CFM 0.36 · Metal 12.27 / RSS 25.17. Combined: mlx_port/reports/train_stage_times.json.</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">G3 close · qualitative inspection</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">2026-08-31 · user waived 50-clip ADE. Quality is the 2026-08-29 review of traj_sample_5_t06 XY / CoC / speed. No new runtime test. Docs only: speedup plan + PORT.md + this report.</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">test_paths.py · reports / doc layout</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">2026-08-31 · repo-root reports/ gone. Progress HTML under mlx_port/reports/. Train how-to under mlx_port/doc/. test_paths + test_sft_stage1_small + test_sft_stage2_small + test_train_step + test_lora: 82 passed · 53.54 s.</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">--expert-bf16 / --train-action-proj rename</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">2026-08-31 · old --dense-expert / --expert-dense error with the new names. --expert-update --quantize-all requires --expert-bf16. --train-action-proj requires --expert-lora. test_lora + test_train_step + test_sft_stage2_small: 74 passed · 48.72 s.</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
+                                <td class="px-2 py-2 font-mono">sft_stage2_small.py · 8 clips · --expert-lora --expert-dense</td>
+                                <td class="px-2 py-2 text-emerald-400">PASS</td>
+                                <td class="px-2 py-2">2026-08-31 · same 4/4. eval 0.1879→0.2194 (spike 0.494). train 1.754→0.290 clip-wise. ~4.4 s/step. prep 185.3 s · wall 217.9 s · Metal 11.74 / RSS 26.18. Packed 1097:9b90d23a… match LoRA-only. adapters 50 MB / 504 + dense.safetensors 2.6 MB / 15 arrays. JSON: mlx_port/reports/sft_stage2_small_8clip_expert_qlora_dense.json.</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono">test_profiling.py (2 cases)</td>
                                 <td class="px-2 py-2 text-emerald-400">PASS</td>
                                 <td class="px-2 py-2">2026-08-31 · record_memory_sample + MemoryMonitor · 2 passed in 0.05 s · no get_active_memory DeprecationWarning.</td>
@@ -1263,7 +1751,7 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono">sft_stage1_small.py · 8 clips · save adapters</td>
                                 <td class="px-2 py-2 text-emerald-400">PASS</td>
-                                <td class="px-2 py-2">2026-08-31 · same seed-0 4/4 split as first 8-clip. eval 2.0874→2.0165 (matches). train 3.9860→2.2233 vs 2.2214. One file adapters.safetensors 87.4 MB · 504 arrays · config step=10. No numbered snapshot. Metal 78.68 / RSS 26.39. JSON: reports/sft_stage1_small_8clip_save.json.</td>
+                                <td class="px-2 py-2">2026-08-31 · same seed-0 4/4 split as first 8-clip. eval 2.0874→2.0165 (matches). train 3.9860→2.2233 vs 2.2214. One file adapters.safetensors 87.4 MB · 504 arrays · config step=10. No numbered snapshot. Metal 78.68 / RSS 26.39. JSON: mlx_port/reports/sft_stage1_small_8clip_save.json.</td>
                             </tr>
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono">test_lora.py save/load (4 new)</td>
@@ -1273,12 +1761,12 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono">sft_stage1_small.py · 30 clips · 10 steps · 15/15</td>
                                 <td class="px-2 py-2 text-emerald-400">PASS</td>
-                                <td class="px-2 py-2">2026-08-31 · eval 2.738→2.495 (down every step) · train 2.652 / 2.843 on distinct clips · seq=3124 n_ce=131 · prep 541.7 s · wall 758.4 s · Metal 82.31 / RSS 28.11 · packed 593:e56ee262… unchanged. JSON: reports/sft_stage1_small_30clip.json.</td>
+                                <td class="px-2 py-2">2026-08-31 · eval 2.738→2.495 (down every step) · train 2.652 / 2.843 on distinct clips · seq=3124 n_ce=131 · prep 541.7 s · wall 758.4 s · Metal 82.31 / RSS 28.11 · packed 593:e56ee262… unchanged. JSON: mlx_port/reports/sft_stage1_small_30clip.json.</td>
                             </tr>
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono">sft_stage1_small.py · 8 clips · 10 steps · --lora-vision none</td>
                                 <td class="px-2 py-2 text-emerald-400">PASS</td>
-                                <td class="px-2 py-2">2026-08-31 · non-CoC only · 4 train / 4 eval · seq=3124 · n_ce=131 · language 252/21.8M · vision frozen. Per-clip train drops on revisit (3.99→2.72, 2.89→2.22, 1.98→1.87, 3.38→2.79). Eval mean 2.087→2.012 then 2.016. No NaN. Packed 593:e56ee262… unchanged. Metal 78.55 GB (8 cached encodes). JSON: reports/sft_stage1_small_10step.json.</td>
+                                <td class="px-2 py-2">2026-08-31 · non-CoC only · 4 train / 4 eval · seq=3124 · n_ce=131 · language 252/21.8M · vision frozen. Per-clip train drops on revisit (3.99→2.72, 2.89→2.22, 1.98→1.87, 3.38→2.79). Eval mean 2.087→2.012 then 2.016. No NaN. Packed 593:e56ee262… unchanged. Metal 78.55 GB (8 cached encodes). JSON: mlx_port/reports/sft_stage1_small_10step.json.</td>
                             </tr>
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono">test_sft_nvidia_parity.py (13 cases)</td>
@@ -1303,7 +1791,7 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono">run_local_traj_sample.py · 5 clips T=0.6 mlx_lm4 disk</td>
                                 <td class="px-2 py-2 text-emerald-400">PASS</td>
-                                <td class="px-2 py-2">2026-08-30 04:18 UTC · reports/traj_sample_5_t06_t31_disk · skipped 399 · 252 QuantizedLinear · tokens=3006 · mean minADE 4.240 m · CoC/ADE match live-pack t31 · 96.9 s wall · Metal 21.24 GB</td>
+                                <td class="px-2 py-2">2026-08-30 04:18 UTC · mlx_port/reports/traj_sample_5_t06_t31_disk · skipped 399 · 252 QuantizedLinear · tokens=3006 · mean minADE 4.240 m · CoC/ADE match live-pack t31 · 96.9 s wall · Metal 21.24 GB</td>
                             </tr>
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono">save_quantized_all.py</td>
@@ -1313,7 +1801,7 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono">run_local_traj_sample.py · 5 clips T=0.6 mlx_all4 disk</td>
                                 <td class="px-2 py-2 text-emerald-400">PASS</td>
-                                <td class="px-2 py-2">2026-08-30 20:29 UTC · reports/traj_sample_5_t06_all4_disk · disk load · mean minADE 3.18 m · 122.4 s wall · Metal 9.66 GB</td>
+                                <td class="px-2 py-2">2026-08-30 20:29 UTC · mlx_port/reports/traj_sample_5_t06_all4_disk · disk load · mean minADE 3.18 m · 122.4 s wall · Metal 9.66 GB</td>
                             </tr>
                             <tr class="border-b border-slate-800/80">
                                 <td class="px-2 py-2 font-mono">test_alpamayo_r1_mlx.py::test_flow_matching_evals_once_after_euler_loop</td>
@@ -1468,7 +1956,7 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                     </div>
                     <p class="text-xs text-slate-400">
                         Recipe A did not cut prefill on this one-shot window (W4 + compile first capture is slower).
-                        Decode is the only stage that moved the right way. G3 is not signed.
+                        Decode is the only stage that moved the right way. G3 later closed on qualitative inspection; ADE on this shot is unseeded FM.
                         CoC pin held — naive affine did not trash the 13-token greedy trace.
                     </p>
                 </div>
@@ -1588,7 +2076,7 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                     <p class="text-xs text-slate-500 mb-2">
                         Same clips / seed 42 / T=0.6 / top_p=0.98 / 1 traj.
                         Pre-P2f snapshot: <code>results_pre_p2f.json</code> (mean minADE 7.85 m).
-                        Plots: <a class="text-cyan-400 hover:underline" href="traj_sample_5_t06/index.html">reports/traj_sample_5_t06/index.html</a>.
+                        Plots: <a class="text-cyan-400 hover:underline" href="traj_sample_5_t06/index.html">mlx_port/reports/traj_sample_5_t06/index.html</a>.
                     </p>
                     <div class="overflow-auto mb-3">
                         <table class="w-full text-left text-xs">
@@ -1653,9 +2141,11 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                     </p>
                     <p class="text-xs text-emerald-300/90 mt-2">
                         User reviewed the XY / CoC / speed plots 2026-08-29 and signed the
-                        5-clip quality as good. Heading and scene language are the win
+                        5-clip quality as good. That inspection is the G3 quality close
+                        (2026-08-31). Heading and scene language are the win
                         (clip 0 left turn, clip 4 lateral miss gone). Yield overshoot is
-                        leftover, not a P2f regression.
+                        leftover, not a P2f regression. ADE numbers stay in the table;
+                        they are not a G3 pass/fail.
                     </p>
                 </div>
                 <div>
@@ -1921,12 +2411,12 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                 <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6">
                     <div class="text-xs text-slate-500">Peak memory (first-step e2e / train)</div>
                     <div class="text-2xl font-semibold text-white mt-2">107.5 <span class="text-lg text-slate-400">GiB Metal</span></div>
-                    <div class="text-xs text-slate-500 mt-1">30-clip smoke: Metal 82.31 / RSS 28.11. 8-clip: 78.55 / 26.15. Activity Monitor Memory Used is the machine, not a third meter. Vision full QLoRA PAI: 107.47 / 23.27. Vision merger: 76.79 / 25.01. Language-only one-clip: 66.48 / 24.99. mlx_all4 greedy: 9.66 / 27.67.</div>
+                    <div class="text-xs text-slate-500 mt-1">Stage-2 8-clip --expert-lora --expert-dense: Metal 11.74 / RSS 26.18. Stage-2 8-clip --expert-lora: Metal 11.72 / RSS 26.31. Stage-2 8-clip dense FT: Metal 32.26 / RSS 33.89. Stage-1 30-clip: Metal 82.31 / RSS 28.11. 8-clip QLoRA: 78.55 / 26.15. Activity Monitor Memory Used is the machine, not a third meter. Vision full QLoRA PAI: 107.47 / 23.27. Vision merger: 76.79 / 25.01. Language-only one-clip: 66.48 / 24.99. mlx_all4 greedy: 9.66 / 27.67.</div>
                 </div>
                 <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6">
-                    <div class="text-xs text-slate-500">PAI train step / infer window</div>
-                    <div class="text-2xl font-semibold text-white mt-2">11.0 s / step</div>
-                    <div class="text-xs text-slate-500 mt-1">30-clip: train ~11.0 s + eval-15 ~64.8 s. Prep 541.7 s. Wall 758.4 s. 8-clip: eval-4 ~17.3 s, prep 152.8 s, wall 282.6 s.</div>
+                    <div class="text-xs text-slate-500">PAI train step (G4 recipe, one clip)</div>
+                    <div class="text-2xl font-semibold text-white mt-2">13.7 / 4.2 s</div>
+                    <div class="text-xs text-slate-500 mt-1">Stage 1 Adam 13.7 s (fwd_bwd 13.6 + adam 0.06). Stage 2 Adam 4.2 s (≈ frozen VLM backbone). Tokenize 13–15 s / clip once. Encode cache 1.11 s. 8-clip 2-epoch loop is eval-bound (4× backbone after every step).</div>
                 </div>
                 <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6">
                     <div class="text-xs text-slate-500">G1 dominant (first LM step)</div>
@@ -1946,7 +2436,7 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                     One task per branch. Open a PR into <code>main</code>, document
                     <code>.venv</code> tests here, then wait for user verification before merge
                     (<code>optimize-inference-time</code> landed in PR #5).
-                    Do not 4-bit the expert first. G1 is signed off. Default load is dense bf16; T3.1 / all4 are opt-in. NVIDIA SFT Stage 1/2 parity is this increment.
+                    Do not 4-bit the expert first. G1 and G3 are signed off. Default load is dense bf16; T3.1 / all4 are opt-in. Stage-2 default is dense expert FT; <code>--expert-lora</code> is the packed-expert QLoRA option.
                 </p>
                 <div class="overflow-auto">
                     <table class="w-full text-left text-xs">
@@ -2073,11 +2563,35 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                                 <td class="px-2 py-2">10-step Stage-1 language QLoRA. 8 then 30 non-CoC clips, 50/50. Vision frozen.</td>
                                 <td class="px-2 py-2 text-sky-400">30-clip eval 2.74→2.50 · 82.3 GB</td>
                             </tr>
+                            <tr>
+                                <td class="px-2 py-2 font-mono text-sky-300">SFT 2 smoke</td>
+                                <td class="px-2 py-2 font-mono">stage1c-stage2-cfm</td>
+                                <td class="px-2 py-2">Freeze Stage-1 LoRA VLM. Dense expert CFM, 8 clips, NVIDIA kappa.</td>
+                                <td class="px-2 py-2 text-sky-400">eval 0.202→0.310 · 32.3 GB · ~4.8 s/step</td>
+                            </tr>
+                            <tr>
+                                <td class="px-2 py-2 font-mono text-emerald-300">G3</td>
+                                <td class="px-2 py-2 font-mono">docs</td>
+                                <td class="px-2 py-2">Close Phase 3 quality gate. ADE band waived; 5-clip human inspection is the criterion.</td>
+                                <td class="px-2 py-2 text-emerald-400">signed 2026-08-31</td>
+                            </tr>
+                            <tr>
+                                <td class="px-2 py-2 font-mono text-sky-300">G4 2-epoch</td>
+                                <td class="px-2 py-2 font-mono">docs + run</td>
+                                <td class="px-2 py-2">8-clip 2-epoch Stage 1 language QLoRA then Stage 2 expert QLoRA + action I/O. Same seed-0 4/4.</td>
+                                <td class="px-2 py-2 text-amber-400">ran · awaiting user to close G4</td>
+                            </tr>
+                            <tr>
+                                <td class="px-2 py-2 font-mono text-sky-300">Train timers</td>
+                                <td class="px-2 py-2 font-mono">docs + run</td>
+                                <td class="px-2 py-2">T1.1 analog: tokenize / encode_cache / backbone / expert / fwd_bwd / adam. One-clip G4 recipe.</td>
+                                <td class="px-2 py-2 text-sky-400">S1 Adam 13.7 s · S2 Adam 4.2 s</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
                 <p class="text-xs text-slate-500">
-                    G1 is signed off. Prefill quant chase is closed. Default load is dense bf16; T3.1 and all4 are opt-in memory. NVIDIA public SFT is now the default <code>--from-clip</code> graph: Stage 1 discrete traj-future + <code>im_end</code>, Stage 2 freeze VLM + CFM (non-causal expert attn). Paper 5.2 CoC CE is <code>--teacher-cot</code>. Hist stays at <code>&lt;i0&gt;</code>. G4 (multi-clip SFT + fuse + expert update on dense/LoRA expert) is not signed.
+                    G1 and G3 are signed off. Prefill quant chase is closed. Default load is dense bf16; T3.1 and all4 are opt-in memory. NVIDIA public SFT is now the default <code>--from-clip</code> graph: Stage 1 discrete traj-future + <code>im_end</code>, Stage 2 freeze VLM + CFM (non-causal expert attn). Paper 5.2 CoC CE is <code>--teacher-cot</code>. Hist stays at <code>&lt;i0&gt;</code>. Train stages are timed (tokenize / encode_cache / backbone / expert / fwd_bwd / adam). G4 8-clip 2-epoch ran 2026-08-31 and is waiting for user confirmation.
                     Leftover 1b yield/stop quality is for MLX SFT after Bar B — not a NVIDIA T-match.
                 </p>
             </div>
@@ -2090,7 +2604,8 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
             </div>
             <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 text-sm space-y-4 text-slate-300">
                 <p>
-                    Full map: <a class="text-cyan-400 hover:underline" href="../mlx_port/PORT.md"><code>mlx_port/PORT.md</code></a>.
+                    Full map: <a class="text-cyan-400 hover:underline" href="../PORT.md"><code>mlx_port/PORT.md</code></a>.
+                    Train flags: <a class="text-cyan-400 hover:underline" href="../doc/train_lora_vs_dense.html">mlx_port/doc/train_lora_vs_dense.html</a>.
                 </p>
                 <div class="grid md:grid-cols-2 gap-4">
                     <div>
@@ -2156,7 +2671,7 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                 </p>
                 <p class="text-xs">
                     CoC pin on 12–13 greedy tokens is not a 256-token CoT
-                    result. G3 stays unsigned. Probe walks are deleted.
+                    result. G3 is signed on qualitative inspection. Probe walks are deleted.
                     Default load is dense bf16. T3.1 <code>lm4</code> is opt-in
                     as a <em>memory</em> recipe (~10&nbsp;GiB decoder), not a
                     speed recipe.
@@ -2166,7 +2681,7 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                     T4.1 dummy 50-step is 12.8&nbsp;s and trends down; language-only
                     PAI grad is 11.6&nbsp;s at 66&nbsp;GB Metal; vision <code>full</code>
                     is 24.8&nbsp;s at 107.5&nbsp;GB; vision <code>merger</code> is
-                    12.5&nbsp;s at 76.8&nbsp;GB. It does not
+                    12.5&nbsp;s at 76.8&nbsp;GB. Bar B did not
                     wait on G3. G4 (clip SFT + fuse) is still open.
                     Bar C toward 2&nbsp;s needs a work cut (T5.1 stream KV or
                     T6 student), not fewer bits.
@@ -2190,7 +2705,7 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
             </div>
             <div class="bg-slate-900 border border-rose-800/50 rounded-3xl p-6 text-xs text-slate-400 space-y-1">
                 <div>• Quantize the whole model to uniform 4-bit as the first change. Do not 4-bit the expert or vision first.</div>
-                <div>• Hunt prefill with more PTQ (mxfp8, QQLinear, gs32, another expert W4, re-adding VLM/nvfp4 walks). Metal dequants into bf16; G3 is not a bit-width gate anymore.</div>
+                <div>• Hunt prefill with more PTQ (mxfp8, QQLinear, gs32, another expert W4, re-adding VLM/nvfp4 walks). Metal dequants into bf16; G3 is closed on qualitative inspection, not a bit-width or ADE gate.</div>
                 <div>• Rank recipes on n=1 pytest wall, n=1 prefill, or unseeded minADE.</div>
                 <div>• Backprop through packed <code>QuantizedLinear.weight</code>. T4.1 trains LoRA A/B only.</div>
                 <div>• Keep compiled prefill on the QLoRA tape (PAI compile+grad ~200&nbsp;GB Metal, killed).</div>
@@ -2207,17 +2722,23 @@ PYTHONPATH=src:. ALPAMAYO_CI_NO_WEIGHTS=1 \
                 <span>Next</span>
             </div>
             <p class="text-sm text-slate-300">
+                LoRA vs dense flag map is
+                <a class="text-cyan-400 hover:underline" href="../doc/train_lora_vs_dense.html">mlx_port/doc/train_lora_vs_dense.html</a>
+                (<code>--expert-bf16</code> / <code>--train-action-proj</code>).
                 Vision QLoRA scopes are in: <code>--lora-vision full|merger|none</code>.
                 PAI Stage-1 all4: <code>full</code> CE 3.7714 / 24.8&nbsp;s / 107.5&nbsp;GB;
                 <code>merger</code> (8 vision leaves) 12.5&nbsp;s / 76.8&nbsp;GB.
                 Packed ints unchanged. Encode stays on the tape.
-                Bar B smoke is met. Do not call the infer rollout inside an
-                optimizer step. Do not run 50 PAI grad steps unless asked.
-                Next is a short clip SFT (G4) or infer T5.1 / T6. Default load
-                is dense bf16. T3.1 / all4 are opt-in. G3 is not signed.
+                Bar B smoke is met. Train stages are now timed like infer
+                (<a class="text-cyan-400 hover:underline" href="train_stage_times.json">train_stage_times.json</a>).
+                The 8-clip 2-epoch Stage 1→2 run finished
+                (JSON under <code>mlx_port/reports/sft_*_8clip_2ep.json</code>).
+                G4 stays open until you confirm that run. Do not call the infer
+                rollout inside an optimizer step. Default load is dense bf16.
+                T3.1 / all4 are opt-in. G3 is signed.
             </p>
             <div class="mt-4 text-xs font-mono text-indigo-400">
-                reports/stage1c_progress.html · started 2026-08-29 ·
+                mlx_port/reports/stage1c_progress.html · started 2026-08-29 ·
                 <a class="text-cyan-400 hover:underline" href="stage1b_progress.html">stage 1b (closed)</a>
             </div>
         </div>

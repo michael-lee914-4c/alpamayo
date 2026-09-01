@@ -298,6 +298,10 @@ class ActionSpace:
         theta_ridge: float = 1e-8,
         v_lambda: float = 1e-6,
         v_ridge: float = 1e-4,
+        a_lambda: float = 1e-4,
+        a_ridge: float = 1e-4,
+        kappa_lambda: float = 1e-4,
+        kappa_ridge: float = 1e-4,
         **_unused,
     ):
         self.accel_mean = accel_mean
@@ -311,6 +315,10 @@ class ActionSpace:
         self.theta_ridge = theta_ridge
         self.v_lambda = v_lambda
         self.v_ridge = v_ridge
+        self.a_lambda = a_lambda
+        self.a_ridge = a_ridge
+        self.kappa_lambda = kappa_lambda
+        self.kappa_ridge = kappa_ridge
 
     def get_action_space_dims(self) -> tuple[int, ...]:
         """Return the shape expected by the diffusion expert.
@@ -496,11 +504,20 @@ class ActionSpace:
             dt=self.dt,
         )
 
-        # 5. Curvature recovery (now lengths match: theta has len n+1, v has len n+1)
+        # 5. Curvature: NVIDIA ``_theta_v_a_to_kappa`` (regularized, not dtheta/s).
+        # ``dtheta / (s + 1e-8)`` explodes when speed is near zero (PAI clip 7744
+        # CFM ~11k). solve_xs_eq_y with w_smooth2=1 matches NVIDIA.
         n = accel.shape[-1]
-        s = v[..., :n] * self.dt
         dtheta = theta[..., 1 : n + 1] - theta[..., :n]
-        kappa = dtheta / (s + 1e-8)
+        s = self.dt * v[..., :n] + (self.dt**2) / 2.0 * accel
+        kappa = solve_xs_eq_y(
+            s=s,
+            y=dtheta,
+            w_smooth2=1.0,
+            lam=self.kappa_lambda,
+            ridge=self.kappa_ridge,
+            dt=self.dt,
+        )
 
         # 6. Normalize to match training distribution
         accel = (accel - self.accel_mean) / self.accel_std
@@ -568,6 +585,7 @@ class AlpamayoR1MLX(nn.Module):
         dtype: mx.Dtype = mx.bfloat16,
         quantize_lm: bool = False,
         quantize_all: bool = False,
+        quantize_expert: bool = True,
         lm4_path: str | None = None,
         all4_path: str | None = None,
     ) -> "AlpamayoR1MLX":
@@ -590,6 +608,10 @@ class AlpamayoR1MLX(nn.Module):
                           Action-in/out stay bf16. ``ALPAMAYO_QUANT=all4``
                           also selects this path. Packed weights load from
                           ``{alpamayo_path}/mlx_all4`` when present.
+            quantize_expert: When ``quantize_all`` is on, pack the expert
+                             (default). Set False for Stage-2 CFM: all4 VLM
+                             stays packed, expert + action proj stay dense
+                             bf16 so Adam can update them.
             lm4_path: Override packed-LM directory. ``ALPAMAYO_LM4_DIR`` also
                       overrides the default.
             all4_path: Override packed VLM+expert directory.
@@ -779,11 +801,16 @@ class AlpamayoR1MLX(nn.Module):
 
         # 5. Load all weights
         if load_expert:
+            pack_expert = quant_mode == "all4" and bool(quantize_expert)
             cls._load_expert_and_action_weights(
-                model, alpamayo_path, dtype=dtype, skip_expert=have_all4
+                model, alpamayo_path, dtype=dtype, skip_expert=have_all4 and pack_expert
             )
-            if quant_mode == "all4":
+            if pack_expert:
                 apply_expert_all4(model.expert, dest_all4, all4_vlm_summary or {})
+            elif quant_mode == "all4":
+                from mlx_port.stage_timers import set_quantized
+
+                set_quantized("expert", "bf16")
 
         # 6. Attach token fusion attributes from the processor (Row 6)
         tokenizer = processor.tokenizer
