@@ -132,37 +132,37 @@
             </div>
             
             <div class="text-sm text-slate-300 mb-4">
-                For <strong>every stage</strong>, the agent must generate a dedicated, self-contained HTML report file saved in <span class="font-mono text-indigo-300">reports/</span> folder:
+                For <strong>every stage</strong>, the agent must generate a dedicated, self-contained HTML report file saved in <span class="font-mono text-indigo-300">mlx_port/reports/</span> folder:
             </div>
             
             <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 text-xs">
                 <div class="bg-slate-900 border border-indigo-800 rounded-2xl p-4">
-                    <div class="font-semibold text-indigo-400 mb-1">reports/stage0_progress.html</div>
+                    <div class="font-semibold text-indigo-400 mb-1">mlx_port/reports/stage0_progress.html</div>
                     <div class="text-emerald-400 mb-1">exists · COMPLETE</div>
                     <div class="text-slate-400">Venv, package versions, MLX GPU verify</div>
                 </div>
                 <div class="bg-slate-900 border border-indigo-800 rounded-2xl p-4">
-                    <div class="font-semibold text-indigo-400 mb-1">reports/stage1_progress.html</div>
+                    <div class="font-semibold text-indigo-400 mb-1">mlx_port/reports/stage1_progress.html</div>
                     <div class="text-emerald-400 mb-1">exists · COMPLETE</div>
                     <div class="text-slate-400">VLM / CoC inference (closed 2026-08-28)</div>
                 </div>
                 <div class="bg-slate-900 border border-indigo-800 rounded-2xl p-4">
-                    <div class="font-semibold text-indigo-400 mb-1">reports/stage1b_progress.html</div>
+                    <div class="font-semibold text-indigo-400 mb-1">mlx_port/reports/stage1b_progress.html</div>
                     <div class="text-emerald-400 mb-1">exists · COMPLETE</div>
                     <div class="text-slate-400">Expert wired · leftover yield/stop + parity</div>
                 </div>
                 <div class="bg-slate-900 border border-sky-800 rounded-2xl p-4">
-                    <div class="font-semibold text-sky-400 mb-1">reports/stage1c_progress.html</div>
+                    <div class="font-semibold text-sky-400 mb-1">mlx_port/reports/stage1c_progress.html</div>
                     <div class="text-sky-400 mb-1">exists · IN PROGRESS</div>
                     <div class="text-slate-400">P0 map in mlx_port/PORT.md · timers next</div>
                 </div>
                 <div class="bg-slate-900 border border-indigo-800 rounded-2xl p-4">
-                    <div class="font-semibold text-indigo-400 mb-1">reports/stage2_progress.html</div>
+                    <div class="font-semibold text-indigo-400 mb-1">mlx_port/reports/stage2_progress.html</div>
                     <div class="text-slate-500 mb-1">blocked</div>
                     <div class="text-slate-400">Training loss curves, discrete token accuracy</div>
                 </div>
                 <div class="bg-slate-900 border border-indigo-800 rounded-2xl p-4">
-                    <div class="font-semibold text-indigo-400 mb-1">reports/stage3_progress.html</div>
+                    <div class="font-semibold text-indigo-400 mb-1">mlx_port/reports/stage3_progress.html</div>
                     <div class="text-slate-500 mb-1">blocked</div>
                     <div class="text-slate-400">Flow-matching loss, final minADE</div>
                 </div>
@@ -170,7 +170,7 @@
             
             <div class="mt-4 text-xs text-indigo-300">
                 Each report must include: code diffs summary • key metrics • training curves (embedded as base64 or linked) • compute footprint (peak RAM, GPU-equivalent time, power if measurable) • qualitative examples.
-                Stage 1c also logs the speedup-plan handoff: encode/prefill/decode/fm ms, dtype, compiled?, 50-clip ADE, train-step ms.
+                Stage 1c also logs the speedup-plan handoff: encode/prefill/decode/fm ms, dtype, compiled?, qualitative 5-clip inspection (G3), train-step ms.
             </div>
         </div>
     </div>
@@ -227,13 +227,13 @@
                     </div>
                     <div class="bg-slate-950 border border-slate-700 rounded-2xl p-5 text-xs">
                         <div class="font-semibold text-emerald-400 mb-2">Report</div>
-                        <div class="text-slate-300">Verified on Apple Silicon (mlx 0.31.x at setup). See <span class="font-mono text-indigo-300">reports/stage0_progress.html</span>.</div>
+                        <div class="text-slate-300">Verified on Apple Silicon (mlx 0.31.x at setup). See <span class="font-mono text-indigo-300">mlx_port/reports/stage0_progress.html</span>.</div>
                     </div>
                 </div>
             </div>
             
             <div class="px-8 py-4 border-t border-slate-700 bg-slate-950 flex items-center justify-between text-xs">
-                <div><span class="font-semibold">Report:</span> <span class="font-mono text-indigo-300">reports/stage0_progress.html</span></div>
+                <div><span class="font-semibold">Report:</span> <span class="font-mono text-indigo-300">mlx_port/reports/stage0_progress.html</span></div>
                 <div class="report-badge">MANDATORY</div>
             </div>
         </div>
@@ -260,7 +260,7 @@
             </div>
             
             <div class="px-8 py-4 border-t border-slate-700 bg-slate-950 flex items-center justify-between text-xs">
-                <div><span class="font-semibold">Report:</span> <span class="font-mono text-indigo-300">reports/stage1_progress.html</span></div>
+                <div><span class="font-semibold">Report:</span> <span class="font-mono text-indigo-300">mlx_port/reports/stage1_progress.html</span></div>
                 <div class="report-badge">MANDATORY</div>
             </div>
         </div>
@@ -286,7 +286,7 @@
                             <li>• Real <code class="text-cyan-300">PerWaypointActionInProjV2</code>, <code class="text-cyan-300">n_waypoints=64</code>, mlx_vlm expert, NVIDIA <code class="text-cyan-300">step_fn</code></li>
                             <li>• Greedy e2e (T=0, after v0): <code class="text-cyan-300">pred_xyz</code> <code>(1,1,1,64,3)</code>, minADE <strong>3.89 m</strong> (was 6.96 m)</li>
                             <li>• 5-clip T=0.6 × 1 traj: mean minADE <strong>7.85 m</strong> (6.05–9.58). First-step speed matches GT on all 5</li>
-                            <li>• Physical meters, not a stub. 64-pt <code class="text-cyan-300">pred_xy_full</code>. Plots in <span class="font-mono text-indigo-300">reports/traj_sample_5_t06/</span></li>
+                            <li>• Physical meters, not a stub. 64-pt <code class="text-cyan-300">pred_xy_full</code>. Plots in <span class="font-mono text-indigo-300">mlx_port/reports/traj_sample_5_t06/</span></li>
                             <li>• <code class="text-cyan-300">dxy_theta_to_v_without_v0</code> for t0. Live RoPE/mask contract holds; accel mean −2.19 (not mute)</li>
                         </ul>
                     </div>
@@ -307,7 +307,7 @@
             </div>
             
             <div class="px-8 py-4 border-t border-slate-700 bg-slate-950 flex items-center justify-between text-xs">
-                <div><span class="font-semibold">Report:</span> <span class="font-mono text-indigo-300">reports/stage1b_progress.html</span></div>
+                <div><span class="font-semibold">Report:</span> <span class="font-mono text-indigo-300">mlx_port/reports/stage1b_progress.html</span></div>
                 <div class="report-badge">MANDATORY</div>
             </div>
         </div>
@@ -352,7 +352,7 @@
                     </div>
                 </div>
                 <div>
-                    <div class="uppercase text-xs tracking-widest text-slate-500 mb-2">Phases (G1 signed off 2026-08-29)</div>
+                    <div class="uppercase text-xs tracking-widest text-slate-500 mb-2">Phases (G1 signed 2026-08-29 · G3 signed 2026-08-31 · G4 signed 2026-08-31)</div>
                     <ol class="list-decimal list-inside space-y-1 text-sm text-slate-300">
                         <li><span class="text-sky-300 font-medium">P0 Inventory</span> — map modules to the four stages; count <code class="text-cyan-300">mx.eval</code> / host roundtrips.</li>
                         <li><span class="text-sky-300 font-medium">P1 Profile</span> — G1 signed off 2026-08-29 on the P2f greedy table (one cold trial; user accepted).</li>
@@ -377,7 +377,7 @@
             </div>
 
             <div class="px-8 py-4 border-t border-slate-700 bg-slate-950 flex items-center justify-between text-xs">
-                <div><span class="font-semibold">Report:</span> <span class="font-mono text-indigo-300">reports/stage1c_progress.html</span> · plan <span class="font-mono text-sky-300">mlx_port/alpamayo1-mlx-speedup-plan.html</span></div>
+                <div><span class="font-semibold">Report:</span> <span class="font-mono text-indigo-300">mlx_port/reports/stage1c_progress.html</span> · plan <span class="font-mono text-sky-300">mlx_port/alpamayo1-mlx-speedup-plan.html</span></div>
                 <div class="report-badge">MANDATORY</div>
             </div>
         </div>
@@ -408,7 +408,7 @@
             </div>
             
             <div class="px-8 py-4 border-t border-slate-700 bg-slate-950 flex items-center justify-between text-xs">
-                <div><span class="font-semibold">Report:</span> <span class="font-mono text-indigo-300">reports/stage2_progress.html</span> (loss curves, discrete accuracy, footprint)</div>
+                <div><span class="font-semibold">Report:</span> <span class="font-mono text-indigo-300">mlx_port/reports/stage2_progress.html</span> (loss curves, discrete accuracy, footprint)</div>
                 <div class="report-badge">MANDATORY</div>
             </div>
         </div>
@@ -437,7 +437,7 @@
             </div>
             
             <div class="px-8 py-4 border-t border-slate-700 bg-slate-950 flex items-center justify-between text-xs">
-                <div><span class="font-semibold">Report:</span> <span class="font-mono text-indigo-300">reports/stage3_progress.html</span> (flow-matching loss, final metrics, full footprint)</div>
+                <div><span class="font-semibold">Report:</span> <span class="font-mono text-indigo-300">mlx_port/reports/stage3_progress.html</span> (flow-matching loss, final metrics, full footprint)</div>
                 <div class="report-badge">MANDATORY</div>
             </div>
         </div>

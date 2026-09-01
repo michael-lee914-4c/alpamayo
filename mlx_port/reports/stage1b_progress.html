@@ -79,7 +79,7 @@
                 </p>
                 <p class="text-xs text-slate-500">
                     VLM / CoC is closed on
-                    <a class="text-cyan-400 hover:underline" href="stage1_progress.html">reports/stage1_progress.html</a>.
+                    <a class="text-cyan-400 hover:underline" href="stage1_progress.html">mlx_port/reports/stage1_progress.html</a>.
                 </p>
             </div>
         </div>
@@ -270,7 +270,7 @@
                     <a class="text-cyan-400 hover:underline" href="coc_sample_5_t06/index.html">coc_sample_5_t06</a>
                     (seed 42, skip t0 &lt; 1.6 s). NVIDIA sampling: T=0.6, top_p=0.98, 1 CoC + 1 expert traj.
                     Full CoC + XY + speed:
-                    <a class="text-cyan-400 hover:underline" href="traj_sample_5_t06/index.html">reports/traj_sample_5_t06/index.html</a>.
+                    <a class="text-cyan-400 hover:underline" href="traj_sample_5_t06/index.html">mlx_port/reports/traj_sample_5_t06/index.html</a>.
                     Jaccard is cheap — read the sentences. ADE/XY is unchanged vs the pre-v0 run
                     (first-step already matched; last-history <code>without_v0</code> ≈ old last-v).
                 </p>
@@ -465,7 +465,7 @@
                 <pre class="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-xs text-cyan-300 overflow-auto">PYTHONPATH=src:. .venv/bin/python -m pytest mlx_port/tests/test_action_in_proj_mlx.py mlx_port/tests/test_expert_mlx.py mlx_port/tests/test_traj_to_action_numerical.py mlx_port/tests/test_traj_sample_plots.py -q --tb=short
 PYTHONPATH=src:. .venv/bin/python -m pytest mlx_port/tests -q -m "not slow"
 PYTHONPATH=src:. .venv/bin/python -m pytest mlx_port/tests/test_end_to_end_inference.py -s --tb=short
-PYTHONPATH=src:. .venv/bin/python mlx_port/scripts/run_local_traj_sample.py --report-dir reports/traj_sample_5_t06 --no-reuse</pre>
+PYTHONPATH=src:. .venv/bin/python mlx_port/scripts/run_local_traj_sample.py --report-dir mlx_port/reports/traj_sample_5_t06 --no-reuse</pre>
                 <p class="text-xs text-slate-400">
                     Greedy e2e (T=0, expert on, 2026-08-29, <code>without_v0</code>): CoC still
                     “Stop for the stop sign at the intersection.”
@@ -485,14 +485,14 @@ PYTHONPATH=src:. .venv/bin/python mlx_port/scripts/run_local_traj_sample.py --re
             </div>
             <p class="text-sm text-slate-300">
                 Stage 1b is closed. Next is
-                <a class="text-cyan-400 hover:underline" href="../mlx_port/alpamayo1-mlx-speedup-plan.html">Stage 1c</a>
+                <a class="text-cyan-400 hover:underline" href="../alpamayo1-mlx-speedup-plan.html">Stage 1c</a>
                 (runtime / train-step speed). After 1c, MLX SFT is the planned close for leftover
                 yield/stop quality — not a token-level NVIDIA match.
                 Do not mask <code>&lt;|im_end|&gt;</code>. Do not 4-bit the expert first.
                 Do not start Stage 2–3 SFT until 1c unblocks a train step.
             </p>
             <div class="mt-4 text-xs font-mono text-indigo-400">
-                reports/stage1b_progress.html · closed 2026-08-29 ·
+                mlx_port/reports/stage1b_progress.html · closed 2026-08-29 ·
                 <a class="text-cyan-400 hover:underline" href="stage1_progress.html">stage 1 (closed)</a>
             </div>
         </div>

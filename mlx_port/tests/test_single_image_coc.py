@@ -5,8 +5,6 @@ Uses one front-wide frame at the CoC event timestamp (not the 16-image
 the human label before we re-open the multi-camera / expert path.
 """
 
-from pathlib import Path
-
 import numpy as np
 import mlx.core as mx
 import pytest
@@ -22,12 +20,13 @@ from mlx_port.gt_eval import (
     load_clip_gt,
     score_coc,
 )
+from mlx_port.paths import REPORTS_DIR
 
 
 LOCAL_DIR = "/Volumes/MicronSSD/pai_coc"
 ALPAMAYO_PATH = "/Users/michaellee/Projects/alpamayo/pre-trained/Alpamayo-R1-10B"
 FRONT_WIDE_INDEX = 1  # after NVIDIA camera_indices sort
-REPORT_IMAGE = Path("reports/stage1_single_image_front_wide.png")
+REPORT_IMAGE = REPORTS_DIR / "stage1_single_image_front_wide.png"
 
 
 def _front_wide_t0_frame(data) -> np.ndarray:

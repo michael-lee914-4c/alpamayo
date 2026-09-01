@@ -84,8 +84,8 @@
       NVIDIA baseline for the same 10B VLA (~704&nbsp;ms) and blocks any practical
       SFT or RL loop. Quantization is one lever, not the first one.
       Stage 1b (action expert / physical <code>pred_xyz</code>) is closed — leftover yield/stop quality is on
-      <a href="../reports/stage1b_progress.html">reports/stage1b_progress.html</a>.
-      Progress report: <code>reports/stage1c_progress.html</code>. Stages 2–3 stay blocked until Bar B is green.
+      <a href="reports/stage1b_progress.html">mlx_port/reports/stage1b_progress.html</a>.
+      Progress report: <code>mlx_port/reports/stage1c_progress.html</code>. Stages 2–3 stay blocked until Bar B is green.
     </p>
     <div class="meta">
       <span class="pill"><strong>Model</strong> Alpamayo 1 / Alpamayo-R1-10B</span>
@@ -350,9 +350,9 @@ nn.quantize(model, group_size=64, bits=4, mode="affine", class_predicate=pred)</
     <p>User-requested VLM W4 probe (2026-08-29 21:25): <code>ALPAMAYO_QUANT=vlm4</code>. Same walk, bits=4. Greedy: encode 1187 · prefill 6538 · decode 664 · wall 34.51 s. CoC pin held. Slowest prefill; fastest decode. Default stays T3.1 <code>lm4</code>.</p>
     <p>User-requested all4 probe (2026-08-29 21:29): <code>ALPAMAYO_QUANT=all4</code> — VLM W4 then expert W4 after weight load. 252 expert Linears packed (no last-dim skips). Action-in/out dense. Greedy: encode 1129 · prefill 4466 · decode 677 · FM 1131 · wall 28.52 s. CoC pin held. FM did not beat P2f 630 ms.</p>
     <p>User-requested nvfp4 probe (2026-08-29 21:46): <code>quantize_vlm_nvfp4</code> + <code>ALPAMAYO_QUANT=nvfp4</code>. Weight-only nvfp4 gs16 on the full VLM. 369 QuantizedLinear (27 vision <code>fc2</code> now pack). Expert stays bf16. Metal shaders, not Blackwell. Greedy: encode 1269 · prefill 5897 · decode 726 / 12 tok · FM 1378 · wall 30.41 s. CoC pin held. Did not beat P2f or T3.1 W4 on prefill.</p>
-    <p><strong>Chase closed 2026-08-29.</strong> Prefill at seq=3006 is compute-bound on M4. Metal dequants 4-bit tiles into FP16/BF16 MMA. No recipe beat P2f 3.64 s prefill. Full table: <code>reports/stage1c_progress.html</code>.</p>
-    <p>2026-08-30 all4 disk path (branch <code>stage1c-p3-all4-disk</code>): <code>mlx_port/models/quantize_all.py</code>. Affine-4 gs64 on the full VLM + expert. Walks are <code>vlm</code> then <code>expert</code>, never <code>AlpamayoR1MLX</code>. Action-in/out stay dense (siblings). 27 vision <code>linear_fc2</code> listed dense (in=4304 ≉ 64). Conv3D + all norms stay bf16. Packed <code>{alpamayo}/mlx_all4/</code> (4.79 + 1.19 GiB). Greedy disk: encode 1116 · prefill 3821 · decode 280 / 13 · FM 487 · Metal 9.66 GB. CoC pin held. Exclusive with T3.1. G3 not signed. Leaf table: <code>reports/stage1c_progress.html#quant-recipes</code>.</p>
-    <p><strong>Done when:</strong> checkpoint saved; T1.1 rerun; 50-clip ADE and a CoT exact-match or token-level agreement vs bf16 recorded.</p>
+    <p><strong>Chase closed 2026-08-29.</strong> Prefill at seq=3006 is compute-bound on M4. Metal dequants 4-bit tiles into FP16/BF16 MMA. No recipe beat P2f 3.64 s prefill. Full table: <code>mlx_port/reports/stage1c_progress.html</code>.</p>
+    <p>2026-08-30 all4 disk path (branch <code>stage1c-p3-all4-disk</code>): <code>mlx_port/models/quantize_all.py</code>. Affine-4 gs64 on the full VLM + expert. Walks are <code>vlm</code> then <code>expert</code>, never <code>AlpamayoR1MLX</code>. Action-in/out stay dense (siblings). 27 vision <code>linear_fc2</code> listed dense (in=4304 ≉ 64). Conv3D + all norms stay bf16. Packed <code>{alpamayo}/mlx_all4/</code> (4.79 + 1.19 GiB). Greedy disk: encode 1116 · prefill 3821 · decode 280 / 13 · FM 487 · Metal 9.66 GB. CoC pin held. Exclusive with T3.1. G3 signed 2026-08-31 (qualitative). Leaf table: <code>mlx_port/reports/stage1c_progress.html#quant-recipes</code>.</p>
+    <p><strong>Done when:</strong> checkpoint saved; T1.1 rerun. 50-clip ADE is not required to close G3 — quality is human inspection of the 5-clip plots.</p>
   </div>
 
   <div class="task">
@@ -368,17 +368,17 @@ nn.quantize(model, group_size=64, bits=4, mode="affine", class_predicate=pred)</
 
   <div class="task">
     <header><span class="tid">T3.3</span><span class="tname">Quality slice</span></header>
-    <p>Freeze 50 PhysicalAI-AV clips. Report minADE@6.4s, ADE@6.4s, off-road if you have it, and whether CoT still contains the expected causal structure (not just perplexity). Fail Recipe A if ADE regresses &gt;0.2&nbsp;m or CoT becomes garbage. Then bump last N layers + head to 6/8-bit, or run T4.2 DWQ.</p>
+    <p>Optional logging only. G3 no longer fails Recipe A on a 50-clip ADE band. Quality is human inspection of the 5-clip XY / CoC / speed plots (<code>mlx_port/reports/traj_sample_5_t06/</code>). A 50-clip minADE table may still be written later; it is not a G3 blocker.</p>
   </div>
 
-  <div class="task gate">
-    <header><span class="tid">G3</span><span class="tname">Gate</span></header>
-    <p>Quantized infer is faster than G2 on decode and/or prefill. ADE within 0.2&nbsp;m of the Phase 2 bf16 port. Action expert still not 4-bit unless T3.3 explicitly says it survived.</p>
-    <p class="note">2026-08-29: G3 is not signed. Prefill quant chase closed. Default load is dense bf16. T3.1 is opt-in memory, not a speed recipe. Do not wait on G3 to start T4.3.</p>
+  <div class="task gate signed">
+    <header><span class="tid">G3</span><span class="tname">Gate — signed off 2026-08-31</span></header>
+    <p>User closed G3. The 0.2&nbsp;m / 50-clip ADE criterion is waived. Quality is confirmed by human inspection of the P2f 5-clip plots (XY, CoC, speed) — heading and scene language hold; leftover yield/stop overshoot is not a P2f regression. This is a quality close, not a claim that quantized prefill beats P2f. Default load stays dense bf16. T3.1 / all4 stay opt-in memory. Decode W4 (−160&nbsp;ms) remains the only quant speed signal.</p>
+    <p class="note">2026-08-31: G3 signed. Prefill quant chase stays closed. Do not reopen a 50-clip ADE gate for Phase 3.</p>
   </div>
 
   <h2 id="p4">Phase 4 — Train in low precision the MLX way</h2>
-  <p class="note">Owner: Train agent. Depends on: G3 (or G2 if staying bf16 LoRA). Timebox: 2–4 days including a short SFT smoke.</p>
+  <p class="note">Owner: Train agent. Depends on: G3 (signed 2026-08-31) or G2 if staying bf16 LoRA. Timebox: 2–4 days including a short SFT smoke.</p>
 
   <div class="card">
     <p>NVIDIA’s own SFT is two stages on 8×H100: Stage 1 backbone (CoC can be off), Stage 2 expert. Reproduce that split on one Mac, at much smaller batch.</p>
@@ -407,16 +407,18 @@ nn.quantize(model, group_size=64, bits=4, mode="affine", class_predicate=pred)</
     <p>For SFT, teacher-force CoT tokens and run a single FM training forward (the flow-matching train loss already samples a timestep — it does not need 10 Euler steps). The 110&nbsp;s number is an <em>inference</em> window. A correct train step should be encode + one backbone forward + one expert forward, not a full rollout.</p>
     <p>If the current “training” code calls <code>sample_trajectories_from_data_with_vlm_rollout</code> every step, that is the bug. Replace it with the official SFT graphs (stage1 VLM CE / stage2 CFM loss).</p>
     <p>In port: <code>mlx_port/train_step.py</code>. <code>sft_train_step(..., stage="stage1"|"stage2"|"joint")</code>. Default <code>--from-clip</code> is NVIDIA public SFT: Stage 1 discrete traj-future + assistant <code>im_end</code> (128 fused action bins, two-mean CE); Stage 2 freezes the VLM and runs one CFM draw with a non-causal expert mask (zeros <code>(B,1,T,prefix+T)</code> — mlx_vlm is causal when <code>mask is None</code>). <code>--teacher-cot</code> is paper 5.2 CoC CE. Unit tests prove 1 VLM forward, 0/1 expert, <code>FlowMatching.sample</code> never called. Side-by-side NVIDIA suite: <code>mlx_port/tests/test_sft_nvidia_parity.py</code>. all4 PAI Stage 1 2026-08-31: seq=3124 · n_ce=131 · CE 3.77 · 5143 ms · 0 expert. Stage 2: CFM 0.73 · 1 expert · 5145 ms.</p>
+    <p>Train stage timers (2026-08-31, T1.1 analog): tokenize / encode_cache / encode / backbone / expert / loss / fwd_bwd / adam. G4 clip 77447940, seq=3124. Stage 1 language QLoRA: tokenize 15.2 s · encode_cache 1.11 s · fwd backbone 4279 · Adam fwd_bwd 13592 / adam 63 · Metal 78.54 GB. Stage 2 expert QLoRA + action I/O: fwd backbone 3984 + expert 73 · Adam 4085 / 70 · Metal 12.27 GB. No decode, no Euler. JSON: <code>mlx_port/reports/train_stage_times.json</code>.</p>
     <p><strong>Done when:</strong> train-step timer does not include autoregressive CoT or a 10-step Euler loop unless the run is RL rollout. NVIDIA Stage-1/2 graphs measured on PAI. LoRA is T4.1.</p>
   </div>
 
-  <div class="task gate">
-    <header><span class="tid">G4</span><span class="tname">Gate</span></header>
-    <p>SFT smoke works. Train step time is in a different regime from 110&nbsp;s infer. Checkpoint can be fused (LoRA→dense) or served as base+adapter. 2026-08-31 language-only Stage-1: 8 non-CoC clips 50/50, 10 steps, train 3.99→2.22, eval 2.09→2.02, ~11&nbsp;s/step, Metal 78.6&nbsp;GB. Not G4 (no multi-clip epoch, no fuse).</p>
+  <div class="task gate signed">
+    <header><span class="tid">G4</span><span class="tname">Gate — signed off 2026-08-31</span></header>
+    <p>User closed G4. SFT smoke works. Train step time is in a different regime from 110&nbsp;s infer (Stage 1 Adam 13.7&nbsp;s, Stage 2 Adam 4.2&nbsp;s). Checkpoint is served as packed base+adapter; fuse stays optional. 2026-08-31 8-clip 2-epoch run (same seed-0 4/4): Stage 1 language QLoRA all4, eval 1.853→1.827, Metal 78.68&nbsp;GB; Stage 2 <code>--expert-lora --train-action-proj</code> on those adapters, eval 0.260→0.180, Metal 11.66&nbsp;GB. JSON: <code>mlx_port/reports/sft_stage1_small_8clip_2ep.json</code> / <code>sft_stage2_small_8clip_2ep.json</code>. Curves: <code>mlx_port/reports/sft_8clip_2ep_curves.html</code>. Stage timers (same recipe, one clip): Stage 1 Adam 13.7&nbsp;s (fwd_bwd 13.6) · Stage 2 Adam 4.2&nbsp;s · see <code>mlx_port/reports/train_stage_times.json</code>.</p>
+    <p class="note">2026-08-31: G4 signed. This is an 8-clip smoke close, not a full 10B finetune. Do not call the infer rollout inside an optimizer step.</p>
   </div>
 
   <h2 id="p5">Phase 5 — Pipeline: stream, speculate, skip FM steps</h2>
-  <p class="note">Owner: Systems agent. Depends on: G3. Do in parallel with Phase 4 if people allow. This is how you leave the multi-second infer regime.</p>
+  <p class="note">Owner: Systems agent. Depends on: G3 (signed 2026-08-31). Do in parallel with Phase 4 if people allow. This is how you leave the multi-second infer regime.</p>
 
   <div class="task">
     <header><span class="tid">T5.1</span><span class="tname">Streaming vision KV</span></header>
@@ -467,7 +469,7 @@ nn.quantize(model, group_size=64, bits=4, mode="affine", class_predicate=pred)</
       <tr><td>CoT tokens, ms/token</td><td>every infer change</td></tr>
       <tr><td>FM steps, ms/step</td><td>every infer change</td></tr>
       <tr><td>peak unified memory</td><td>infer + train</td></tr>
-      <tr><td>minADE@6.4s, ADE@6.4s on 50-clip slice</td><td>every quality-affecting change</td></tr>
+      <tr><td>minADE@6.4s, ADE@6.4s</td><td>optional record (G3 quality is 5-clip human inspection, not a 50-clip ADE band)</td></tr>
       <tr><td>CoT valid rate (parseable causal trace)</td><td>after quant / DWQ / speculative</td></tr>
       <tr><td>train step ms, samples/s</td><td>Phase 4+</td></tr>
     </tbody>

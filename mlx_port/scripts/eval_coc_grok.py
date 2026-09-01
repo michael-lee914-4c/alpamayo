@@ -27,7 +27,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-DEFAULT_RESULTS = Path("/Users/michaellee/Projects/alpamayo/reports/coc_sample_5/results.json")
+from mlx_port.paths import REPORTS_DIR
+
+DEFAULT_RESULTS = REPORTS_DIR / "coc_sample_5" / "results.json"
 DEFAULT_MODEL = "grok-4.6"
 XAI_CHAT_URL = "https://api.x.ai/v1/chat/completions"
 

@@ -1,7 +1,7 @@
 {
   "model": "grok-4.6",
   "generated_at": "2026-08-28 19:59 UTC",
-  "results_path": "/Users/michaellee/Projects/alpamayo/reports/coc_sample_5/results.json",
+  "results_path": "/Users/michaellee/Projects/alpamayo/mlx_port/reports/coc_sample_5/results.json",
   "evaluations": [
     {
       "clip_id": "faff17c7-4572-472a-be28-0f035bb88a37",

@@ -9,6 +9,7 @@ tokens, assistant ``<|im_end|>``. ``--teacher-cot`` is paper 5.2 CoC CE.
 from __future__ import annotations
 
 import argparse
+import json
 import time
 from pathlib import Path
 
@@ -30,7 +31,9 @@ from mlx_port.profiling import MemoryMonitor, get_global_memory_peak
 from mlx_port.stage_timers import quantized_flags
 from mlx_port.lora import (
     DEFAULT_SAVE_EVERY,
+    freeze_vision_features,
     inject_backbone_lora,
+    inject_expert_lora,
     lora_save_steps,
     packed_weight_fingerprint,
     save_lora_adapters,
@@ -41,14 +44,16 @@ from mlx_port.train_step import (
     drop_n_traj_group,
     freeze_vlm,
     labels_mask_between,
+    print_train_table,
     sft_expert_update,
     sft_stage1_labels_mask,
     sft_train_step,
 )
+from mlx_port.paths import REPORTS_DIR
 from mlx_port.traj_sample_plot_utils import quant_path_label
 
 CHECKPOINT = Path("/Users/michaellee/Projects/alpamayo/pre-trained/Alpamayo-R1-10B")
-LORA_SAVE_DEFAULT = Path("/Users/michaellee/Projects/alpamayo/reports/qlora/time_train_step")
+LORA_SAVE_DEFAULT = REPORTS_DIR / "qlora" / "time_train_step"
 
 
 def _dummy_ids(model: AlpamayoR1MLX, seq_len: int) -> mx.array:
@@ -319,22 +324,31 @@ def _load_model(args: argparse.Namespace) -> tuple[AlpamayoR1MLX, str, dict]:
     quant_mode = resolve_quant_mode(
         quantize_lm=args.quantize_lm, quantize_all=args.quantize_all
     )
+    pack_expert = bool(getattr(args, "quantize_expert", True))
     model = AlpamayoR1MLX.from_pretrained(
         str(args.alpamayo_path),
         load_expert=True,
         quantize_lm=quant_mode == "lm4",
         quantize_all=quant_mode == "all4",
+        quantize_expert=pack_expert,
     )
     flags = quantized_flags()
     path = quant_path_label(flags)
-    if quant_mode == "all4" and (
-        not str(flags.get("vision") or "").startswith("affine-4")
-        or not str(flags.get("expert") or "").startswith("affine-4")
-    ):
-        raise RuntimeError(
-            f"requested all4 but quantized flags are {flags}; "
-            "mlx_all4 did not install on VLM+expert"
-        )
+    if quant_mode == "all4":
+        if not str(flags.get("vision") or "").startswith("affine-4"):
+            raise RuntimeError(
+                f"requested all4 VLM but quantized flags are {flags}"
+            )
+        expert_flag = str(flags.get("expert") or "")
+        if pack_expert and not expert_flag.startswith("affine-4"):
+            raise RuntimeError(
+                f"requested all4 expert but quantized flags are {flags}; "
+                "mlx_all4 did not install on the expert"
+            )
+        if not pack_expert and expert_flag.startswith("affine-4"):
+            raise RuntimeError(
+                f"requested dense expert but quantized flags are {flags}"
+            )
     if quant_mode == "lm4" and not str(flags.get("lm") or "").startswith("affine-4"):
         raise RuntimeError(f"requested lm4 but quantized flags are {flags}")
     return model, path, flags
@@ -358,10 +372,50 @@ def main() -> None:
     parser.add_argument(
         "--expert-update",
         action="store_true",
-        help="Stage-2 Adam step on expert + action proj. VLM frozen. Packed expert raises.",
+        help="Stage-2 Adam step on dense expert + action proj. VLM frozen. Packed expert raises.",
+    )
+    parser.add_argument(
+        "--expert-lora",
+        action="store_true",
+        help=(
+            "Stage-2 QLoRA on the diffusion expert decoder (36×7). "
+            "Packs the all4 expert unless --expert-bf16. Exclusive with --expert-update. "
+            "Action in/out stay frozen unless --train-action-proj."
+        ),
+    )
+    parser.add_argument(
+        "--train-action-proj",
+        action="store_true",
+        help=(
+            "With --expert-lora, also Adam-step leftover dense action in/out. "
+            "Packed QuantizedLinear stays frozen. Requires --expert-lora."
+        ),
+    )
+    parser.add_argument("--expert-lora-rank", type=int, default=8)
+    parser.add_argument("--expert-lora-scale", type=float, default=20.0)
+    parser.add_argument(
+        "--expert-lora-lr",
+        type=float,
+        default=1e-4,
+        help="Adam LR on expert LoRA A/B. NVIDIA sft_base Stage-2 default.",
     )
     parser.add_argument("--clip-id", default=DEFAULT_EVAL_CLIP_ID)
+    parser.add_argument(
+        "--t0-us",
+        type=int,
+        default=None,
+        help=(
+            "Sample time for --from-clip Stage-1 recipe. Default is the first "
+            "CoC event. NVIDIA public SFT uses 5100000."
+        ),
+    )
     parser.add_argument("--local-dir", type=Path, default=LOCAL_PAI_COC)
+    parser.add_argument(
+        "--report",
+        type=Path,
+        default=None,
+        help="Optional JSON path for the train-stage table (tokenize / encode / backbone / expert / fwd_bwd / adam).",
+    )
     parser.add_argument(
         "--quantize-lm",
         action="store_true",
@@ -371,6 +425,15 @@ def main() -> None:
         "--quantize-all",
         action="store_true",
         help="all4 affine-4 on the full VLM and diffusion expert.",
+    )
+    parser.add_argument(
+        "--expert-bf16",
+        action="store_true",
+        help=(
+            "Keep the expert + action proj dense bf16 when --quantize-all. "
+            "Required for --expert-update (packed QuantizedLinear.weight cannot train). "
+            "Not required for --expert-lora (that path wraps a packed expert)."
+        ),
     )
     parser.add_argument(
         "--lora",
@@ -416,7 +479,13 @@ def main() -> None:
         action="store_true",
         help="Do not write LoRA weights.",
     )
+    parser.add_argument("--dense-expert", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--expert-dense", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
+    if args.dense_expert:
+        parser.error("--dense-expert was renamed to --expert-bf16")
+    if args.expert_dense:
+        parser.error("--expert-dense was renamed to --train-action-proj")
     if args.quantize_lm and args.quantize_all:
         parser.error("--quantize-lm and --quantize-all are exclusive")
     if args.lora and args.stage != "stage1":
@@ -429,10 +498,35 @@ def main() -> None:
         parser.error("--lora-vision requires --lora")
     if args.teacher_cot and not args.from_clip:
         parser.error("--teacher-cot requires --from-clip")
+    if args.t0_us is not None and not args.from_clip:
+        parser.error("--t0-us requires --from-clip")
+    if args.t0_us is not None and args.teacher_cot:
+        parser.error("--t0-us is exclusive with --teacher-cot")
     if args.expert_update and args.stage != "stage2":
         parser.error("--expert-update is Stage-2 only; use --stage stage2")
+    if args.expert_lora and args.stage != "stage2":
+        parser.error("--expert-lora is Stage-2 only; use --stage stage2")
     if args.expert_update and args.lora:
         parser.error("--expert-update and --lora are exclusive")
+    if args.expert_lora and args.lora:
+        parser.error("--expert-lora and --lora are exclusive")
+    if args.expert_lora and args.expert_update:
+        parser.error("--expert-lora and --expert-update are exclusive")
+    if args.train_action_proj and not args.expert_lora:
+        parser.error("--train-action-proj requires --expert-lora")
+    if (
+        int(args.expert_lora_rank) != 8
+        or float(args.expert_lora_scale) != 20.0
+        or float(args.expert_lora_lr) != 1e-4
+    ) and not args.expert_lora:
+        parser.error(
+            "--expert-lora-rank/--expert-lora-scale/--expert-lora-lr require --expert-lora"
+        )
+    if args.expert_bf16 and not args.quantize_all:
+        parser.error("--expert-bf16 requires --quantize-all")
+    if args.expert_update and args.quantize_all and not args.expert_bf16:
+        parser.error("--expert-update with --quantize-all requires --expert-bf16")
+    args.quantize_expert = not args.expert_bf16
     if args.no_lora_save and args.lora_save_every != DEFAULT_SAVE_EVERY:
         parser.error("--no-lora-save and --lora-save-every are exclusive")
     if not args.lora and args.lora_save_dir != LORA_SAVE_DEFAULT:
@@ -440,14 +534,23 @@ def main() -> None:
     if args.lora and not args.no_lora_save and args.lora_save_every < 1:
         parser.error("--lora-save-every must be >= 1")
 
+    t_load = time.perf_counter()
     model, path, flags = _load_model(args)
+    load_ms = (time.perf_counter() - t_load) * 1000.0
+    print(f"[LOAD] path={path} load_ms={load_ms:.1f}")
+    tokenize_ms = 0.0
+    encode_cache_ms = 0.0
     if args.from_clip:
         t_prep = time.perf_counter()
         recipe = "coc" if args.teacher_cot else "stage1"
         batch, meta = build_pai_train_batch(
-            model, args.clip_id, args.local_dir, recipe=recipe
+            model,
+            args.clip_id,
+            args.local_dir,
+            recipe=recipe,
+            t0_us=args.t0_us,
         )
-        prep_ms = (time.perf_counter() - t_prep) * 1000.0
+        tokenize_ms = (time.perf_counter() - t_prep) * 1000.0
         seq_len = int(meta["seq"])
         print(
             f"[TRAIN] clip={meta['clip_id']} t0_us={meta['t0_us']} "
@@ -458,7 +561,7 @@ def main() -> None:
             f"images={meta['n_images']} "
             f"grid0={meta['image_grid_thw'][0]} "
             f"{meta['pixel_key']}={meta['pixel_shape']} "
-            f"action={meta['action_shape']} prep_ms={prep_ms:.1f}"
+            f"action={meta['action_shape']} tokenize_ms={tokenize_ms:.1f}"
         )
         if meta.get("teacher_cot"):
             print(f"[TRAIN] teacher_cot={meta['teacher_cot']!r}")
@@ -471,6 +574,9 @@ def main() -> None:
         seq_len = int(args.seq_len)
 
     packed_fp0 = None
+    expert_lora_info = None
+    lora_info = None
+    vision_on_tape = bool(args.lora and args.lora_vision != "none")
     if args.lora:
         lora_info = inject_backbone_lora(
             model,
@@ -482,12 +588,67 @@ def main() -> None:
         if args.quantize_lm or args.quantize_all:
             packed_fp0 = packed_weight_fingerprint(model)
             print(f"[LORA] packed_fp={packed_fp0}")
+    elif args.expert_lora:
+        expert_lora_info = inject_expert_lora(
+            model,
+            rank=args.expert_lora_rank,
+            scale=args.expert_lora_scale,
+        )
+        if args.quantize_lm or args.quantize_all:
+            packed_fp0 = packed_weight_fingerprint(model)
+            print(f"[EXPERT-LORA] packed_fp={packed_fp0}")
+
+    if not vision_on_tape and (
+        batch.get("pixel_values") is not None or batch.get("pixel_values_videos") is not None
+    ):
+        t_enc = time.perf_counter()
+        batch = freeze_vision_features(model, batch)
+        encode_cache_ms = (time.perf_counter() - t_enc) * 1000.0
+        print(f"[ENCODE-CACHE] encode_cache_ms={encode_cache_ms:.1f}")
+
+    report: dict = {
+        "stage": args.stage,
+        "path": path,
+        "flags": flags,
+        "seq": seq_len,
+        "load_ms": load_ms,
+        "tokenize_ms": tokenize_ms,
+        "encode_cache_ms": encode_cache_ms,
+        "fwd": None,
+        "adam": None,
+    }
 
     with MemoryMonitor(poll_interval=0.05, label="train_step"):
+        if args.stage == "stage2":
+            freeze_vlm(model)
+        out = sft_train_step(model, batch, stage=args.stage)
+        mx.eval(out.loss)
+        fwd_times = out.times.as_dict()
+        report["fwd"] = fwd_times
+        ce = None if out.vlm_ce is None else float(out.vlm_ce.item())
+        mse = None if out.cfm_mse is None else float(out.cfm_mse.item())
+        ce_f = None if out.ce_future is None else float(out.ce_future.item())
+        ce_o = None if out.ce_others is None else float(out.ce_others.item())
+        print(
+            f"[TRAIN-FWD] stage={args.stage} seq={seq_len} path={path} "
+            f"lm={flags.get('lm')} vision={flags.get('vision')} "
+            f"expert={flags.get('expert')} "
+            f"loss={float(out.loss.item()):.4f} "
+            f"ce={ce if ce is None else f'{ce:.4f}'} "
+            f"ce_future={ce_f if ce_f is None else f'{ce_f:.4f}'} "
+            f"ce_others={ce_o if ce_o is None else f'{ce_o:.4f}'} "
+            f"n_ce={out.n_ce} n_future={out.n_future} n_others={out.n_others} "
+            f"cfm={mse if mse is None else f'{mse:.4f}'} "
+            f"vlm={out.times.n_vlm_forwards} expert_fwd={out.times.n_expert_forwards} "
+            f"euler={out.times.n_euler_steps} decode_tok={out.times.n_decode_tokens}"
+        )
+        print_train_table(fwd_times)
+
         if args.lora:
             opt = optim.Adam(learning_rate=args.lora_lr)
             losses: list[float] = []
             step_ms: list[float] = []
+            adam_rows: list[dict] = []
             t_all = time.perf_counter()
             save_at = (
                 set()
@@ -496,13 +657,16 @@ def main() -> None:
             )
             for i in range(int(args.lora_steps)):
                 t0 = time.perf_counter()
-                loss = sft_lora_update(model, batch, opt, stage=args.stage)
+                upd = sft_lora_update(model, batch, opt, stage=args.stage)
                 dt = (time.perf_counter() - t0) * 1000.0
-                losses.append(loss)
+                losses.append(upd.loss)
                 step_ms.append(dt)
-                print(f"[LORA] step={i} loss={loss:.4f} ms={dt:.1f}")
+                adam_times = upd.times.as_dict()
+                adam_rows.append(adam_times)
+                print(f"[LORA] step={i} loss={upd.loss:.4f} ms={dt:.1f}")
+                print_train_table(adam_times)
                 completed = i + 1
-                if completed in save_at:
+                if completed in save_at and lora_info is not None:
                     save_lora_adapters(
                         model,
                         args.lora_save_dir,
@@ -519,6 +683,7 @@ def main() -> None:
                     raise RuntimeError(
                         "packed QuantizedLinear.weight changed after LoRA steps"
                     )
+            report["adam"] = adam_rows[-1]
             print(
                 f"[LORA] stage={args.stage} seq={seq_len} path={path} "
                 f"lm={flags.get('lm')} vision={flags.get('vision')} "
@@ -530,41 +695,34 @@ def main() -> None:
                 f"step0_ms={step_ms[0]:.1f} stepN_ms={step_ms[-1]:.1f} "
                 f"wall_s={wall_s:.1f}"
             )
-        elif args.expert_update:
-            freeze_vlm(model)
-            opt = optim.Adam(learning_rate=args.lora_lr)
+        elif args.expert_update or args.expert_lora:
+            lr = args.expert_lora_lr if args.expert_lora else args.lora_lr
+            opt = optim.Adam(learning_rate=lr)
             t0 = time.perf_counter()
-            loss = sft_expert_update(model, batch, opt)
+            upd = sft_expert_update(
+                model, batch, opt, train_action_proj=bool(args.train_action_proj)
+            )
             dt = (time.perf_counter() - t0) * 1000.0
+            if packed_fp0 is not None:
+                packed_fp1 = packed_weight_fingerprint(model)
+                if packed_fp1 != packed_fp0:
+                    raise RuntimeError(
+                        "packed QuantizedLinear.weight changed after expert LoRA step"
+                    )
+            adam_times = upd.times.as_dict()
+            report["adam"] = adam_times
+            tag = "EXPERT-LORA" if args.expert_lora else "EXPERT"
+            extra = ""
+            if expert_lora_info is not None:
+                extra = (
+                    f" leaves={expert_lora_info['n_wrapped']} "
+                    f"rank={args.expert_lora_rank}"
+                )
             print(
-                f"[EXPERT] stage=stage2 seq={seq_len} path={path} "
-                f"loss={loss:.4f} ms={dt:.1f} lr={args.lora_lr}"
+                f"[{tag}] stage=stage2 seq={seq_len} path={path} "
+                f"loss={upd.loss:.4f} ms={dt:.1f} lr={lr}{extra}"
             )
-        else:
-            if args.stage == "stage2":
-                freeze_vlm(model)
-            out = sft_train_step(model, batch, stage=args.stage)
-            mx.eval(out.loss)
-            t = out.times
-            ce = None if out.vlm_ce is None else float(out.vlm_ce.item())
-            mse = None if out.cfm_mse is None else float(out.cfm_mse.item())
-            ce_f = None if out.ce_future is None else float(out.ce_future.item())
-            ce_o = None if out.ce_others is None else float(out.ce_others.item())
-            print(
-                f"[TRAIN] stage={args.stage} seq={seq_len} path={path} "
-                f"lm={flags.get('lm')} vision={flags.get('vision')} "
-                f"expert={flags.get('expert')} "
-                f"loss={float(out.loss.item()):.4f} "
-                f"ce={ce if ce is None else f'{ce:.4f}'} "
-                f"ce_future={ce_f if ce_f is None else f'{ce_f:.4f}'} "
-                f"ce_others={ce_o if ce_o is None else f'{ce_o:.4f}'} "
-                f"n_ce={out.n_ce} n_future={out.n_future} n_others={out.n_others} "
-                f"cfm={mse if mse is None else f'{mse:.4f}'} "
-                f"encode={t.encode_ms:.1f} backbone={t.backbone_ms:.1f} "
-                f"expert={t.expert_ms:.1f} total={t.total_ms:.1f} "
-                f"vlm={t.n_vlm_forwards} expert_fwd={t.n_expert_forwards} "
-                f"euler={t.n_euler_steps} decode_tok={t.n_decode_tokens}"
-            )
+            print_train_table(adam_times)
     peak = get_global_memory_peak()
     if peak["total"] > 0 or peak["metal"] > 0:
         print(
@@ -572,6 +730,12 @@ def main() -> None:
             f"rss={peak['resident']/1e9:.2f}GB "
             f"total={peak['total']/1e9:.2f}GB"
         )
+        report["metal_gb"] = peak["metal"] / 1e9
+        report["rss_gb"] = peak["resident"] / 1e9
+    if args.report is not None:
+        args.report.parent.mkdir(parents=True, exist_ok=True)
+        args.report.write_text(json.dumps(report, indent=2))
+        print(f"[DONE] report={args.report}")
 
 
 if __name__ == "__main__":

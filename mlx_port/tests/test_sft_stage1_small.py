@@ -11,7 +11,7 @@ from mlx_port.gt_eval import (
     list_local_traj_clips,
     split_train_eval,
 )
-from mlx_port.scripts.sft_stage1_small import select_non_coc_clips
+from mlx_port.scripts.sft_stage1_small import resolve_train_steps, select_non_coc_clips
 from mlx_port.scripts.time_train_step import build_pai_train_batch
 
 
@@ -89,6 +89,7 @@ def test_sft_stage1_small_help_mentions_no_coc():
         "--lora-save-every",
         "--lora-save-dir",
         "--no-lora-save",
+        "--epochs",
     ):
         if token not in proc.stdout:
             raise AssertionError(f"{token!r} missing from help:\n{proc.stdout}")
@@ -109,5 +110,52 @@ def test_sft_stage1_small_rejects_save_every_with_no_save():
     )
     if proc.returncode == 0:
         raise AssertionError("expected non-zero exit for --no-lora-save + --lora-save-every")
+    if "exclusive" not in (proc.stderr + proc.stdout):
+        raise AssertionError(proc.stderr)
+
+
+def test_resolve_train_steps_epochs_is_n_train_times_epochs():
+    steps, epochs = resolve_train_steps(steps=None, epochs=2, n_train=4)
+    assert steps == 8
+    assert epochs == 2
+    steps, epochs = resolve_train_steps(steps=None, epochs=None, n_train=4)
+    assert steps == 10
+    assert epochs is None
+    steps, epochs = resolve_train_steps(steps=7, epochs=None, n_train=4)
+    assert steps == 7
+    assert epochs is None
+
+
+def test_resolve_train_steps_rejects_both_and_bad_values():
+    try:
+        resolve_train_steps(steps=10, epochs=2, n_train=4)
+    except ValueError as exc:
+        assert "exclusive" in str(exc)
+    else:
+        raise AssertionError("expected exclusive error")
+    try:
+        resolve_train_steps(steps=None, epochs=0, n_train=4)
+    except ValueError as exc:
+        assert "epochs" in str(exc)
+    else:
+        raise AssertionError("expected epochs >= 1")
+
+
+def test_sft_stage1_small_rejects_epochs_with_steps():
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "mlx_port.scripts.sft_stage1_small",
+            "--epochs",
+            "2",
+            "--steps",
+            "8",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode == 0:
+        raise AssertionError("expected non-zero exit for --epochs + --steps")
     if "exclusive" not in (proc.stderr + proc.stdout):
         raise AssertionError(proc.stderr)

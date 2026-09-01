@@ -53,12 +53,36 @@ def test_action_space_stores_nvidia_regularizers():
         theta_ridge=3e-8,
         v_lambda=4e-6,
         v_ridge=5e-4,
+        a_lambda=2e-4,
+        kappa_lambda=3e-4,
         accel_bounds=[-9.8, 9.8],
     )
     assert aspace.theta_lambda == 2e-6
     assert aspace.theta_ridge == 3e-8
     assert aspace.v_lambda == 4e-6
     assert aspace.v_ridge == 5e-4
+    assert aspace.a_lambda == 2e-4
+    assert aspace.kappa_lambda == 3e-4
+
+
+def test_traj_to_action_stopped_car_kappa_is_finite():
+    """Near-zero speed must not use dtheta/s (that made Stage-2 CFM ~11k)."""
+    aspace = MLXActionSpace(
+        dt=0.1,
+        n_waypoints=8,
+        accel_mean=0.029,
+        accel_std=0.681,
+        curvature_mean=0.0,
+        curvature_std=0.026,
+    )
+    hist_xyz = mx.zeros((1, 3, 3))
+    fut_xyz = mx.zeros((1, 8, 3))
+    eye = mx.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+    hist_rot = mx.broadcast_to(eye[None, None, :, :], (1, 3, 3, 3))
+    fut_rot = mx.broadcast_to(eye[None, None, :, :], (1, 8, 3, 3))
+    action = aspace.traj_to_action(hist_xyz, hist_rot, fut_xyz, fut_rot)
+    assert bool(mx.all(mx.isfinite(action)))
+    assert float(mx.max(mx.abs(action))) < 20.0
 
 
 def test_theta_smooth_returns_init_plus_horizon():

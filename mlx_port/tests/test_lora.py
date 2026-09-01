@@ -1,5 +1,6 @@
 """T4.1 QLoRA: wrap decoder + vision 27-block/merger/deepstack; packed ints stay frozen."""
 
+import json
 from types import SimpleNamespace
 
 import mlx.core as mx
@@ -12,18 +13,23 @@ from mlx_lm.tuner.lora import LoRALinear
 from mlx_port.lora import (
     ADAPTER_CONFIG_NAME,
     ADAPTER_WEIGHTS_NAME,
+    DENSE_WEIGHTS_NAME,
     LORA_LEAVES,
     VISION_BLOCK_LEAVES,
     VISION_MERGER_LEAVES,
     assert_only_lora_trainable,
     decoder_layer_inner,
+    freeze_expert_base_unfreeze_lora,
     freeze_vision_features,
+    has_expert_lora,
     has_vision_lora,
     inject_backbone_lora,
+    inject_expert_lora,
     inject_vision_lora,
     load_lora_adapters,
     lora_save_steps,
     packed_weight_fingerprint,
+    save_dense_trainables,
     save_lora_adapters,
     sft_lora_update,
 )
@@ -97,6 +103,31 @@ class TinyHost(nn.Module):
         super().__init__()
         self.vlm = TinyVLM(vocab=vocab, d=d, n=n)
         self.expert = nn.Linear(d, d, bias=False)
+
+
+class TinyExpert(nn.Module):
+    def __init__(self, d: int, n: int):
+        super().__init__()
+        self.language_model = _LM(n, d)
+
+    @property
+    def layers(self):
+        return self.language_model.model.layers
+
+    def __call__(self, inputs_embeds, position_ids=None, cache=None, mask=None, **kwargs):
+        x = inputs_embeds
+        for layer in self.layers:
+            x = decoder_layer_inner(layer)(x)
+        return x
+
+
+class TinyStage2Host(nn.Module):
+    def __init__(self, vocab: int = 16, d: int = 32, n_vlm: int = 2, n_expert: int = 2):
+        super().__init__()
+        self.vlm = TinyVLM(vocab=vocab, d=d, n=n_vlm)
+        self.expert = TinyExpert(d=d, n=n_expert)
+        self.action_in_proj = nn.Linear(d, d, bias=False)
+        self.action_out_proj = nn.Linear(d, 2, bias=False)
 
 
 class _VAttn(nn.Module):
@@ -308,7 +339,10 @@ def test_packed_weight_unchanged_after_lora_step():
     fp1 = packed_weight_fingerprint(host)
     after = {k: np.array(v) for k, v in tree_flatten(host.trainable_parameters())}
     assert fp1 == fp0
-    assert float(loss) >= 0.0
+    assert float(loss.loss) >= 0.0
+    assert loss.times.fwd_bwd_ms > 0.0
+    assert loss.times.adam_ms >= 0.0
+    assert loss.times.n_vlm_forwards == 1
     moved = [k for k in before if not np.allclose(before[k], after[k], atol=0.0)]
     if not moved:
         raise AssertionError("LoRA A/B did not change after an optimizer step")
@@ -600,7 +634,7 @@ def test_sft_lora_update_trains_vision_adapters_and_keeps_encode_on_tape():
         for k, v in tree_flatten(host.trainable_parameters())
         if "vision_tower" in k
     }
-    assert float(loss) >= 0.0
+    assert float(loss.loss) >= 0.0
     assert "cached_image_features" not in batch
     moved = [k for k in before if not np.allclose(before[k], after[k], atol=0.0)]
     if not moved:
@@ -670,7 +704,7 @@ def test_packed_vision_weight_unchanged_after_lora_step():
     )
     fp1 = packed_weight_fingerprint(host)
     assert fp1 == fp0
-    assert float(loss) >= 0.0
+    assert float(loss.loss) >= 0.0
     assert_only_lora_trainable(host)
 
 
@@ -763,3 +797,231 @@ def test_save_lora_raises_without_adapters(tmp_path):
         assert "trainable" in str(exc).lower() or "LoRA" in str(exc)
     else:
         raise AssertionError("expected RuntimeError when no LoRA is injected")
+
+
+def _quantize_expert_leaves(host: TinyStage2Host) -> None:
+    for layer in host.expert.layers:
+        for name in ("q_proj", "k_proj", "v_proj", "o_proj"):
+            _quantize_leaf(layer.self_attn, name)
+        for name in ("gate_proj", "up_proj", "down_proj"):
+            _quantize_leaf(layer.mlp, name)
+
+
+def test_inject_expert_lora_wraps_decoder_skips_action_and_vlm():
+    host = TinyStage2Host(n_vlm=2, n_expert=2, d=32)
+    assert not has_expert_lora(host)
+    info = inject_expert_lora(host, rank=4, expected_layers=2)
+    assert info["n_wrapped"] == 14
+    assert info["n_trainable"] == 28
+    assert has_expert_lora(host)
+    for layer in host.expert.layers:
+        names = []
+        for path, mod in decoder_layer_inner(layer).named_modules():
+            leaf = path.split(".")[-1]
+            if leaf in LORA_LEAVES:
+                assert isinstance(mod, LoRALinear), path
+                names.append(leaf)
+        assert tuple(sorted(names)) == tuple(sorted(LORA_LEAVES))
+    assert not isinstance(host.action_in_proj, LoRALinear)
+    assert not isinstance(host.action_out_proj, LoRALinear)
+    assert not isinstance(host.vlm.language_model.model.layers[0].self_attn.q_proj, LoRALinear)
+    assert not isinstance(host.vlm.lm_head, LoRALinear)
+    flat = dict(tree_flatten(host.trainable_parameters()))
+    expert_lora = [k for k in flat if k.startswith("expert.") and "lora_" in k]
+    assert len(expert_lora) == 28
+    assert not any(k.startswith("action_") for k in flat)
+    assert any(k.startswith("vlm.") for k in flat)
+
+
+def test_inject_backbone_lora_still_skips_expert_stack():
+    host = TinyStage2Host(n_vlm=2, n_expert=2, d=32)
+    inject_backbone_lora(host, rank=4, expected_layers=2, vision=False)
+    assert not has_expert_lora(host)
+    assert isinstance(host.expert.layers[0].self_attn.q_proj, nn.Linear)
+    assert isinstance(host.vlm.language_model.model.layers[0].self_attn.q_proj, LoRALinear)
+
+
+def test_inject_expert_lora_raises_on_linear_expert_and_layer_count():
+    host = TinyHost(n=2, d=32)
+    try:
+        inject_expert_lora(host, rank=4, expected_layers=2)
+    except ValueError as exc:
+        assert "expert" in str(exc)
+    else:
+        raise AssertionError("expected ValueError when expert has no decoder layers")
+
+    host2 = TinyStage2Host(n_vlm=1, n_expert=2, d=32)
+    try:
+        inject_expert_lora(host2, rank=4, expected_layers=36)
+    except RuntimeError as exc:
+        assert "36" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError for 36 vs 2 expert layers")
+
+
+def test_inject_expert_lora_refuses_double_wrap():
+    host = TinyStage2Host(n_vlm=1, n_expert=1, d=32)
+    inject_expert_lora(host, rank=4, expected_layers=1)
+    try:
+        inject_expert_lora(host, rank=4, expected_layers=1)
+    except RuntimeError as exc:
+        assert "already LoRALinear" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError on second expert inject")
+
+
+def test_packed_expert_fingerprint_unchanged_after_expert_lora_step():
+    mx.random.seed(0)
+    host = TinyStage2Host(n_vlm=1, n_expert=2, d=32)
+    _quantize_expert_leaves(host)
+    inject_expert_lora(host, rank=4, expected_layers=2)
+    from mlx_port.train_step import freeze_vlm
+
+    freeze_vlm(host)
+    freeze_expert_base_unfreeze_lora(host)
+    assert_only_lora_trainable(host)
+    fp0 = packed_weight_fingerprint(host)
+    before = {k: np.array(v) for k, v in tree_flatten(host.trainable_parameters())}
+    action_in0 = np.array(host.action_in_proj.weight)
+    opt = optim.Adam(learning_rate=1e-2)
+
+    def loss_fn(m):
+        x = mx.ones((1, 4, 32), dtype=mx.float32)
+        return m.expert(x).mean()
+
+    loss, grads = nn.value_and_grad(host, loss_fn)(host)
+    opt.update(host, grads)
+    mx.eval(loss, host.parameters(), opt.state)
+    fp1 = packed_weight_fingerprint(host)
+    after = {k: np.array(v) for k, v in tree_flatten(host.trainable_parameters())}
+    assert fp1 == fp0
+    moved = [k for k in before if not np.allclose(before[k], after[k], atol=0.0)]
+    if not moved:
+        raise AssertionError("expert LoRA A/B did not change after an optimizer step")
+    assert all("lora_" in k and k.startswith("expert.") for k in moved)
+    if not np.allclose(action_in0, np.array(host.action_in_proj.weight)):
+        raise AssertionError("action_in_proj moved during expert LoRA step")
+
+
+def test_save_load_expert_lora_excludes_vlm_keys(tmp_path):
+    mx.random.seed(4)
+    host = TinyStage2Host(n_vlm=2, n_expert=2, d=32)
+    inject_backbone_lora(host, rank=4, expected_layers=2, vision=False)
+    inject_expert_lora(host, rank=4, expected_layers=2)
+    from mlx_port.train_step import freeze_vlm
+
+    freeze_vlm(host)
+    freeze_expert_base_unfreeze_lora(host)
+    assert_only_lora_trainable(host)
+    opt = optim.Adam(learning_rate=1e-2)
+
+    def loss_fn(m):
+        x = mx.ones((1, 4, 32), dtype=mx.float32)
+        return m.expert(x).mean()
+
+    loss, grads = nn.value_and_grad(host, loss_fn)(host)
+    opt.update(host, grads)
+    mx.eval(loss, host.parameters())
+    before = {k: np.array(v) for k, v in tree_flatten(host.trainable_parameters())}
+    info = save_lora_adapters(
+        host,
+        tmp_path,
+        step=1,
+        rank=4,
+        scale=20.0,
+        vision_scope="none",
+        extra={"target": "expert"},
+    )
+    assert info["n_arrays"] == 28
+    saved = mx.load(str(tmp_path / ADAPTER_WEIGHTS_NAME))
+    assert all(k.startswith("expert.") for k in saved)
+    assert not any(k.startswith("vlm.") for k in saved)
+    cfg = json.loads((tmp_path / ADAPTER_CONFIG_NAME).read_text())
+    assert cfg["target"] == "expert"
+
+    fresh = TinyStage2Host(n_vlm=2, n_expert=2, d=32)
+    inject_expert_lora(fresh, rank=4, expected_layers=2)
+    freeze_vlm(fresh)
+    freeze_expert_base_unfreeze_lora(fresh)
+    load_lora_adapters(fresh, tmp_path)
+    after = {k: np.array(v) for k, v in tree_flatten(fresh.trainable_parameters())}
+    for key, val in before.items():
+        if not np.allclose(val, after[key]):
+            raise AssertionError(f"expert adapter roundtrip mismatch on {key}")
+
+
+def test_load_expert_adapters_reject_vlm_file(tmp_path):
+    vlm_host = TinyHost(n=2, d=32)
+    inject_backbone_lora(vlm_host, rank=4, expected_layers=2, vision=False)
+    save_lora_adapters(
+        vlm_host, tmp_path, step=1, rank=4, scale=20.0, vision_scope="none"
+    )
+    host = TinyStage2Host(n_vlm=2, n_expert=2, d=32)
+    inject_expert_lora(host, rank=4, expected_layers=2)
+    from mlx_port.train_step import freeze_vlm
+
+    freeze_vlm(host)
+    freeze_expert_base_unfreeze_lora(host)
+    try:
+        load_lora_adapters(host, tmp_path)
+    except RuntimeError as exc:
+        assert "key set" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError loading VLM adapters onto expert LoRA")
+
+
+def test_expert_lora_train_action_proj_unfreezes_action_proj():
+    host = TinyStage2Host(n_vlm=1, n_expert=2, d=32)
+    inject_expert_lora(host, rank=4, expected_layers=2)
+    from mlx_port.train_step import freeze_vlm
+
+    freeze_vlm(host)
+    freeze_expert_base_unfreeze_lora(host, train_action_proj=True)
+    flat = dict(tree_flatten(host.trainable_parameters()))
+    assert any(k.startswith("expert.") and "lora_" in k for k in flat)
+    assert any(k.startswith("action_in_proj.") for k in flat)
+    assert any(k.startswith("action_out_proj.") for k in flat)
+    assert not any(k.startswith("vlm.") for k in flat)
+    try:
+        assert_only_lora_trainable(host)
+    except RuntimeError as exc:
+        assert "non-LoRA" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError when action proj is trainable")
+
+
+def test_save_expert_lora_with_dense_action_proj(tmp_path):
+    mx.random.seed(5)
+    host = TinyStage2Host(n_vlm=1, n_expert=1, d=32)
+    inject_expert_lora(host, rank=4, expected_layers=1)
+    from mlx_port.train_step import freeze_vlm
+
+    freeze_vlm(host)
+    freeze_expert_base_unfreeze_lora(host, train_action_proj=True)
+    try:
+        save_lora_adapters(
+            host, tmp_path, step=1, rank=4, scale=20.0, vision_scope="none"
+        )
+    except RuntimeError as exc:
+        assert "LoRA" in str(exc) or "trainable" in str(exc).lower()
+    else:
+        raise AssertionError("expected RuntimeError saving LoRA while action proj trains")
+    info = save_lora_adapters(
+        host,
+        tmp_path,
+        step=1,
+        rank=4,
+        scale=20.0,
+        vision_scope="none",
+        extra={"train_action_proj": True},
+        allow_extra_trainables=True,
+    )
+    assert info["n_arrays"] == 14
+    saved = mx.load(str(tmp_path / ADAPTER_WEIGHTS_NAME))
+    assert all("lora_" in k for k in saved)
+    dense_info = save_dense_trainables(host, tmp_path, step=1)
+    assert dense_info["n_arrays"] >= 2
+    dense = mx.load(str(tmp_path / DENSE_WEIGHTS_NAME))
+    assert any(k.startswith("action_in_proj.") for k in dense)
+    assert any(k.startswith("action_out_proj.") for k in dense)
+    assert not any("lora_" in k for k in dense)

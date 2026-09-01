@@ -96,3 +96,11 @@ def test_html_report_stamps_bf16_and_t31_paths():
         }
     )
     assert all4["quant_path"] == "all4 W4 VLM+expert"
+    dense_ex = quant_path_label(
+        {
+            "lm": "affine-4-gs64",
+            "vision": "affine-4-gs64",
+            "expert": "bf16",
+        }
+    )
+    assert dense_ex == "all4 W4 VLM + dense expert"

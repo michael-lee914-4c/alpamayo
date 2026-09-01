@@ -54,8 +54,12 @@ def quant_path_label(flags: dict | None) -> str:
     lm = str(flags.get("lm") or "bf16")
     vision = str(flags.get("vision") or "bf16")
     expert = str(flags.get("expert") or "bf16")
-    if vision.startswith("affine-4") or expert.startswith("affine-4"):
+    if vision.startswith("affine-4") and expert.startswith("affine-4"):
         return "all4 W4 VLM+expert"
+    if vision.startswith("affine-4"):
+        return "all4 W4 VLM + dense expert"
+    if expert.startswith("affine-4"):
+        return "dense VLM + all4 expert"
     if lm.startswith("affine-4"):
         return "T3.1 W4 LM"
     if lm == "bf16":
