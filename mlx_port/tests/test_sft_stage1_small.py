@@ -139,6 +139,27 @@ def test_resolve_train_steps_rejects_both_and_bad_values():
         assert "epochs" in str(exc)
     else:
         raise AssertionError("expected epochs >= 1")
+    try:
+        resolve_train_steps(steps=None, epochs=1, n_train=0)
+    except ValueError as exc:
+        assert "n_train" in str(exc)
+    else:
+        raise AssertionError("expected n_train >= 1")
+    try:
+        resolve_train_steps(steps=0, epochs=None, n_train=4)
+    except ValueError as exc:
+        assert "steps" in str(exc)
+    else:
+        raise AssertionError("expected steps >= 1")
+
+
+def test_select_non_coc_clips_rejects_tiny_pool():
+    try:
+        select_non_coc_clips("/unused", n_clips=1, seed=0)
+    except ValueError as exc:
+        assert "n_clips" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for n_clips < 2")
 
 
 def test_sft_stage1_small_rejects_epochs_with_steps():

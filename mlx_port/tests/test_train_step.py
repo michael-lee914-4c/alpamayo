@@ -341,6 +341,24 @@ def test_create_message_sft_stage1_is_nvidia_traj_future():
         assert "stage1" in str(exc)
     else:
         raise AssertionError("expected ValueError for unknown sft_stage")
+    try:
+        create_message(frames, sft_stage="stage1", num_future_traj_tokens=0)
+    except ValueError as exc:
+        assert "num_future_traj_tokens" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for zero future pads")
+    try:
+        create_message(frames, num_history_traj_tokens=0)
+    except ValueError as exc:
+        assert "num_history_traj_tokens" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for zero history pads")
+    try:
+        create_message(np.zeros((3, 8, 8), dtype=np.uint8))
+    except ValueError as exc:
+        assert "expected 4" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for rank-3 frames")
 
 
 class _FakeTok:

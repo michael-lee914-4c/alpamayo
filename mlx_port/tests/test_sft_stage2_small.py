@@ -126,6 +126,17 @@ def test_sft_stage2_small_rejects_renamed_expert_dense():
         raise AssertionError(err)
 
 
+def test_sft_stage2_mean_eval_rejects_empty_split():
+    from mlx_port.scripts.sft_stage2_small import _mean_eval
+
+    try:
+        _mean_eval(None, [])
+    except ValueError as exc:
+        assert "empty" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for empty eval set")
+
+
 def test_sft_stage2_small_rejects_epochs_with_steps():
     proc = subprocess.run(
         [

@@ -140,3 +140,120 @@ def test_tokenize_future_rejects_3d():
         assert "4D" in str(exc)
     else:
         raise AssertionError("expected ValueError for 3D future xyz")
+
+
+def _rank4_traj(b=1, n=1, t_hist=2, t_fut=2):
+    eye = np.eye(3, dtype=np.float32)
+    return {
+        "ego_history_xyz": np.zeros((b, n, t_hist, 3), dtype=np.float32),
+        "ego_history_rot": np.broadcast_to(eye, (b, n, t_hist, 3, 3)).copy(),
+        "ego_future_xyz": np.zeros((b, n, t_fut, 3), dtype=np.float32),
+        "ego_future_rot": np.broadcast_to(eye, (b, n, t_fut, 3, 3)).copy(),
+    }
+
+
+def test_tokenize_future_requires_history_and_future_rot():
+    tok = _StubFutureTok()
+    data = _rank4_traj()
+    try:
+        tokenize_future_trajectory(tok, {**data, "ego_future_rot": None})
+    except ValueError as exc:
+        assert "ego_future_rot" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for missing future rot")
+    try:
+        tokenize_future_trajectory(tok, {k: data[k] for k in ("ego_future_xyz", "ego_future_rot")})
+    except ValueError as exc:
+        assert "history" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for missing history")
+
+
+def test_tokenize_future_rejects_history_future_batch_mismatch():
+    data = _rank4_traj(b=2, t_fut=2)
+    data["ego_history_xyz"] = np.zeros((1, 1, 2, 3), dtype=np.float32)
+    data["ego_history_rot"] = np.broadcast_to(
+        np.eye(3, dtype=np.float32), (1, 1, 2, 3, 3)
+    ).copy()
+    try:
+        tokenize_future_trajectory(_StubFutureTok(), data)
+    except ValueError as exc:
+        assert "batch" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for history/future batch mismatch")
+
+
+def test_fuse_history_only_leaves_future_pads():
+    hist_pad, fut_pad = 100, 200
+    ids = np.array([[1, hist_pad, hist_pad, 2, fut_pad, 3]], dtype=np.int32)
+    data = {
+        "ego_history_xyz": np.zeros((1, 1, 1, 3), dtype=np.float32),
+        "ego_history_rot": np.broadcast_to(np.eye(3, dtype=np.float32), (1, 1, 1, 3, 3)).copy(),
+    }
+
+    class _Hist:
+        def encode(self, hist_xyz, hist_rot, fut_xyz, fut_rot):
+            del hist_xyz, hist_rot, fut_rot
+            b = int(np.asarray(fut_xyz).shape[0])
+            return np.full((b, 2), 7, dtype=np.int64)
+
+    out = np.array(
+        fuse_traj_tokens(
+            ids,
+            data,
+            hist_traj_tokenizer=_Hist(),
+            hist_token_start_idx=10,
+            traj_token_ids={"history": hist_pad, "future": fut_pad},
+        )
+    )
+    assert list(out[0]) == [1, 17, 17, 2, fut_pad, 3]
+
+
+def test_fuse_future_requires_tokenizer_and_pad_id():
+    data = _rank4_traj(t_hist=1, t_fut=1)
+    ids = np.array([[1, 100, 200]], dtype=np.int32)
+
+    class _Hist:
+        def encode(self, hist_xyz, hist_rot, fut_xyz, fut_rot):
+            del hist_xyz, hist_rot, fut_rot
+            return np.zeros((1, 1), dtype=np.int64)
+
+    try:
+        fuse_traj_tokens(
+            ids,
+            data,
+            hist_traj_tokenizer=_Hist(),
+            hist_token_start_idx=0,
+            traj_token_ids={"history": 100, "future": 200},
+        )
+    except AttributeError as exc:
+        assert "traj_tokenizer" in str(exc)
+    else:
+        raise AssertionError("expected AttributeError when future xyz is set without tokenizer")
+
+    try:
+        fuse_traj_tokens(
+            ids,
+            data,
+            hist_traj_tokenizer=_Hist(),
+            hist_token_start_idx=0,
+            traj_token_ids={"history": 100},
+            traj_tokenizer=_StubFutureTok(),
+            future_token_start_idx=0,
+        )
+    except ValueError as exc:
+        assert "future" in str(exc)
+    else:
+        raise AssertionError("expected ValueError when future pad id is missing")
+
+
+def test_fuse_without_history_returns_ids_unchanged():
+    ids = np.array([[1, 2, 3]], dtype=np.int32)
+    out = fuse_traj_tokens(
+        ids,
+        None,
+        hist_traj_tokenizer=object(),
+        hist_token_start_idx=0,
+        traj_token_ids={"history": 100},
+    )
+    assert np.array_equal(np.asarray(out), ids)
