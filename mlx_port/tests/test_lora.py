@@ -718,6 +718,12 @@ def test_lora_save_steps_always_includes_last():
         assert "save-every" in str(exc)
     else:
         raise AssertionError("expected ValueError for save-every=0")
+    try:
+        lora_save_steps(0, 10)
+    except ValueError as exc:
+        assert "n_steps" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for n_steps=0")
 
 
 def test_save_and_load_lora_roundtrip(tmp_path):
