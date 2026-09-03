@@ -30,6 +30,15 @@ def test_smart_resize_rejects_bad_budget():
         smart_resize_hw(1080, 1920, min_pixels=200000, max_pixels=1000)
 
 
+def test_smart_resize_rejects_extreme_aspect_and_nonpositive():
+    with pytest.raises(ValueError, match="aspect ratio"):
+        smart_resize_hw(10, 3000)
+    with pytest.raises(ValueError, match="positive"):
+        smart_resize_hw(0, 1920)
+    with pytest.raises(ValueError, match="positive"):
+        smart_resize_hw(1080, -1)
+
+
 def test_bind_image_pixel_budget_overrides_16m_size():
     class _IP:
         def __init__(self):

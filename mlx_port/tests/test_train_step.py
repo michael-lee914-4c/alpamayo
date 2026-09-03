@@ -17,10 +17,12 @@ from mlx_port.train_step import (
     TRAIN_DOMINANT,
     TRAIN_MS_KEYS,
     TrainStepTimes,
+    _action_from_batch,
     append_traj_future_start,
     apply_labels_mask,
     assert_stage2_trainables,
     drop_n_traj_group,
+    future_traj_label_mask,
     get_role_eos_mask,
     labels_mask_between,
     assert_train_graph,
@@ -125,6 +127,24 @@ def test_shifted_ce_perfect_and_ignore():
     masked = apply_labels_mask(mx.array([[1, 2, 3]]), mx.array([[True, False, True]]))
     assert int(masked[0, 1].item()) == IGNORE_INDEX
     assert int(masked[0, 0].item()) == 1
+    try:
+        apply_labels_mask(mx.array([[1, 2, 3]]), mx.array([[True, False]]))
+    except ValueError as exc:
+        assert "labels_mask" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for labels_mask shape mismatch")
+    try:
+        shifted_cross_entropy(mx.zeros((1, 4, 8)), mx.array([[1, 2]]))
+    except ValueError as exc:
+        assert "does not match" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for logits/labels shape mismatch")
+    try:
+        shifted_cross_entropy(None, mx.array([[1, 2]]))
+    except ValueError as exc:
+        assert "requires" in str(exc)
+    else:
+        raise AssertionError("expected ValueError when logits are missing")
 
 
 def test_traj_future_keep_len_and_position_ids():
@@ -272,6 +292,100 @@ def test_drop_n_traj_group_squeezes_loader_dim():
     assert tuple(rot2.shape) == (1, 16, 3, 3)
 
 
+class _StubActionSpace:
+    def get_action_space_dims(self):
+        return (8, 2)
+
+    def traj_to_action(self, hist_xyz, hist_rot, fut_xyz, fut_rot):
+        del hist_xyz, hist_rot, fut_xyz, fut_rot
+        return np.full((1, 8, 2), 0.25, dtype=np.float32)
+
+
+def test_action_from_batch_promotes_2d_and_derives_from_ego():
+    model = SimpleNamespace(action_space=_StubActionSpace())
+    promoted = _action_from_batch(model, {"action": np.ones((8, 2), dtype=np.float32)})
+    assert tuple(promoted.shape) == (1, 8, 2)
+    already = _action_from_batch(model, {"action": np.ones((2, 8, 2), dtype=np.float32)})
+    assert tuple(already.shape) == (2, 8, 2)
+    derived = _action_from_batch(
+        model,
+        {
+            "ego_history_xyz": np.zeros((1, 1, 16, 3), dtype=np.float32),
+            "ego_history_rot": np.zeros((1, 1, 16, 3, 3), dtype=np.float32),
+            "ego_future_xyz": np.zeros((1, 1, 64, 3), dtype=np.float32),
+            "ego_future_rot": np.zeros((1, 1, 64, 3, 3), dtype=np.float32),
+        },
+    )
+    assert tuple(derived.shape) == (1, 8, 2)
+    assert abs(float(derived[0, 0, 0].item()) - 0.25) < 1e-6
+    try:
+        _action_from_batch(SimpleNamespace(action_space=None), {})
+    except ValueError as exc:
+        assert "action" in str(exc) or "ego" in str(exc)
+    else:
+        raise AssertionError("expected ValueError when action and ego are missing")
+    try:
+        _action_from_batch(
+            SimpleNamespace(action_space=None),
+            {
+                "ego_history_xyz": np.zeros((1, 16, 3)),
+                "ego_history_rot": np.zeros((1, 16, 3, 3)),
+                "ego_future_xyz": np.zeros((1, 64, 3)),
+                "ego_future_rot": np.zeros((1, 64, 3, 3)),
+            },
+        )
+    except ValueError as exc:
+        assert "action_space" in str(exc)
+    else:
+        raise AssertionError("expected ValueError when action_space is missing")
+
+
+def test_action_from_batch_rejects_wrong_traj_to_action_shape():
+    class _BadDims:
+        def get_action_space_dims(self):
+            return (8, 2)
+
+        def traj_to_action(self, hist_xyz, hist_rot, fut_xyz, fut_rot):
+            del hist_xyz, hist_rot, fut_xyz, fut_rot
+            return np.ones((1, 4, 2), dtype=np.float32)
+
+    try:
+        _action_from_batch(
+            SimpleNamespace(action_space=_BadDims()),
+            {
+                "ego_history_xyz": np.zeros((1, 16, 3)),
+                "ego_history_rot": np.zeros((1, 16, 3, 3)),
+                "ego_future_xyz": np.zeros((1, 64, 3)),
+                "ego_future_rot": np.zeros((1, 64, 3, 3)),
+            },
+        )
+    except RuntimeError as exc:
+        assert "does not end with" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError for action dim mismatch")
+
+
+def test_stage2_derives_action_from_ego_when_batch_omits_action():
+    mx.random.seed(4)
+    model = _toy_model()
+    model.action_space = _StubActionSpace()
+    ids = mx.array([[1, 2, 7, 4]], dtype=mx.int32)
+    out = sft_train_step(
+        model,
+        {
+            "input_ids": ids,
+            "ego_history_xyz": np.zeros((1, 1, 16, 3), dtype=np.float32),
+            "ego_history_rot": np.zeros((1, 1, 16, 3, 3), dtype=np.float32),
+            "ego_future_xyz": np.zeros((1, 1, 64, 3), dtype=np.float32),
+            "ego_future_rot": np.zeros((1, 1, 64, 3, 3), dtype=np.float32),
+        },
+        stage="stage2",
+    )
+    assert model.expert.calls == 1
+    assert out.cfm_mse is not None
+    assert_train_graph(out.times)
+
+
 def test_labels_mask_between_one_span():
     ids = mx.array([[1, 2, 9, 4, 5, 8, 6]], dtype=mx.int32)
     mask = labels_mask_between(ids, 9, 8)
@@ -297,6 +411,12 @@ def test_labels_mask_between_one_span():
         assert "precedes" in str(exc)
     else:
         raise AssertionError("expected ValueError when end precedes start")
+    try:
+        labels_mask_between(mx.array([[9, 1, 9, 8]]), 9, 8)
+    except ValueError as exc:
+        assert "exactly one" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for two start markers")
 
 
 def test_create_message_teacher_cot_completes_assistant():
@@ -341,6 +461,18 @@ def test_create_message_sft_stage1_is_nvidia_traj_future():
         assert "stage1" in str(exc)
     else:
         raise AssertionError("expected ValueError for unknown sft_stage")
+
+
+def test_create_message_scales_unit_float_chw():
+    frames = np.zeros((2, 3, 4, 6), dtype=np.float32)
+    frames[0, 1, 2, 3] = 1.0
+    msg = create_message(frames)
+    img = np.asarray(msg[1]["content"][0]["image"])
+    assert img.shape == (4, 6, 3)
+    assert img.dtype == np.uint8
+    assert int(img[2, 3, 1]) == 255
+    assert int(img[2, 3, 0]) == 0
+    assert int(img[2, 3, 2]) == 0
 
 
 class _FakeTok:
@@ -409,6 +541,36 @@ def test_stage1_two_mean_ce_splits_traj_and_im_end():
     assert abs(float(total.item()) - float((ce_f + ce_o).item())) < 1e-5
 
 
+def test_future_traj_label_mask_bins_and_specials():
+    model = SimpleNamespace(
+        future_token_start_idx=20,
+        traj_vocab_size=10,
+        traj_token_ids={"future_start": 10, "future_end": 11},
+    )
+    labels = mx.array([[10, 19, 20, 29, 30, 11]], dtype=mx.int32)
+    mask = [bool(v.item()) for v in future_traj_label_mask(labels, model)[0]]
+    assert mask == [True, False, True, True, False, True]
+    try:
+        future_traj_label_mask(labels, SimpleNamespace(traj_token_ids={"future_start": 10}))
+    except ValueError as exc:
+        assert "future_token_start_idx" in str(exc)
+    else:
+        raise AssertionError("expected ValueError when start/vocab are missing")
+    try:
+        future_traj_label_mask(
+            labels,
+            SimpleNamespace(
+                future_token_start_idx=20,
+                traj_vocab_size=10,
+                traj_token_ids={"future_start": 10},
+            ),
+        )
+    except ValueError as exc:
+        assert "future_end" in str(exc)
+    else:
+        raise AssertionError("expected ValueError when future_end is missing")
+
+
 def test_replace_pad_token_requires_exact_count():
     ids = mx.array([[1, 5, 5, 2]], dtype=mx.int32)
     out = replace_pad_token(ids, mx.array([[9, 8]]), 5)
@@ -435,6 +597,12 @@ def test_event_coc_requires_matching_t0():
         assert "no CoC" in str(exc)
     else:
         raise AssertionError("expected RuntimeError when t0 has no CoC")
+    try:
+        _event_coc({"events": [{"event_start_timestamp": 10, "coc": "   "}]}, 10)
+    except RuntimeError as exc:
+        assert "empty CoC" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError for whitespace-only CoC")
 
 
 def test_append_traj_future_start_once():

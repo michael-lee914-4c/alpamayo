@@ -108,3 +108,36 @@ def test_format_gt_report_rank2_single_traj():
     gt, gt_xyz, pred = _toy_gt_report_inputs()
     report = format_gt_report(gt, pred_xyz=pred[1], ego_future_xyz=gt_xyz)
     assert "minADE=0.000 m" in report
+
+
+def test_format_gt_report_accepts_nvidia_gt_layouts():
+    """NVIDIA gt_xy is (2, T) from rank-4 / rank-3 ego_future_xyz."""
+    gt, gt_xyz, pred = _toy_gt_report_inputs()
+    good = pred[1]
+    report4 = format_gt_report(gt, pred_xyz=good, ego_future_xyz=good.reshape(1, 1, 4, 3))
+    report3 = format_gt_report(gt, pred_xyz=good, ego_future_xyz=good.reshape(1, 4, 3))
+    assert "minADE=0.000 m" in report4
+    assert "minADE=0.000 m" in report3
+
+
+def test_format_gt_report_without_pred_is_na():
+    gt, _, _ = _toy_gt_report_inputs()
+    report = format_gt_report(gt, pred_coc="Yield to the pedestrian.")
+    assert "minADE=n/a" in report
+    assert "readable=True" in report
+    assert "jaccard=1.000" in report
+
+
+def test_score_coc_empty_pred_and_best_of_gts():
+    empty = score_coc(None, ["Yield to the pedestrian."])
+    assert empty["readable"] is False
+    assert empty["jaccard"] == 0.0
+    best = score_coc(
+        "Yield to the pedestrian.",
+        ["unrelated words here", "Yield to the pedestrian."],
+    )
+    assert best["jaccard"] == 1.0
+    assert best["matched_gt"] == "Yield to the pedestrian."
+    none_gt = score_coc("hello there friend", [])
+    assert none_gt["matched_gt"] is None
+    assert none_gt["jaccard"] == 0.0
