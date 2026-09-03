@@ -92,6 +92,26 @@ def test_hf_generate_stop_keeps_delayed_traj_future_start():
     assert stop(mx.array([[1, 2, traj_future, 99]])) is True
 
 
+def test_hf_eos_token_ids_drops_unk_negative_and_dupes():
+    class _Tok:
+        unk_token_id = 0
+        eos_token_id = [151645, 0, -1, 7]
+
+        def convert_tokens_to_ids(self, name):
+            return {"<|im_end|>": 151645, "<|endoftext|>": 151643}[name]
+
+    assert hf_eos_token_ids(_Tok()) == [151645, 151643, 7]
+
+    class _ScalarEos:
+        unk_token_id = None
+        eos_token_id = 151645
+
+        def convert_tokens_to_ids(self, name):
+            return None
+
+    assert hf_eos_token_ids(_ScalarEos()) == [151645]
+
+
 def test_qwen_hf_eos_ids_match_generation_config():
     from transformers import AutoTokenizer
 

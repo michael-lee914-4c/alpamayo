@@ -124,6 +124,77 @@ def test_fuse_replaces_history_and_future_pads():
     assert list(out[0]) == [1, 17, 17, 17, 2, 1000, 1001, 1002, 1003, 4]
 
 
+def test_discrete_bins_clamp_out_of_range_actions():
+    class _RangeAS:
+        def get_action_space_dims(self):
+            return (2, 2)
+
+        def traj_to_action(self, hist_xyz, hist_rot, fut_xyz, fut_rot):
+            del hist_xyz, hist_rot, fut_xyz, fut_rot
+            return np.array([[[-20.0, 20.0], [0.0, 10.0]]], dtype=np.float64)
+
+    tok = DiscreteTrajectoryTokenizerMLX(
+        action_space=_RangeAS(),
+        dims_min=[-10.0, -10.0],
+        dims_max=[10.0, 10.0],
+        num_bins=3000,
+    )
+    ids = np.array(
+        tok.encode(
+            np.zeros((1, 1, 3), dtype=np.float32),
+            np.zeros((1, 1, 3, 3), dtype=np.float32),
+            np.zeros((1, 2, 3), dtype=np.float32),
+            np.zeros((1, 2, 3, 3), dtype=np.float32),
+        )
+    )
+    assert ids.shape == (1, 4)
+    assert int(ids[0, 0]) == 0
+    assert int(ids[0, 1]) == 2999
+    assert int(ids[0, 2]) == 1500
+    assert int(ids[0, 3]) == 2999
+
+
+def test_discrete_tokenizer_rejects_bad_bins_and_zero_scale():
+    try:
+        DiscreteTrajectoryTokenizerMLX(num_bins=1)
+    except ValueError as exc:
+        assert "num_bins" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for num_bins < 2")
+    try:
+        DiscreteTrajectoryTokenizerMLX(dims_min=[-1.0], dims_max=[-1.0, 1.0])
+    except ValueError as exc:
+        assert "length" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for dims length mismatch")
+
+    class _ZeroScale:
+        def get_action_space_dims(self):
+            return (1, 2)
+
+        def traj_to_action(self, hist_xyz, hist_rot, fut_xyz, fut_rot):
+            del hist_xyz, hist_rot, fut_xyz, fut_rot
+            return np.zeros((1, 1, 2), dtype=np.float64)
+
+    tok = DiscreteTrajectoryTokenizerMLX(
+        action_space=_ZeroScale(),
+        dims_min=[0.0, 0.0],
+        dims_max=[0.0, 1.0],
+        num_bins=8,
+    )
+    try:
+        tok.encode(
+            np.zeros((1, 1, 3)),
+            np.zeros((1, 1, 3, 3)),
+            np.zeros((1, 1, 3)),
+            np.zeros((1, 1, 3, 3)),
+        )
+    except ValueError as exc:
+        assert "zero" in str(exc)
+    else:
+        raise AssertionError("expected ValueError when a dim scale is zero")
+
+
 def test_tokenize_future_rejects_3d():
     tok = _StubFutureTok()
     try:

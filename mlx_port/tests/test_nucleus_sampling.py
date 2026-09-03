@@ -28,6 +28,22 @@ def test_top_p_one_is_noop():
     np.testing.assert_allclose(out[0], [1.0, 2.0, 3.0])
 
 
+def test_top_p_zero_and_negative_raise():
+    logits = mx.array([[1.0, 2.0]])
+    try:
+        apply_top_p(logits, 0.0)
+    except ValueError as exc:
+        assert "top_p" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for top_p=0")
+    try:
+        apply_top_p(logits, -0.1)
+    except ValueError as exc:
+        assert "top_p" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for negative top_p")
+
+
 def test_nucleus_does_not_sample_masked_tail():
     mx.random.seed(0)
     logits = mx.array([[20.0, -20.0, -20.0, -20.0]])

@@ -71,6 +71,15 @@ def test_traj_future_start_offsets_and_mask():
     assert mask[1, 0, 0, 2] < 0.0
 
 
+def test_traj_future_start_offsets_missing_marker_is_len_minus_one():
+    seq = np.array([1, 2, 3, 4], dtype=np.int32)
+    off = traj_future_start_offsets(seq, 99)
+    np.testing.assert_array_equal(off, [3])
+    batch = np.array([[1, 2, 99, 4], [5, 6, 7, 8]], dtype=np.int32)
+    off2 = traj_future_start_offsets(batch, 99)
+    np.testing.assert_array_equal(off2, [3, 3])
+
+
 def test_expert_position_ids_adds_delta_and_offset():
     pos = np.asarray(expert_position_ids(4, 2, np.array([[10], [20]]), np.array([3, 5])))
     assert pos.shape == (3, 2, 4)

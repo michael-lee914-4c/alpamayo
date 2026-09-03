@@ -54,6 +54,15 @@ def test_build_stage1_rejects_t0_when_recipe_is_coc():
         raise AssertionError("expected ValueError when recipe=coc and t0_us is set")
 
 
+def test_build_pai_rejects_unknown_recipe():
+    try:
+        build_pai_train_batch(None, "unused", "/tmp", recipe="joint")
+    except ValueError as exc:
+        assert "recipe" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for unknown recipe")
+
+
 @pytest.mark.skipif(not REASONING_PATH.exists(), reason="PAI-CoC not on this machine")
 def test_traj_pool_excludes_coc_and_default_eval_clip():
     table = list_local_traj_clips(exclude_coc=True)
@@ -158,4 +167,34 @@ def test_sft_stage1_small_rejects_epochs_with_steps():
     if proc.returncode == 0:
         raise AssertionError("expected non-zero exit for --epochs + --steps")
     if "exclusive" not in (proc.stderr + proc.stdout):
+        raise AssertionError(proc.stderr)
+
+
+def test_sft_stage1_small_rejects_n_clips_below_two():
+    proc = subprocess.run(
+        [sys.executable, "-m", "mlx_port.scripts.sft_stage1_small", "--n-clips", "1"],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode == 0:
+        raise AssertionError("expected non-zero exit for --n-clips 1")
+    if "n-clips" not in (proc.stderr + proc.stdout):
+        raise AssertionError(proc.stderr)
+
+
+def test_sft_stage1_small_rejects_save_every_zero():
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "mlx_port.scripts.sft_stage1_small",
+            "--lora-save-every",
+            "0",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode == 0:
+        raise AssertionError("expected non-zero exit for --lora-save-every 0")
+    if "lora-save-every" not in (proc.stderr + proc.stdout):
         raise AssertionError(proc.stderr)

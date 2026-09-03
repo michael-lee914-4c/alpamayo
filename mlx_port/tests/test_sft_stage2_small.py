@@ -144,3 +144,72 @@ def test_sft_stage2_small_rejects_epochs_with_steps():
         raise AssertionError("expected non-zero exit for --epochs + --steps")
     if "exclusive" not in (proc.stderr + proc.stdout):
         raise AssertionError(proc.stderr)
+
+
+def test_sft_stage2_small_rejects_n_clips_below_two():
+    proc = subprocess.run(
+        [sys.executable, "-m", "mlx_port.scripts.sft_stage2_small", "--n-clips", "1"],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode == 0:
+        raise AssertionError("expected non-zero exit for --n-clips 1")
+    if "n-clips" not in (proc.stderr + proc.stdout):
+        raise AssertionError(proc.stderr)
+
+
+def test_sft_stage2_small_no_expert_lora_save_requires_flag():
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "mlx_port.scripts.sft_stage2_small",
+            "--no-expert-lora-save",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode == 0:
+        raise AssertionError("expected non-zero exit for --no-expert-lora-save without --expert-lora")
+    err = (proc.stderr or "") + (proc.stdout or "")
+    if "expert-lora" not in err:
+        raise AssertionError(err)
+
+
+def test_sft_stage2_small_expert_lora_save_dir_requires_flag():
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "mlx_port.scripts.sft_stage2_small",
+            "--expert-lora-save-dir",
+            "/tmp/expert-lora-missing-flag",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode == 0:
+        raise AssertionError("expected non-zero exit for --expert-lora-save-dir without --expert-lora")
+    err = (proc.stderr or "") + (proc.stdout or "")
+    if "expert-lora" not in err:
+        raise AssertionError(err)
+
+
+def test_sft_stage2_small_expert_lora_save_every_requires_positive():
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "mlx_port.scripts.sft_stage2_small",
+            "--expert-lora",
+            "--expert-lora-save-every",
+            "0",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode == 0:
+        raise AssertionError("expected non-zero exit for --expert-lora-save-every 0")
+    err = (proc.stderr or "") + (proc.stdout or "")
+    if "expert-lora-save-every" not in err:
+        raise AssertionError(err)
