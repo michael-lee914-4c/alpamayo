@@ -1,6 +1,9 @@
 """Unit tests for Stage 1 GT comparison (no model load)."""
 
+import json
+
 import numpy as np
+import pandas as pd
 import pytest
 
 from mlx_port.gt_eval import (
@@ -10,10 +13,23 @@ from mlx_port.gt_eval import (
     clean_pred_coc,
     format_gt_report,
     list_local_coc_clips,
+    list_local_traj_clips,
     load_clip_gt,
     min_ade_xy,
     score_coc,
 )
+
+
+def _write_pai(tmp_path, index: dict, coc: dict | None = None):
+    """Minimal clip_index + optional CoC parquet tree."""
+    root = tmp_path / "pai"
+    (root / "reasoning").mkdir(parents=True)
+    pd.DataFrame.from_dict(index, orient="index").to_parquet(root / "clip_index.parquet")
+    if coc is not None:
+        pd.DataFrame.from_dict(coc, orient="index").to_parquet(
+            root / "reasoning" / "ood_reasoning.parquet"
+        )
+    return root
 
 _HAS_PAI_COC = REASONING_PATH.exists()
 
@@ -108,3 +124,116 @@ def test_format_gt_report_rank2_single_traj():
     gt, gt_xyz, pred = _toy_gt_report_inputs()
     report = format_gt_report(gt, pred_xyz=pred[1], ego_future_xyz=gt_xyz)
     assert "minADE=0.000 m" in report
+
+
+def test_list_local_traj_clips_excludes_coc_and_invalid(tmp_path):
+    root = _write_pai(
+        tmp_path,
+        index={
+            "keep": {"clip_is_valid": True, "chunk": 1},
+            "coc_clip": {"clip_is_valid": True, "chunk": 2},
+            "invalid": {"clip_is_valid": False, "chunk": 3},
+            "far_chunk": {"clip_is_valid": True, "chunk": 300},
+            "neg_chunk": {"clip_is_valid": True, "chunk": -1},
+        },
+        coc={
+            "coc_clip": {
+                "split": "val",
+                "event_cluster": "yield",
+                "events": [{"coc": "Yield."}],
+            }
+        },
+    )
+    table = list_local_traj_clips(root, chunk_max=249, exclude_coc=True)
+    assert list(table.index.astype(str)) == ["keep"]
+    kept = list_local_traj_clips(root, chunk_max=249, exclude_coc=False)
+    assert set(kept.index.astype(str)) == {"keep", "coc_clip"}
+
+
+def test_list_local_traj_clips_empty_or_missing_coc_raises(tmp_path):
+    only_coc = _write_pai(
+        tmp_path / "only_coc",
+        index={"coc_clip": {"clip_is_valid": True, "chunk": 0}},
+        coc={"coc_clip": {"split": "val", "event_cluster": "x", "events": []}},
+    )
+    with pytest.raises(RuntimeError, match="no traj clips"):
+        list_local_traj_clips(only_coc, exclude_coc=True)
+
+    no_coc = _write_pai(
+        tmp_path / "no_coc",
+        index={"keep": {"clip_is_valid": True, "chunk": 0}},
+        coc=None,
+    )
+    with pytest.raises(FileNotFoundError, match="CoC labels"):
+        list_local_traj_clips(no_coc, exclude_coc=True)
+    kept = list_local_traj_clips(no_coc, exclude_coc=False)
+    assert list(kept.index.astype(str)) == ["keep"]
+
+
+def test_list_local_coc_clips_filters_chunk_and_split(tmp_path):
+    root = _write_pai(
+        tmp_path,
+        index={
+            "train_ok": {"clip_is_valid": True, "chunk": 1},
+            "val_ok": {"clip_is_valid": True, "chunk": 2},
+            "invalid": {"clip_is_valid": False, "chunk": 3},
+            "far": {"clip_is_valid": True, "chunk": 300},
+        },
+        coc={
+            "train_ok": {"split": "train", "event_cluster": "a", "events": []},
+            "val_ok": {"split": "val", "event_cluster": "b", "events": []},
+            "invalid": {"split": "val", "event_cluster": "c", "events": []},
+            "far": {"split": "val", "event_cluster": "d", "events": []},
+            "missing_index": {"split": "val", "event_cluster": "e", "events": []},
+        },
+    )
+    all_local = list_local_coc_clips(root, chunk_max=249)
+    assert set(all_local.index.astype(str)) == {"train_ok", "val_ok"}
+    val_only = list_local_coc_clips(root, chunk_max=249, split="val")
+    assert list(val_only.index.astype(str)) == ["val_ok"]
+
+
+def test_load_clip_gt_parses_events_and_missing_index(tmp_path):
+    events = [
+        {"coc": "Yield to the pedestrian.", "event_start_timestamp": 10},
+        {"coc": "", "event_start_timestamp": 20},
+        {"event_start_timestamp": 30},
+    ]
+    root = _write_pai(
+        tmp_path,
+        index={"labeled": {"clip_is_valid": True, "chunk": 7}},
+        coc={
+            "labeled": {
+                "split": "val",
+                "event_cluster": "yield",
+                "events": json.dumps(events),
+            },
+            "no_index": {
+                "split": "train",
+                "event_cluster": "other",
+                "events": json.dumps(json.dumps([{"coc": "Stop."}])),
+            },
+        },
+    )
+    gt = load_clip_gt("labeled", local_dir=root)
+    assert gt["clip_id"] == "labeled"
+    assert gt["split"] == "val"
+    assert gt["chunk"] == 7
+    assert gt["gt_coc_texts"] == ["Yield to the pedestrian."]
+
+    orphan = load_clip_gt("no_index", local_dir=root)
+    assert orphan["chunk"] is None
+    assert orphan["gt_coc_texts"] == ["Stop."]
+
+    with pytest.raises(KeyError, match="no CoC label"):
+        load_clip_gt("missing", local_dir=root)
+
+
+def test_score_coc_readable_needs_three_letter_words():
+    gt = ["Yield to the pedestrian in the crosswalk."]
+    short = score_coc("ok go", gt)
+    assert short["readable"] is False
+    sentence = score_coc("stop the car", gt)
+    assert sentence["readable"] is True
+    angled = score_coc("<stop the car now", gt)
+    assert angled["readable"] is False

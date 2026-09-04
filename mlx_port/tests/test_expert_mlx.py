@@ -9,6 +9,7 @@ from mlx_port.models.expert_mlx import (
     AlpamayoExpert,
     cache_seq_len,
     expert_attention_mask,
+    expert_non_causal_train_mask,
     expert_position_ids,
     expert_rope_mask_contract,
     text_config_from_vlm_and_overrides,
@@ -147,3 +148,36 @@ def test_trim_cache_restores_prefix_len():
     trim_cache(cache, 4)
     assert cache_seq_len(cache) == 6
     assert cache[0]._idx == 6
+
+
+def test_cache_seq_len_empty_or_uninitialized_is_zero():
+    assert cache_seq_len([]) == 0
+    assert cache_seq_len([None]) == 0
+
+
+def test_expert_attention_mask_skips_hide_when_offset_not_in_prefix():
+    no_hide = np.asarray(expert_attention_mask(1, 4, 5, np.array([5])))
+    assert no_hide.shape == (1, 1, 4, 9)
+    assert not np.any(no_hide[0, 0, 0, :5] < 0)
+    past = np.asarray(expert_attention_mask(1, 4, 5, np.array([8])))
+    assert not np.any(past[0, 0, 0, :5] < 0)
+    negative = np.asarray(expert_attention_mask(1, 4, 5, np.array([-1])))
+    assert not np.any(negative[0, 0, 0, :5] < 0)
+
+
+def test_expert_non_causal_train_mask_is_zeros_and_rejects_empty():
+    mask = np.asarray(expert_non_causal_train_mask(2, 4, 6))
+    assert mask.shape == (2, 1, 4, 10)
+    assert np.all(mask == 0.0)
+    try:
+        expert_non_causal_train_mask(0, 4, 1)
+    except ValueError as exc:
+        assert "batch" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for batch=0")
+    try:
+        expert_non_causal_train_mask(1, 0, 1)
+    except ValueError as exc:
+        assert "n_tokens" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for n_tokens=0")

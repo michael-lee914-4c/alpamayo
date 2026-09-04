@@ -3,6 +3,7 @@
 import subprocess
 import sys
 
+import pandas as pd
 import pytest
 
 from mlx_port.gt_eval import (
@@ -159,3 +160,49 @@ def test_sft_stage1_small_rejects_epochs_with_steps():
         raise AssertionError("expected non-zero exit for --epochs + --steps")
     if "exclusive" not in (proc.stderr + proc.stdout):
         raise AssertionError(proc.stderr)
+
+
+def _write_pai(tmp_path, index: dict, coc: dict | None = None):
+    root = tmp_path / "pai"
+    (root / "reasoning").mkdir(parents=True)
+    pd.DataFrame.from_dict(index, orient="index").to_parquet(root / "clip_index.parquet")
+    if coc is not None:
+        pd.DataFrame.from_dict(coc, orient="index").to_parquet(
+            root / "reasoning" / "ood_reasoning.parquet"
+        )
+    return root
+
+
+def test_select_non_coc_clips_rejects_default_eval_in_traj_pool(tmp_path):
+    root = _write_pai(
+        tmp_path,
+        index={
+            DEFAULT_EVAL_CLIP_ID: {"clip_is_valid": True, "chunk": 0},
+            "other": {"clip_is_valid": True, "chunk": 1},
+        },
+        coc={"unrelated": {"split": "val", "event_cluster": "x", "events": []}},
+    )
+    try:
+        select_non_coc_clips(root, n_clips=2, seed=0)
+    except RuntimeError as exc:
+        assert DEFAULT_EVAL_CLIP_ID in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError when default CoC eval clip is in the traj pool")
+
+
+def test_select_non_coc_clips_rejects_short_local_pool(tmp_path):
+    root = _write_pai(
+        tmp_path,
+        index={
+            "a": {"clip_is_valid": True, "chunk": 0},
+            "b": {"clip_is_valid": True, "chunk": 1},
+            "c": {"clip_is_valid": True, "chunk": 2},
+        },
+        coc={"unrelated": {"split": "val", "event_cluster": "x", "events": []}},
+    )
+    try:
+        select_non_coc_clips(root, n_clips=8, seed=0)
+    except RuntimeError as exc:
+        assert "only 3 non-CoC" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError when the local traj pool is smaller than n_clips")
