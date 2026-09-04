@@ -881,3 +881,151 @@ def test_time_train_step_t0_us_requires_from_clip():
         raise AssertionError("expected non-zero exit for --t0-us without --from-clip")
     if "requires --from-clip" not in (proc.stderr + proc.stdout):
         raise AssertionError(proc.stderr)
+
+
+def test_get_role_eos_mask_pairs_complete_assistant_blocks():
+    tok = _FakeTok()
+    # system / user-like / complete assistant / incomplete assistant (extra BOS)
+    ids = mx.array([[1, 4, 8, 2, 1, 99, 8, 2, 1, 3, 8, 2, 1, 3, 8]], dtype=mx.int32)
+    mask = get_role_eos_mask(ids, tok)
+    got = [bool(mask[0, i].item()) for i in range(ids.shape[1])]
+    assert got[3] is False
+    assert got[7] is False
+    assert got[11] is True
+    assert got[14] is False
+    assert sum(got) == 1
+
+    one_d = get_role_eos_mask([1, 3, 8, 2], tok)
+    assert tuple(one_d.shape) == (1, 4)
+    assert bool(one_d[0, 3].item()) is True
+
+    user_only = get_role_eos_mask(mx.array([[1, 4, 8, 2]]), tok)
+    assert bool(mx.any(user_only).item()) is False
+
+
+def test_get_role_eos_mask_rejects_missing_tokenizer_and_trailing_bos():
+    tok = _FakeTok()
+    try:
+        get_role_eos_mask([[1, 2]], None)
+    except ValueError as exc:
+        assert "tokenizer" in str(exc)
+    else:
+        raise AssertionError("expected ValueError when tokenizer is None")
+
+    class _Missing:
+        def convert_tokens_to_ids(self, name):
+            return None
+
+    try:
+        get_role_eos_mask([[1, 2, 3]], _Missing())
+    except ValueError as exc:
+        assert "missing" in str(exc)
+    else:
+        raise AssertionError("expected ValueError when role tokens are missing")
+
+    try:
+        get_role_eos_mask([[2, 1]], tok)
+    except ValueError as exc:
+        assert "last token" in str(exc)
+    else:
+        raise AssertionError("expected ValueError when BOS is the last token")
+
+
+def test_sft_stage1_labels_mask_requires_traj_specials():
+    try:
+        sft_stage1_labels_mask([[1, 2]], None)
+    except ValueError as exc:
+        assert "tokenizer" in str(exc)
+    else:
+        raise AssertionError("expected ValueError when tokenizer is None")
+
+    class _NoTraj(_FakeTok):
+        def convert_tokens_to_ids(self, name):
+            if "traj_future" in name:
+                return None
+            return super().convert_tokens_to_ids(name)
+
+    try:
+        sft_stage1_labels_mask([[1, 3, 2]], _NoTraj())
+    except RuntimeError as exc:
+        assert "traj_future" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError when traj_future specials are missing")
+
+
+def test_apply_labels_mask_none_is_identity():
+    ids = mx.array([[1, 2, 3]], dtype=mx.int32)
+    out = apply_labels_mask(ids, None)
+    assert [int(out[0, i].item()) for i in range(3)] == [1, 2, 3]
+
+
+def test_labels_mask_between_promotes_1d_and_rejects_rank3():
+    mask = labels_mask_between([1, 9, 4, 8, 6], 9, 8)
+    assert tuple(mask.shape) == (1, 5)
+    assert [bool(mask[0, i].item()) for i in range(5)] == [
+        False,
+        True,
+        True,
+        True,
+        False,
+    ]
+    try:
+        labels_mask_between(mx.zeros((1, 1, 3), dtype=mx.int32), 1, 2)
+    except ValueError as exc:
+        assert "(B, L)" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for rank-3 input_ids")
+
+
+def test_expert_train_position_ids_none_delta_and_rejects_empty():
+    pos = expert_train_position_ids(3, 1, rope_deltas=None, prefix_len=2)
+    assert tuple(pos.shape) == (3, 1, 3)
+    assert int(pos[0, 0, 0].item()) == 2
+    assert int(pos[2, 0, 2].item()) == 4
+    try:
+        expert_train_position_ids(0, 1, 0, 0)
+    except ValueError as exc:
+        assert "n_tokens" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for n_tokens=0")
+    try:
+        expert_train_position_ids(4, 0, 0, 0)
+    except ValueError as exc:
+        assert "batch" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for batch=0")
+
+
+def test_event_coc_rejects_whitespace_only_label():
+    gt = {"events": [{"event_start_timestamp": 10, "coc": "   "}]}
+    try:
+        _event_coc(gt, 10)
+    except RuntimeError as exc:
+        assert "empty CoC" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError for whitespace-only CoC")
+
+
+def test_create_message_rejects_nonpositive_traj_pad_counts():
+    frames = np.zeros((16, 3, 8, 8), dtype=np.uint8)
+    try:
+        create_message(frames, num_history_traj_tokens=0)
+    except ValueError as exc:
+        assert "num_history_traj_tokens" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for zero history pads")
+    try:
+        create_message(frames, sft_stage="stage1", num_future_traj_tokens=0)
+    except ValueError as exc:
+        assert "num_future_traj_tokens" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for zero future pads")
+
+
+def test_assert_train_graph_requires_times():
+    try:
+        assert_train_graph(None)
+    except ValueError as exc:
+        assert "times" in str(exc)
+    else:
+        raise AssertionError("expected ValueError when times is None")

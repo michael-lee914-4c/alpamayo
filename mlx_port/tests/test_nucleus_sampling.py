@@ -34,3 +34,12 @@ def test_nucleus_does_not_sample_masked_tail():
     for _ in range(8):
         tok = int(sample_next_token(logits, temperature=0.6, top_p=0.98).item())
         assert tok == 0
+
+
+def test_sample_and_top_p_promote_1d_logits():
+    tok = sample_next_token(mx.array([1.0, 10.0, 2.0]), temperature=0.0, top_p=0.98)
+    assert int(tok.item()) == 1
+    masked = np.asarray(apply_top_p(mx.array([10.0, 1.0, 1.0, 0.0]), 0.9))
+    assert masked.shape == (1, 4)
+    assert np.isfinite(masked[0, 0])
+    assert not np.isfinite(masked[0, 1])

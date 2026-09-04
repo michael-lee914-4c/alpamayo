@@ -68,6 +68,22 @@ def test_replace_padding_after_eos():
     assert out[1, 2] == 0 and out[1, 3] == 0 and out[1, 4] == 0
 
 
+def test_replace_padding_after_eos_no_match_or_terminal_eos_is_noop():
+    no_eos = mx.array([[1, 2, 3, 4]], dtype=mx.int32)
+    out = replace_padding_after_eos(no_eos, eos_token_id=42, pad_token_id=0)
+    assert [int(out[0, i].item()) for i in range(4)] == [1, 2, 3, 4]
+    terminal = mx.array([[1, 2, 42]], dtype=mx.int32)
+    out2 = replace_padding_after_eos(terminal, eos_token_id=42, pad_token_id=0)
+    assert [int(out2[0, i].item()) for i in range(3)] == [1, 2, 42]
+
+
+def test_stop_after_eos_accepts_scalar_token_id():
+    stop = StopAfterEOS(eos_token_id=42)
+    assert stop(42) is False
+    assert bool(stop.eos_found[0].item()) is True
+    assert stop(7) is True
+
+
 def test_hf_generate_stop_ends_immediately_on_im_end():
     """HF generate finishes a sequence as soon as eos_token_id is emitted."""
     im_end, endoftext, traj_future = 151645, 151643, 155681

@@ -63,6 +63,30 @@ def test_bind_image_pixel_budget_rejects_missing():
         bind_image_pixel_budget(None)
 
 
+def test_image_pixel_budget_reads_size_dict_when_attrs_missing():
+    class _IP:
+        size = {"shortest_edge": MIN_PIXELS, "longest_edge": MAX_PIXELS}
+
+    assert image_pixel_budget(_IP()) == (MIN_PIXELS, MAX_PIXELS)
+    with pytest.raises(ValueError, match="requires an image processor"):
+        image_pixel_budget(None)
+    with pytest.raises(ValueError, match="cannot read pixel budget"):
+        image_pixel_budget(object())
+
+
+def test_bind_image_pixel_budget_rejects_invalid_budget():
+    class _IP:
+        def __init__(self):
+            self.min_pixels = MIN_PIXELS
+            self.max_pixels = MAX_PIXELS
+            self.size = {"shortest_edge": MIN_PIXELS, "longest_edge": MAX_PIXELS}
+
+    with pytest.raises(ValueError, match="invalid pixel budget"):
+        bind_image_pixel_budget(_IP(), min_pixels=0, max_pixels=MAX_PIXELS)
+    with pytest.raises(ValueError, match="invalid pixel budget"):
+        bind_image_pixel_budget(_IP(), min_pixels=MAX_PIXELS, max_pixels=MIN_PIXELS)
+
+
 def test_mlx_vlm_image_processor_1080p_grid_after_bind():
     from mlx_vlm.models.qwen3_vl.processing_qwen3_vl import Qwen3VLImageProcessor
 
