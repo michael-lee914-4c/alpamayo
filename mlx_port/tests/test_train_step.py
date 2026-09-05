@@ -10,13 +10,25 @@ import numpy as np
 from mlx_port.models.alpamayo_r1_mlx import ActionInProj, ActionOutProj, FlowMatching
 from mlx_port.models.token_utils_mlx import replace_pad_token
 from mlx_port.processor import create_message
-from mlx_port.scripts.time_train_step import _event_coc, _image_batch_from_tokenized
+from mlx_port.scripts.time_train_step import (
+    _event_coc,
+    _gt_action,
+    _image_batch_from_tokenized,
+    _token_id,
+    build_pai_train_batch,
+)
 from mlx_port.models.expert_mlx import expert_non_causal_train_mask
+from mlx_port.stage_timers import current_clock
 from mlx_port.train_step import (
     IGNORE_INDEX,
     TRAIN_DOMINANT,
     TRAIN_MS_KEYS,
     TrainStepTimes,
+    _as_int32,
+    _crop_cache_to_future_start,
+    _future_start_id,
+    _stop_gradient_cache,
+    _vlm_kwargs,
     append_traj_future_start,
     apply_labels_mask,
     assert_stage2_trainables,
@@ -35,6 +47,7 @@ from mlx_port.train_step import (
     sft_train_step,
     shifted_cross_entropy,
     stage1_two_mean_ce,
+    teacher_forced_vlm,
     traj_future_keep_len,
     unfreeze_expert,
 )
@@ -881,3 +894,288 @@ def test_time_train_step_t0_us_requires_from_clip():
         raise AssertionError("expected non-zero exit for --t0-us without --from-clip")
     if "requires --from-clip" not in (proc.stderr + proc.stdout):
         raise AssertionError(proc.stderr)
+
+
+def test_future_start_id_prefers_model_dict_then_tokenizer():
+    assert _future_start_id(SimpleNamespace(traj_token_ids={"future_start": 7})) == 7
+    tok = SimpleNamespace(
+        convert_tokens_to_ids=lambda name: 99 if name == "<|traj_future_start|>" else None
+    )
+    assert _future_start_id(SimpleNamespace(traj_token_ids={}, tokenizer=tok)) == 99
+    assert _future_start_id(SimpleNamespace(traj_token_ids=None, tokenizer=None)) is None
+    missing = SimpleNamespace(
+        traj_token_ids={},
+        tokenizer=SimpleNamespace(convert_tokens_to_ids=lambda name: None),
+    )
+    assert _future_start_id(missing) is None
+
+
+def test_vlm_kwargs_coerces_grids_and_omits_missing():
+    deepstack = ["keep"]
+    feats = np.ones((2, 2), dtype=np.float32)
+    out = _vlm_kwargs(
+        {
+            "image_grid_thw": np.array([[1, 2, 3]], dtype=np.int64),
+            "cached_deepstack_visual_embeds": deepstack,
+            "cached_image_features": feats,
+            "mask": [1, 0, 1],
+            "pixel_values": None,
+            "unused": 1,
+        }
+    )
+    assert "pixel_values" not in out
+    assert "unused" not in out
+    assert out["cached_deepstack_visual_embeds"] is deepstack
+    assert out["image_grid_thw"].dtype == mx.int32
+    assert tuple(out["image_grid_thw"].shape) == (1, 3)
+    assert tuple(out["cached_image_features"].shape) == (2, 2)
+    assert tuple(out["mask"].shape) == (3,)
+
+
+def test_as_int32_promotes_1d_and_rejects_rank3():
+    out = _as_int32([1, 2, 3])
+    assert tuple(out.shape) == (1, 3)
+    assert out.dtype == mx.int32
+    try:
+        _as_int32([[[1, 2]]])
+    except ValueError as exc:
+        assert "(B, L)" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for rank-3 input_ids")
+
+
+def test_crop_cache_to_future_start_drops_only_post_marker(monkeypatch):
+    import mlx_port.train_step as ts
+
+    drops = []
+
+    def fake_trim(cache, n):
+        drops.append(int(n))
+
+    monkeypatch.setattr(ts, "trim_cache", fake_trim)
+    ids = mx.array([[1, 2, 7, 4, 5]], dtype=mx.int32)
+    cache = [SimpleNamespace(offset=10)]
+    _crop_cache_to_future_start(cache, ids, 7)
+    assert drops == [7]
+    drops.clear()
+    _crop_cache_to_future_start([SimpleNamespace(offset=3)], ids, 7)
+    assert drops == []
+    _crop_cache_to_future_start(None, ids, 7)
+    assert drops == []
+    _crop_cache_to_future_start([SimpleNamespace(offset=0)], ids, 7)
+    assert drops == []
+
+
+def test_stop_gradient_cache_wraps_keys_and_values(monkeypatch):
+    import mlx_port.train_step as ts
+
+    seen = []
+
+    def wrap(value):
+        seen.append(value)
+        return ("sg", value)
+
+    monkeypatch.setattr(ts.mx, "stop_gradient", wrap)
+    layer = SimpleNamespace(keys="K", values="V")
+    _stop_gradient_cache([layer])
+    assert layer.keys == ("sg", "K")
+    assert layer.values == ("sg", "V")
+    assert seen == ["K", "V"]
+    _stop_gradient_cache(None)
+    assert seen == ["K", "V"]
+    partial = SimpleNamespace(keys="K2")
+    _stop_gradient_cache([partial])
+    assert partial.keys == ("sg", "K2")
+    assert not hasattr(partial, "values") or getattr(partial, "values", None) is None
+
+
+def test_teacher_forced_vlm_rejects_decode_and_euler():
+    class _DecodeVLM(_StubVLM):
+        def __call__(self, input_ids, cache=None, **kwargs):
+            clock = current_clock()
+            if clock is not None:
+                clock.decode_ms = 1.0
+                clock.decode_tok = 1
+            return super().__call__(input_ids, cache=cache, **kwargs)
+
+    try:
+        teacher_forced_vlm(
+            SimpleNamespace(vlm=_DecodeVLM()),
+            mx.array([[1, 2, 3]], dtype=mx.int32),
+        )
+    except RuntimeError as exc:
+        assert "decoded" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError when the train graph decodes")
+
+    class _EulerVLM(_StubVLM):
+        def __call__(self, input_ids, cache=None, **kwargs):
+            clock = current_clock()
+            if clock is not None:
+                clock.fm_steps = 10
+            return super().__call__(input_ids, cache=cache, **kwargs)
+
+    try:
+        teacher_forced_vlm(
+            SimpleNamespace(vlm=_EulerVLM()),
+            mx.array([[1, 2, 3]], dtype=mx.int32),
+        )
+    except RuntimeError as exc:
+        assert "Euler" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError when the train graph runs Euler")
+
+
+def test_sft_train_step_fuse_and_single_ce_fallback(monkeypatch):
+    import mlx_port.train_step as ts
+
+    model = _toy_model()
+    fused = []
+
+    def fuse(ids, data):
+        fused.append(data)
+        return ids
+
+    model.fuse_traj_tokens = fuse
+    ids = mx.array([[1, 2, 3, 4, 7, 8]], dtype=mx.int32)
+    sft_train_step(
+        model,
+        {"input_ids": ids, "fuse": True, "ego_history_xyz": "H"},
+        stage="stage1",
+    )
+    assert len(fused) == 1
+    assert fused[0]["ego_history_xyz"] == "H"
+
+    model.future_token_start_idx = 20
+    model.traj_vocab_size = 10
+    model.traj_token_ids = {"future_start": 7, "future_end": 8}
+    seen = {"two": 0, "one": 0}
+    real_two = ts.stage1_two_mean_ce
+    real_one = ts.shifted_cross_entropy
+
+    def two(*args, **kwargs):
+        seen["two"] += 1
+        return real_two(*args, **kwargs)
+
+    def one(*args, **kwargs):
+        seen["one"] += 1
+        return real_one(*args, **kwargs)
+
+    monkeypatch.setattr(ts, "stage1_two_mean_ce", two)
+    monkeypatch.setattr(ts, "shifted_cross_entropy", one)
+    sft_train_step(
+        model, {"input_ids": ids, "stage1_two_mean": False}, stage="stage1"
+    )
+    assert seen["two"] == 0
+    assert seen["one"] >= 1
+    sft_train_step(model, {"input_ids": ids}, stage="stage1")
+    assert seen["two"] == 1
+
+
+def test_assert_stage2_trainables_rejects_vlm_or_missing_expert():
+    from mlx_port.lora import inject_backbone_lora
+    from mlx_port.tests.test_lora import TinyHost
+
+    host = TinyHost(n=1, d=32)
+    inject_backbone_lora(host, rank=4, expected_layers=1, vision=False)
+    try:
+        assert_stage2_trainables(host)
+    except RuntimeError as exc:
+        assert "VLM must be frozen" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError when VLM LoRA is still trainable")
+    freeze_vlm(host)
+    host.expert.freeze()
+    try:
+        assert_stage2_trainables(host)
+    except RuntimeError as exc:
+        assert "no trainable expert" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError when expert params are frozen")
+
+
+def test_freeze_vlm_and_unfreeze_expert_guards():
+    try:
+        freeze_vlm(None)
+    except ValueError as exc:
+        assert "freeze_vlm" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for freeze_vlm(None)")
+    try:
+        freeze_vlm(SimpleNamespace())
+    except RuntimeError as exc:
+        assert "no freeze()" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError when the VLM has no freeze()")
+    try:
+        unfreeze_expert(None)
+    except ValueError as exc:
+        assert "unfreeze_expert" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for unfreeze_expert(None)")
+    try:
+        unfreeze_expert(
+            SimpleNamespace(expert=None, action_in_proj=None, action_out_proj=None)
+        )
+    except RuntimeError as exc:
+        assert "missing" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError when expert modules are missing")
+
+
+def test_token_id_and_gt_action_guards():
+    tok = SimpleNamespace(convert_tokens_to_ids=lambda name: 3 if name == "ok" else None)
+    assert _token_id(tok, "ok") == 3
+    try:
+        _token_id(tok, "<|cot_start|>")
+    except RuntimeError as exc:
+        assert "<|cot_start|>" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError for a missing tokenizer id")
+    try:
+        _gt_action(SimpleNamespace(action_space=None), {})
+    except RuntimeError as exc:
+        assert "action_space" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError when action_space is missing")
+    needed = (
+        "ego_history_xyz",
+        "ego_history_rot",
+        "ego_future_xyz",
+        "ego_future_rot",
+    )
+    try:
+        _gt_action(SimpleNamespace(action_space=object()), {k: None for k in needed})
+    except RuntimeError as exc:
+        assert "missing" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError when ego keys are missing")
+    space = SimpleNamespace(
+        traj_to_action=lambda *a, **k: np.zeros((1, 4, 3), dtype=np.float32),
+        get_action_space_dims=lambda: (4, 2),
+    )
+    data = {
+        "ego_history_xyz": np.zeros((1, 1, 2, 3), dtype=np.float32),
+        "ego_history_rot": np.zeros((1, 1, 2, 3, 3), dtype=np.float32),
+        "ego_future_xyz": np.zeros((1, 1, 4, 3), dtype=np.float32),
+        "ego_future_rot": np.zeros((1, 1, 4, 3, 3), dtype=np.float32),
+    }
+    try:
+        _gt_action(SimpleNamespace(action_space=space), data)
+    except RuntimeError as exc:
+        assert "does not end with" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError for a traj_to_action dim mismatch")
+
+
+def test_build_pai_coc_rejects_empty_events(monkeypatch):
+    monkeypatch.setattr(
+        "mlx_port.scripts.time_train_step.load_clip_gt",
+        lambda clip_id, local_dir=None: {"events": []},
+    )
+    try:
+        build_pai_train_batch(None, "clip", "/tmp", recipe="coc")
+    except RuntimeError as exc:
+        assert "no CoC events" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError for an empty CoC event list")

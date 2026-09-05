@@ -5,6 +5,7 @@ import numpy as np
 from mlx_port.models.token_utils_mlx import (
     fuse_traj_tokens,
     tokenize_future_trajectory,
+    tokenize_history_trajectory,
 )
 from mlx_port.models.trajectory_tokenizer_mlx import DiscreteTrajectoryTokenizerMLX
 
@@ -140,3 +141,28 @@ def test_tokenize_future_rejects_3d():
         assert "4D" in str(exc)
     else:
         raise AssertionError("expected ValueError for 3D future xyz")
+
+
+def test_tokenize_history_requires_encode_and_rank4():
+    data = {
+        "ego_history_xyz": np.zeros((1, 1, 2, 3), dtype=np.float32),
+        "ego_history_rot": np.zeros((1, 1, 2, 3, 3), dtype=np.float32),
+    }
+    try:
+        tokenize_history_trajectory(object(), data)
+    except AttributeError as exc:
+        assert "encode" in str(exc)
+    else:
+        raise AssertionError("expected AttributeError when history tokenizer has no encode")
+    try:
+        tokenize_history_trajectory(
+            object(),
+            {
+                "ego_history_xyz": np.zeros((1, 2, 3), dtype=np.float32),
+                "ego_history_rot": np.zeros((1, 2, 3, 3), dtype=np.float32),
+            },
+        )
+    except AssertionError:
+        pass
+    else:
+        raise AssertionError("expected AssertionError for non-4D history xyz")

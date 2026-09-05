@@ -63,6 +63,16 @@ def test_score_coc_punctuation_is_not_readable():
     assert s["readable"] is False
 
 
+def test_score_coc_skips_empty_token_gts():
+    pred = "yield to the pedestrian now extra"
+    s = score_coc(pred, ["!!!", pred])
+    assert s["matched_gt"] == pred
+    assert s["jaccard"] == 1.0
+    empty = score_coc(pred, ["!!!", "..."])
+    assert empty["matched_gt"] is None
+    assert empty["jaccard"] == 0.0
+
+
 def test_min_ade_zero_when_identical():
     gt = np.zeros((2, 64), dtype=np.float32)
     gt[0] = np.linspace(0, 6.4, 64)
@@ -89,6 +99,16 @@ def test_pred_xy_for_ade_rank3_is_samples_t_2():
     _, _, pred = _toy_gt_report_inputs()
     xy = _pred_xy_for_ade(pred)
     assert xy.shape == (2, 4, 2)
+
+
+def test_pred_xy_for_ade_rank4_drops_leading_batch():
+    pred = np.zeros((3, 2, 5, 3), dtype=np.float64)
+    pred[0, 1, :, 0] = np.arange(5, dtype=np.float64)
+    pred[1, :, :, 0] = 99.0
+    xy = _pred_xy_for_ade(pred)
+    assert xy.shape == (2, 5, 2)
+    assert xy[1, :, 0].tolist() == [0.0, 1.0, 2.0, 3.0, 4.0]
+    assert float(xy[0].sum()) == 0.0
 
 
 def test_format_gt_report_rank3_pred_uses_best_sample():
