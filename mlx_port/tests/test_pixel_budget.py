@@ -63,6 +63,27 @@ def test_bind_image_pixel_budget_rejects_missing():
         bind_image_pixel_budget(None)
 
 
+def test_smart_resize_rejects_nonpositive_factor():
+    with pytest.raises(ValueError, match="factor"):
+        smart_resize_hw(64, 64, patch_size=0, merge_size=2)
+    with pytest.raises(ValueError, match="factor"):
+        smart_resize_hw(64, 64, patch_size=16, merge_size=0)
+
+
+def test_image_pixel_budget_requires_readable_edges():
+    with pytest.raises(ValueError, match="requires an image processor"):
+        image_pixel_budget(None)
+    with pytest.raises(ValueError, match="cannot read pixel budget"):
+        image_pixel_budget(object())
+
+
+def test_create_message_rejects_non_nchw_rank():
+    with pytest.raises(ValueError, match="expected 4"):
+        create_message(np.zeros((3, 8, 8), dtype=np.uint8))
+    with pytest.raises(ValueError, match="expected 4"):
+        create_message(np.zeros((1, 16, 3, 8, 8), dtype=np.uint8))
+
+
 def test_mlx_vlm_image_processor_1080p_grid_after_bind():
     from mlx_vlm.models.qwen3_vl.processing_qwen3_vl import Qwen3VLImageProcessor
 

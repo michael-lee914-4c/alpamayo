@@ -368,6 +368,57 @@ def test_freeze_vision_features_is_noop_without_pixels():
     assert "cached_image_features" not in out
 
 
+def test_freeze_vision_features_cached_is_identity():
+    host = TinyHost(n=1, d=32)
+    batch = {
+        "cached_image_features": "keep",
+        "pixel_values": np.zeros((1, 3, 8, 8), dtype=np.float32),
+    }
+    out = freeze_vision_features(host, batch)
+    assert out is batch
+    assert out["cached_image_features"] == "keep"
+
+
+def test_freeze_vision_features_requires_tower_grid_and_deepstack():
+    batch = {
+        "pixel_values": np.zeros((1, 3, 8, 8), dtype=np.float32),
+        "image_grid_thw": np.array([[1, 2, 2]], dtype=np.int32),
+    }
+    try:
+        freeze_vision_features(SimpleNamespace(vlm=None), batch)
+    except RuntimeError as exc:
+        assert "vision_tower" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError when vision_tower is missing")
+    try:
+        freeze_vision_features(
+            TinyHost(n=1, d=32),
+            {"pixel_values": np.zeros((1, 3, 8, 8), dtype=np.float32)},
+        )
+    except RuntimeError as exc:
+        assert "image_grid_thw" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError when the grid is missing")
+
+    class _Tower:
+        def __init__(self):
+            self.patch_embed = SimpleNamespace(
+                proj=SimpleNamespace(weight=mx.ones((4, 4), dtype=mx.float32))
+            )
+
+        def __call__(self, pixels, grid):
+            del pixels, grid
+            return mx.ones((1, 2, 4), dtype=mx.float32), None
+
+    host = SimpleNamespace(vlm=SimpleNamespace(vision_tower=_Tower()))
+    try:
+        freeze_vision_features(host, batch)
+    except RuntimeError as exc:
+        assert "deepstack" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError when deepstack is missing")
+
+
 def test_time_train_step_lora_flags_in_help():
     import subprocess
     import sys
@@ -797,6 +848,57 @@ def test_save_lora_raises_without_adapters(tmp_path):
         assert "trainable" in str(exc).lower() or "LoRA" in str(exc)
     else:
         raise AssertionError("expected RuntimeError when no LoRA is injected")
+
+
+def test_save_adapters_reject_step_zero_and_reserved_extra(tmp_path):
+    host = TinyHost(n=1, d=32)
+    inject_backbone_lora(host, rank=4, expected_layers=1, vision=False)
+    try:
+        save_lora_adapters(
+            host, tmp_path, step=0, rank=4, scale=20.0, vision_scope="none"
+        )
+    except ValueError as exc:
+        assert "step must be >= 1" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for adapter step=0")
+    try:
+        save_dense_trainables(host, tmp_path, step=0)
+    except ValueError as exc:
+        assert "step must be >= 1" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for dense step=0")
+    try:
+        save_lora_adapters(
+            host,
+            tmp_path,
+            step=1,
+            rank=4,
+            scale=20.0,
+            vision_scope="none",
+            extra={"rank": 99, "step": 2},
+        )
+    except ValueError as exc:
+        assert "collide" in str(exc)
+        assert "rank" in str(exc)
+    else:
+        raise AssertionError("expected ValueError when extra keys collide")
+
+
+def test_load_lora_requires_config_and_weights(tmp_path):
+    host = TinyHost(n=1, d=32)
+    try:
+        load_lora_adapters(host, tmp_path)
+    except FileNotFoundError as exc:
+        assert ADAPTER_CONFIG_NAME in str(exc)
+    else:
+        raise AssertionError("expected FileNotFoundError for missing adapter_config")
+    (tmp_path / ADAPTER_CONFIG_NAME).write_text("{}\n")
+    try:
+        load_lora_adapters(host, tmp_path)
+    except FileNotFoundError as exc:
+        assert ADAPTER_WEIGHTS_NAME in str(exc)
+    else:
+        raise AssertionError("expected FileNotFoundError for missing adapter weights")
 
 
 def _quantize_expert_leaves(host: TinyStage2Host) -> None:

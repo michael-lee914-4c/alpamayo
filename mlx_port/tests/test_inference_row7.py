@@ -1,10 +1,13 @@
 """Structural tests for Row 7 inference components."""
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import mlx.core as mx
+import numpy as np
 import pytest
 
+from mlx_port.inference import _rope_deltas_np
 from mlx_port.models.token_utils_mlx import (
     AlpamayoGenerateStop,
     ExpertLogitsProcessor,
@@ -107,3 +110,19 @@ def test_qwen_hf_eos_ids_match_generation_config():
     assert ids == [151645, 151643]
     stop = make_vlm_generate_stop(tokenizer, delayed_eos_id=155681)
     assert stop.immediate_eos_ids == {151645, 151643}
+
+
+def test_rope_deltas_np_broadcasts_scalar_and_truncates():
+    model = SimpleNamespace(
+        vlm=SimpleNamespace(language_model=SimpleNamespace(_rope_deltas=None))
+    )
+    zeros = _rope_deltas_np(model, 3)
+    assert zeros.shape == (3, 1)
+    assert np.all(zeros == 0)
+    model.vlm.language_model._rope_deltas = np.array([5])
+    broadcast = _rope_deltas_np(model, 2)
+    assert broadcast.shape == (2, 1)
+    assert np.all(broadcast == 5)
+    model.vlm.language_model._rope_deltas = np.array([1, 2, 3, 4])
+    truncated = _rope_deltas_np(model, 2)
+    assert truncated.reshape(-1).tolist() == [1, 2]
