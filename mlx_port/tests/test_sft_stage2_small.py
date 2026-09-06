@@ -126,6 +126,73 @@ def test_sft_stage2_small_rejects_renamed_expert_dense():
         raise AssertionError(err)
 
 
+def test_stage2_prepare_batches_rejects_coc_missing_action_and_vision_lora(monkeypatch):
+    from pathlib import Path
+
+    from mlx_port.scripts import sft_stage2_small as s2
+
+    monkeypatch.setattr(s2, "has_vision_lora", lambda model: True)
+    try:
+        s2._prepare_batches(object(), ["clip-a"], Path("/tmp"))
+    except RuntimeError as exc:
+        assert "vision LoRA" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError when Stage-2 has vision LoRA")
+
+    monkeypatch.setattr(s2, "has_vision_lora", lambda model: False)
+    monkeypatch.setattr(
+        s2,
+        "build_pai_train_batch",
+        lambda *args, **kwargs: (
+            {"action": [0.0]},
+            {"teacher_cot": "Yield.", "seq": 8, "t0_us": 5_100_000},
+        ),
+    )
+    try:
+        s2._prepare_batches(object(), ["clip-a"], Path("/tmp"))
+    except RuntimeError as exc:
+        assert "CoC teacher" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError when Stage-2 batch carries CoC")
+
+    monkeypatch.setattr(
+        s2,
+        "build_pai_train_batch",
+        lambda *args, **kwargs: (
+            {"action": None},
+            {"teacher_cot": None, "seq": 8, "t0_us": 5_100_000},
+        ),
+    )
+    try:
+        s2._prepare_batches(object(), ["clip-a"], Path("/tmp"))
+    except RuntimeError as exc:
+        assert "no action" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError when Stage-2 batch has no action")
+
+
+def test_sft_stage2_small_no_save_exclusive_with_save_every():
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "mlx_port.scripts.sft_stage2_small",
+            "--expert-lora",
+            "--no-expert-lora-save",
+            "--expert-lora-save-every",
+            "5",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode == 0:
+        raise AssertionError(
+            "expected non-zero exit for --no-expert-lora-save + --expert-lora-save-every"
+        )
+    if "exclusive" not in (proc.stderr + proc.stdout):
+        raise AssertionError(proc.stderr)
+
+
 def test_sft_stage2_small_rejects_epochs_with_steps():
     proc = subprocess.run(
         [

@@ -141,6 +141,40 @@ def test_resolve_train_steps_rejects_both_and_bad_values():
         raise AssertionError("expected epochs >= 1")
 
 
+def test_stage1_prepare_batches_rejects_coc_teacher(monkeypatch):
+    from pathlib import Path
+
+    from mlx_port.scripts import sft_stage1_small as s1
+
+    monkeypatch.setattr(
+        s1,
+        "build_pai_train_batch",
+        lambda *args, **kwargs: (
+            {"input_ids": [1]},
+            {"teacher_cot": "Yield to the pedestrian.", "seq": 8, "t0_us": 5_100_000},
+        ),
+    )
+    monkeypatch.setattr(s1, "freeze_vision_features", lambda model, batch: batch)
+    try:
+        s1._prepare_batches(object(), ["clip-a"], Path("/tmp"))
+    except RuntimeError as exc:
+        assert "CoC teacher" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError when Stage-1 batch carries CoC")
+
+
+def test_stage1_eval_loss_rejects_vision_lora(monkeypatch):
+    from mlx_port.scripts import sft_stage1_small as s1
+
+    monkeypatch.setattr(s1, "has_vision_lora", lambda model: True)
+    try:
+        s1._eval_loss(object(), {"input_ids": [1]})
+    except RuntimeError as exc:
+        assert "vision" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError when Stage-1 eval has vision LoRA")
+
+
 def test_sft_stage1_small_rejects_epochs_with_steps():
     proc = subprocess.run(
         [

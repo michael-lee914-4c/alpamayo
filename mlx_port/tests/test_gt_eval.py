@@ -108,3 +108,17 @@ def test_format_gt_report_rank2_single_traj():
     gt, gt_xyz, pred = _toy_gt_report_inputs()
     report = format_gt_report(gt, pred_xyz=pred[1], ego_future_xyz=gt_xyz)
     assert "minADE=0.000 m" in report
+
+
+def test_score_coc_empty_gt_list_is_zero_overlap():
+    s = score_coc("Yield to the pedestrian in the crosswalk.", [])
+    assert s["readable"] is True
+    assert s["jaccard"] == 0.0
+    assert s["matched_gt"] is None
+
+
+def test_format_gt_report_pred_without_gt_xyz_does_not_invent_ade():
+    gt, _, pred = _toy_gt_report_inputs()
+    report = format_gt_report(gt, pred_xyz=pred, ego_future_xyz=None)
+    assert "minADE=" not in report
+    assert "GT CoC:" in report

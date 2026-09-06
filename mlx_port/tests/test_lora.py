@@ -718,6 +718,12 @@ def test_lora_save_steps_always_includes_last():
         assert "save-every" in str(exc)
     else:
         raise AssertionError("expected ValueError for save-every=0")
+    try:
+        lora_save_steps(0, 10)
+    except ValueError as exc:
+        assert "n_steps" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for n_steps=0")
 
 
 def test_save_and_load_lora_roundtrip(tmp_path):
@@ -769,6 +775,51 @@ def test_save_and_load_lora_roundtrip(tmp_path):
     for key, val in before.items():
         if not np.allclose(val, after[key]):
             raise AssertionError(f"roundtrip mismatch on {key}")
+
+
+def test_load_lora_rejects_n_arrays_mismatch(tmp_path):
+    host = TinyHost(n=2, d=32)
+    inject_backbone_lora(host, rank=4, expected_layers=2, vision=False)
+    save_lora_adapters(host, tmp_path, step=1, rank=4, scale=20.0, vision_scope="none")
+    cfg_path = tmp_path / ADAPTER_CONFIG_NAME
+    cfg = json.loads(cfg_path.read_text())
+    cfg["n_arrays"] = int(cfg["n_arrays"]) + 1
+    cfg_path.write_text(json.dumps(cfg, indent=2) + "\n")
+    fresh = TinyHost(n=2, d=32)
+    inject_backbone_lora(fresh, rank=4, expected_layers=2, vision=False)
+    try:
+        load_lora_adapters(fresh, tmp_path)
+    except RuntimeError as exc:
+        assert "n_arrays" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError when adapter_config n_arrays is stale")
+
+
+def test_save_dense_trainables_rejects_step_zero_and_empty(tmp_path):
+    host = TinyHost(n=1, d=16)
+    try:
+        save_dense_trainables(host, tmp_path, step=0)
+    except ValueError as exc:
+        assert "step" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for dense save step=0")
+    host.freeze()
+    try:
+        save_dense_trainables(host, tmp_path, step=1)
+    except RuntimeError as exc:
+        assert "dense" in str(exc).lower()
+    else:
+        raise AssertionError("expected RuntimeError when no dense trainables remain")
+
+
+def test_has_vision_and_expert_lora_false_without_adapters():
+    host = TinyHost(n=1, d=16)
+    assert has_vision_lora(host) is False
+    assert has_expert_lora(host) is False
+    host.vlm.vision_tower = None
+    host.expert = None
+    assert has_vision_lora(host) is False
+    assert has_expert_lora(host) is False
 
 
 def test_load_lora_raises_on_key_mismatch(tmp_path):
