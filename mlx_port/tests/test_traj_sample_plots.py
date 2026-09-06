@@ -4,6 +4,7 @@ import numpy as np
 
 from mlx_port.traj_sample_plot_utils import (
     N_WAYPOINTS,
+    _as_xy,
     _require_full_xy,
     _speed_mps,
     _xy_for_redraw,
@@ -104,3 +105,26 @@ def test_html_report_stamps_bf16_and_t31_paths():
         }
     )
     assert dense_ex == "all4 W4 VLM + dense expert"
+    expert_only = quant_path_label(
+        {
+            "lm": "bf16",
+            "vision": "bf16",
+            "expert": "affine-4-gs64",
+        }
+    )
+    assert expert_only == "dense VLM + all4 expert"
+
+
+def test_as_xy_squeezes_nvidia_rank4_and_drops_z():
+    arr = np.zeros((1, 1, 8, 3), dtype=np.float64)
+    arr[0, 0, :, 0] = np.arange(8)
+    arr[0, 0, :, 2] = 99.0
+    xy = _as_xy(arr)
+    assert xy.shape == (8, 2)
+    np.testing.assert_allclose(xy[:, 0], np.arange(8))
+    np.testing.assert_allclose(xy[:, 1], 0.0)
+    rank3 = np.zeros((1, 8, 3), dtype=np.float64)
+    rank3[0, :, 1] = 2.0
+    xy3 = _as_xy(rank3)
+    assert xy3.shape == (8, 2)
+    np.testing.assert_allclose(xy3[:, 1], 2.0)

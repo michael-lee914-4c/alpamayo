@@ -10,7 +10,11 @@ import numpy as np
 from mlx_port.models.alpamayo_r1_mlx import ActionInProj, ActionOutProj, FlowMatching
 from mlx_port.models.token_utils_mlx import replace_pad_token
 from mlx_port.processor import create_message
-from mlx_port.scripts.time_train_step import _event_coc, _image_batch_from_tokenized
+from mlx_port.scripts.time_train_step import (
+    _dummy_ids,
+    _event_coc,
+    _image_batch_from_tokenized,
+)
 from mlx_port.models.expert_mlx import expert_non_causal_train_mask
 from mlx_port.train_step import (
     IGNORE_INDEX,
@@ -186,6 +190,48 @@ def test_stage2_one_vlm_one_expert_no_euler():
     assert out.vlm_ce is None
     assert out.cfm_mse is not None
     assert_train_graph(out.times)
+    mask = model.expert.last_mask
+    assert mask is not None
+    assert float(mx.max(mx.abs(mask)).item()) == 0.0
+
+
+def test_stage2_omits_mask_when_non_causal_flag_is_false():
+    mx.random.seed(1)
+    model = _toy_model()
+    model.expert_non_causal_attention = False
+    ids = mx.array([[1, 2, 7, 4]], dtype=mx.int32)
+    action = mx.zeros((1, 8, 2), dtype=mx.float32)
+    sft_train_step(model, {"input_ids": ids, "action": action}, stage="stage2")
+    assert model.expert.last_mask is None
+
+
+def test_sft_train_step_promotes_1d_labels():
+    model = _toy_model()
+    ids = mx.array([[1, 2, 3, 4, 7, 8]], dtype=mx.int32)
+    labels = mx.array([1, 2, 3, 4, 7, 8], dtype=mx.int32)
+    out = sft_train_step(model, {"input_ids": ids, "labels": labels}, stage="stage1")
+    assert out.vlm_ce is not None
+    assert model.expert.calls == 0
+
+
+def test_cfm_expert_forward_requires_expert_and_diffusion():
+    action = mx.zeros((1, 8, 2), dtype=mx.float32)
+    missing_expert = _toy_model()
+    missing_expert.expert = None
+    try:
+        cfm_expert_forward(missing_expert, action)
+    except ValueError as exc:
+        assert "expert" in str(exc)
+    else:
+        raise AssertionError("expected ValueError when expert is missing")
+    missing_fm = _toy_model()
+    missing_fm.diffusion = None
+    try:
+        cfm_expert_forward(missing_fm, action)
+    except ValueError as exc:
+        assert "diffusion" in str(exc)
+    else:
+        raise AssertionError("expected ValueError when diffusion is missing")
 
 
 def test_joint_adds_ce_and_cfm():
@@ -217,6 +263,18 @@ def test_unknown_stage_and_missing_action_raise():
         assert "action" in str(exc) or "ego" in str(exc)
     else:
         raise AssertionError("expected ValueError when stage2 has no action")
+    try:
+        sft_train_step(model, None, stage="stage1")
+    except ValueError as exc:
+        assert "batch" in str(exc)
+    else:
+        raise AssertionError("expected ValueError when batch is missing")
+    try:
+        sft_train_step(model, {}, stage="stage1")
+    except ValueError as exc:
+        assert "input_ids" in str(exc)
+    else:
+        raise AssertionError("expected ValueError when input_ids is missing")
 
 
 def test_cfm_forward_does_not_call_sample(monkeypatch):
@@ -270,6 +328,18 @@ def test_drop_n_traj_group_squeezes_loader_dim():
     xyz2, rot2 = drop_n_traj_group(xyz_b, rot_b)
     assert tuple(xyz2.shape) == (1, 16, 3)
     assert tuple(rot2.shape) == (1, 16, 3, 3)
+
+
+def test_drop_n_traj_group_keeps_last_not_first_traj():
+    xyz = mx.zeros((1, 2, 4, 3), dtype=mx.float32)
+    xyz = xyz.at[0, 0, :, 0].add(1.0)
+    xyz = xyz.at[0, 1, :, 0].add(9.0)
+    rot = mx.zeros((1, 2, 4, 3, 3), dtype=mx.float32)
+    rot = rot.at[0, 1].add(1.0)
+    xyz_b, rot_b = drop_n_traj_group(xyz, rot)
+    assert tuple(xyz_b.shape) == (1, 4, 3)
+    assert float(xyz_b[0, 0, 0].item()) == 9.0
+    assert float(mx.abs(rot_b).max().item()) == 1.0
 
 
 def test_labels_mask_between_one_span():
@@ -387,6 +457,15 @@ def test_sft_stage1_labels_mask_is_traj_span_plus_assistant_im_end():
     assert bool(eos[0, 10].item()) is True
 
 
+def test_get_role_eos_mask_ignores_unpaired_trailing_eos():
+    tok = _FakeTok()
+    # system BOS/EOS, assistant BOS/EOS, then an extra EOS with no matching BOS
+    ids = mx.array([[1, 4, 9, 2, 1, 3, 20, 2, 2]], dtype=mx.int32)
+    eos = get_role_eos_mask(ids, tok)
+    got = [bool(eos[0, i].item()) for i in range(ids.shape[1])]
+    assert got == [False, False, False, False, False, False, False, True, False]
+
+
 def test_stage1_two_mean_ce_splits_traj_and_im_end():
     model = SimpleNamespace(
         future_token_start_idx=20,
@@ -419,6 +498,32 @@ def test_replace_pad_token_requires_exact_count():
         assert "pad tokens" in str(exc)
     else:
         raise AssertionError("expected ValueError when pad count mismatches")
+
+
+def test_dummy_ids_requires_marker_and_min_length():
+    class _Tok:
+        def convert_tokens_to_ids(self, name):
+            return 7 if name == "<|traj_future_start|>" else None
+
+    model = SimpleNamespace(tokenizer=_Tok())
+    try:
+        _dummy_ids(model, 3)
+    except ValueError as exc:
+        assert "seq_len" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for seq_len < 4")
+    ids = _dummy_ids(model, 8)
+    assert tuple(ids.shape) == (1, 8)
+    assert int(ids[0, -3].item()) == 7
+    empty = SimpleNamespace(
+        tokenizer=SimpleNamespace(convert_tokens_to_ids=lambda name: None)
+    )
+    try:
+        _dummy_ids(empty, 8)
+    except RuntimeError as exc:
+        assert "traj_future_start" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError when tokenizer lacks the crop marker")
 
 
 def test_event_coc_requires_matching_t0():

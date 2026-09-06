@@ -147,3 +147,15 @@ def test_trim_cache_restores_prefix_len():
     trim_cache(cache, 4)
     assert cache_seq_len(cache) == 6
     assert cache[0]._idx == 6
+    offset_before = cache[0].offset
+    idx_before = cache[0]._idx
+    trim_cache(cache, 0)
+    trim_cache(cache, -3)
+    trim_cache([], 2)
+    assert cache[0].offset == offset_before
+    assert cache[0]._idx == idx_before
+    sync_cache_idx([])
+    sync_cache_idx([None])
+    cache[0]._idx = 0
+    sync_cache_idx([None, cache[0]])
+    assert cache[0]._idx == cache[0].offset
