@@ -4,6 +4,7 @@ import numpy as np
 
 from mlx_port.traj_sample_plot_utils import (
     N_WAYPOINTS,
+    _as_xy,
     _require_full_xy,
     _speed_mps,
     _xy_for_redraw,
@@ -44,6 +45,25 @@ def test_redraw_uses_saved_64pt_pred_not_plot_cache():
     assert pred is not None
     assert pred.shape == (N_WAYPOINTS, 2)
     np.testing.assert_allclose(pred, pred64)
+
+
+def test_xy_for_redraw_rejects_missing_hist_or_gt():
+    try:
+        _xy_for_redraw({"pred_xy_full": np.zeros((N_WAYPOINTS, 2))})
+    except ValueError as exc:
+        assert "hist_xy_full" in str(exc) or "gt_xy_full" in str(exc)
+    else:
+        raise AssertionError("expected ValueError when hist/gt XY are missing")
+
+
+def test_as_xy_squeezes_rank3_and_drops_z():
+    xyz = np.zeros((2, 5, 3), dtype=np.float64)
+    xyz[0, :, 0] = np.arange(5)
+    xyz[0, :, 2] = 9.0
+    xy = _as_xy(xyz)
+    assert xy.shape == (5, 2)
+    np.testing.assert_array_equal(xy[:, 0], np.arange(5))
+    np.testing.assert_array_equal(xy[:, 1], np.zeros(5))
 
 
 def test_redraw_does_not_interpolate_missing_pred():
