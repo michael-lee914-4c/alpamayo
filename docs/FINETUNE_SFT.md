@@ -4,6 +4,9 @@
 
 This guide explains how to run supervised fine-tuning (SFT) for the Alpamayo 1 model on the Physical AI AV dataset. The SFT scripts live under [finetune/sft](../finetune/sft/).
 
+Apple Silicon small-scale SFT (QLoRA / CFM smokes, not this Hydra
+`torchrun` path) is documented in [mlx_port/README.md](../mlx_port/README.md).
+
 ## Features
 
 - [x] Stage 1: fine-tune the base VLM

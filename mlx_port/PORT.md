@@ -1,5 +1,9 @@
 # MLX port map (Stage 1c Phase 0)
 
+Developer setup, CLI, and pitfalls: [README.md](README.md). This file
+is the signed lab log (timings, quant walks, G1–G4), not the getting-started
+page.
+
 Filled from code on 2026-08-29, not from memory. One inference window =
 encode → prefill → CoC decode → 10-step flow-matching → `action_to_traj`.
 

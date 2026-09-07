@@ -83,7 +83,13 @@ the `num_traj_samples=1` argument to a higher number (Line 60).
 
 ### Interactive notebook
 
-We provide a notebook with similar inference code at `notebook/inference.ipynb`.
+We provide a notebook with similar inference code at `notebooks/inference.ipynb`.
+
+### Apple Silicon / MLX port
+
+`mlx_port/` is a separate MLX implementation of inference and
+small-scale SFT. It does **not** use `uv sync` (that pulls CUDA
+packages). Start at [mlx_port/README.md](mlx_port/README.md).
 
 ## Relationship with the Paper
 
@@ -110,6 +116,7 @@ This release includes the core model, SFT scripts, and the RL post-training pipe
 | ------- | -------------------------------------------------------- | --------------------------------- |
 | **SFT** | Supervised fine-tuning                                   | [SFT guide](docs/FINETUNE_SFT.md) |
 | **RL**  | Reinforcement learning-based post-training via Cosmos-RL | [RL guide](finetune/rl/README.md) |
+| **MLX** | Apple Silicon inference + small-scale SFT                | [MLX port](mlx_port/README.md)    |
 
 Please refer to the linked guides for compute requirements, step-by-step
 instructions, and fine-tuning FAQ.
@@ -155,6 +162,8 @@ No. The model weights are released under a **non-commercial license**. This rele
 
 ```
 alpamayo/
+├── docs/
+│   └── FINETUNE_SFT.md                  # CUDA SFT guide (Hydra / torchrun)
 ├── finetune/
 │   ├── rl/                              # RL post-training
 │   │   ├── models/                      # Model wrappers & Cosmos-RL entry scripts
@@ -168,8 +177,20 @@ alpamayo/
 │       ├── models/                      # Trainable wrappers
 │       ├── train_hf.py                  # Training script
 │       └── evaluate_hf.py               # Evaluation script
-├── notebook/
-│   └── inference.ipynb                  # Example notebook
+├── mlx_port/                            # Apple Silicon / MLX infer + small SFT
+│   ├── README.md                        # Developer setup and runbook
+│   ├── PORT.md                          # Signed timings / quant walks
+│   ├── inference.py                     # CoC decode + 10-step flow matching
+│   ├── train_step.py                    # Stage-1/2/joint SFT graphs
+│   └── scripts/                         # Local infer, SFT smokes, quant pack
+├── notebooks/
+│   ├── inference.ipynb                  # CUDA inference notebook
+│   └── inspect_dataset.ipynb            # PAI clip inspection
+├── scripts/
+│   ├── download_pai.py                  # Physical AI AV download
+│   ├── curate_pai_samples.py            # Mini clip-index for local RL
+│   ├── convert_release_config_to_training.py
+│   └── convert_cosmos_rl_checkpoint.py  # Cosmos-RL shards → HF export
 ├── src/
 │   └── alpamayo_r1/
 │       ├── action_space/
@@ -182,10 +203,10 @@ alpamayo/
 │       │   ├── ...                      # Model components and utils functions
 │       ├── __init__.py                  # Package marker
 │       ├── config.py                    # Model and experiment configuration
-│       ├── helper.py                    # Utility functions
-│       ├── load_physical_aiavdataset.py # Dataset loader
+│       ├── helper.py                    # CUDA message / processor helpers
+│       ├── load_physical_aiavdataset.py # Dataset loader (CUDA + MLX)
 │       ├── test_inference.py            # Inference test script
-├── pyproject.toml                       # Project dependencies
+├── pyproject.toml                       # Project dependencies (incl. mlx-ci group)
 └── uv.lock                              # Locked dependency versions
 ```
 
