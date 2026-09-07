@@ -88,6 +88,25 @@ def test_sft_stage2_small_expert_lora_rank_requires_flag():
         raise AssertionError(err)
 
 
+def test_sft_stage2_small_expert_lora_scale_requires_flag():
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "mlx_port.scripts.sft_stage2_small",
+            "--expert-lora-scale",
+            "4.0",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode == 0:
+        raise AssertionError("expected non-zero exit when --expert-lora-scale has no --expert-lora")
+    err = (proc.stderr or "") + (proc.stdout or "")
+    if "expert-lora" not in err:
+        raise AssertionError(err)
+
+
 def test_sft_stage2_small_train_action_proj_requires_expert_lora():
     proc = subprocess.run(
         [

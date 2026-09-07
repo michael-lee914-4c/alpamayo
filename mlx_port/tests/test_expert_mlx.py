@@ -78,6 +78,13 @@ def test_expert_position_ids_adds_delta_and_offset():
     np.testing.assert_array_equal(pos[2, 1], [25, 26, 27, 28])
 
 
+def test_expert_position_ids_broadcasts_scalar_delta():
+    pos = np.asarray(expert_position_ids(3, 2, 10, np.array([1, 4])))
+    assert pos.shape == (3, 2, 3)
+    np.testing.assert_array_equal(pos[0, 0], [11, 12, 13])
+    np.testing.assert_array_equal(pos[1, 1], [14, 15, 16])
+
+
 def test_expert_rope_mask_contract_matches_nvidia():
     """pos0 = offset + rope_deltas; hide [offset, prefix); diffusion block is 0."""
     tfs = 155681
@@ -147,3 +154,12 @@ def test_trim_cache_restores_prefix_len():
     trim_cache(cache, 4)
     assert cache_seq_len(cache) == 6
     assert cache[0]._idx == 6
+
+
+def test_sync_cache_idx_skips_empty_and_none_layers():
+    sync_cache_idx([])
+    layer = type("C", (), {})()
+    layer.offset = 4
+    layer._idx = 0
+    sync_cache_idx([None, layer])
+    assert layer._idx == 4

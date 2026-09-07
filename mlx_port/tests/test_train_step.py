@@ -27,6 +27,8 @@ from mlx_port.train_step import (
     cfm_expert_forward,
     expert_train_position_ids,
     freeze_vlm,
+    _new_cache,
+    future_traj_label_mask,
     mean_train_times,
     prepare_stage2_trainables,
     print_train_table,
@@ -297,6 +299,169 @@ def test_labels_mask_between_one_span():
         assert "precedes" in str(exc)
     else:
         raise AssertionError("expected ValueError when end precedes start")
+    try:
+        labels_mask_between(mx.array([[9, 1, 9, 8]]), 9, 8)
+    except ValueError as exc:
+        assert "exactly one" in str(exc)
+    else:
+        raise AssertionError("expected ValueError when start id appears twice")
+
+
+def test_labels_mask_between_and_stage1_span_are_row0_only():
+    """Smoke batches are B=1. A second row must not silently steal row-0 markers."""
+    ids = mx.array(
+        [
+            [1, 4, 9, 2, 1, 3, 10, 20, 21, 11, 2],
+            [1, 3, 10, 30, 31, 11, 2, 0, 0, 0, 0],
+        ],
+        dtype=mx.int32,
+    )
+    span = np.asarray(labels_mask_between(ids, 10, 11))
+    assert span.shape == (2, 11)
+    assert span[0].tolist() == [
+        False,
+        False,
+        False,
+        False,
+        False,
+        False,
+        True,
+        True,
+        True,
+        True,
+        False,
+    ]
+    assert not span[1].any()
+
+    tok = _FakeTok()
+    mask = np.asarray(sft_stage1_labels_mask(ids, tok))
+    # Traj span is row-0 only; assistant <|im_end|> is labeled per row.
+    assert mask[0].tolist() == [
+        False,
+        False,
+        False,
+        False,
+        False,
+        False,
+        True,
+        True,
+        True,
+        True,
+        True,
+    ]
+    assert mask[1].tolist() == [
+        False,
+        False,
+        False,
+        False,
+        False,
+        False,
+        True,
+        False,
+        False,
+        False,
+        False,
+    ]
+
+
+def test_traj_future_keep_len_uses_last_marker_on_row0():
+    assert traj_future_keep_len(mx.array([1, 7, 4, 7, 9], dtype=mx.int32), 7) == 4
+    batch = mx.array(
+        [
+            [1, 2, 7, 4, 5],
+            [7, 7, 7, 0, 0],
+        ],
+        dtype=mx.int32,
+    )
+    # Crop length is NVIDIA last_traj_future_start_idx on row 0, not row 1.
+    assert traj_future_keep_len(batch, 7) == 3
+
+
+def test_apply_labels_mask_rejects_shape_mismatch():
+    try:
+        apply_labels_mask(mx.array([[1, 2, 3]]), mx.array([[True, False]]))
+    except ValueError as exc:
+        assert "labels_mask" in str(exc)
+    else:
+        raise AssertionError("expected ValueError when labels_mask shape differs")
+
+
+def test_shifted_ce_rejects_wrong_rank_and_batch():
+    labels = mx.array([[1, 2, 3]], dtype=mx.int32)
+    try:
+        shifted_cross_entropy(mx.zeros((1, 3), dtype=mx.float32), labels)
+    except ValueError as exc:
+        assert "B, L, V" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for rank-2 logits")
+    try:
+        shifted_cross_entropy(mx.zeros((2, 3, 8), dtype=mx.float32), labels)
+    except ValueError as exc:
+        assert "does not match" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for batch mismatch")
+    try:
+        shifted_cross_entropy(mx.zeros((1, 3, 8), dtype=mx.float32), mx.array([1, 2, 3]))
+    except ValueError as exc:
+        assert "B, L" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for rank-1 labels")
+
+
+def test_future_traj_label_mask_requires_model_fields():
+    labels = mx.array([[10, 22, 11]], dtype=mx.int32)
+    try:
+        future_traj_label_mask(labels, SimpleNamespace(traj_vocab_size=10))
+    except ValueError as exc:
+        assert "future_token_start_idx" in str(exc)
+    else:
+        raise AssertionError("expected ValueError when future_token_start_idx is missing")
+    try:
+        future_traj_label_mask(
+            labels,
+            SimpleNamespace(future_token_start_idx=20, traj_vocab_size=10, traj_token_ids={}),
+        )
+    except ValueError as exc:
+        assert "future_start" in str(exc)
+    else:
+        raise AssertionError("expected ValueError when traj specials are missing")
+
+
+def test_get_role_eos_mask_is_per_row():
+    tok = _FakeTok()
+    ids = mx.array(
+        [
+            [1, 4, 9, 2, 1, 3, 10, 2],
+            [1, 3, 10, 2, 1, 4, 9, 2],
+        ],
+        dtype=mx.int32,
+    )
+    eos = np.asarray(get_role_eos_mask(ids, tok))
+    assert eos[0].tolist() == [False, False, False, False, False, False, False, True]
+    assert eos[1].tolist() == [False, False, False, True, False, False, False, False]
+
+
+def test_assert_train_graph_requires_vlm_forward():
+    try:
+        assert_train_graph(
+            type("T", (), {"n_euler_steps": 0, "n_decode_tokens": 0, "n_vlm_forwards": 0})()
+        )
+    except RuntimeError as exc:
+        assert "VLM forward" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError when the VLM did not run")
+
+
+def test_new_cache_is_none_without_layers():
+    assert _new_cache(SimpleNamespace()) is None
+    assert _new_cache(SimpleNamespace(language_model=SimpleNamespace())) is None
+    assert _new_cache(SimpleNamespace(layers=[])) is None
+
+
+def test_train_step_times_zero_clock_is_python_overhead():
+    times = TrainStepTimes().as_dict()
+    assert times["dominant_stage"] == "python-overhead"
+    assert times["total_ms"] == 0.0
 
 
 def test_create_message_teacher_cot_completes_assistant():

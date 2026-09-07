@@ -11,6 +11,7 @@ from mlx_port.gt_eval import (
     format_gt_report,
     list_local_coc_clips,
     load_clip_gt,
+    load_coc_table,
     min_ade_xy,
     score_coc,
 )
@@ -68,6 +69,33 @@ def test_min_ade_zero_when_identical():
     gt[0] = np.linspace(0, 6.4, 64)
     pred = gt[None, ...]  # (1, 2, T)
     assert min_ade_xy(pred, gt) == 0.0
+
+
+def test_min_ade_accepts_t_by_2_gt_without_transposing():
+    """(T, 2) must stay waypoint-major. Transposing it would look like a 2-step path."""
+    t = 8
+    gt_t2 = np.stack([np.linspace(0.0, 7.0, t), np.zeros(t)], axis=-1)
+    pred = gt_t2[None, ...]
+    assert min_ade_xy(pred, gt_t2) == 0.0
+    # NVIDIA (2, T) layout of the same XY still scores 0.
+    assert min_ade_xy(np.transpose(pred, (0, 2, 1)), gt_t2.T) == 0.0
+
+
+def test_pred_xy_for_ade_rank2_is_one_sample():
+    xyz = np.zeros((6, 3), dtype=np.float64)
+    xyz[:, 0] = np.arange(6)
+    xy = _pred_xy_for_ade(xyz)
+    assert xy.shape == (1, 6, 2)
+    np.testing.assert_array_equal(xy[0, :, 0], np.arange(6))
+
+
+def test_load_coc_table_missing_file(tmp_path):
+    try:
+        load_coc_table(tmp_path / "missing.parquet")
+    except FileNotFoundError as exc:
+        assert "CoC labels" in str(exc)
+    else:
+        raise AssertionError("expected FileNotFoundError when the CoC table is absent")
 
 
 def _toy_gt_report_inputs(t: int = 4):
