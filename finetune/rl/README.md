@@ -109,6 +109,8 @@ Convert the HuggingFace release model into a training-ready checkpoint.
 By default, the script downloads
 [Alpamayo 1.5 Model Weights](https://huggingface.co/nvidia/Alpamayo-1.5-10B). Use `--alpamayo-model` to switch to
 [Alpamayo 1 Model Weights](https://huggingface.co/nvidia/Alpamayo-R1-10B) if needed.
+Flag-level notes for this converter, PAI download, clip curation, and
+policy export live in [scripts/README.md](../../scripts/README.md).
 
 ```bash
 cd "$ALPAMAYO_WORKSPACE"
@@ -256,6 +258,7 @@ as the RL algorithm.
 | `hydra_configs/alpamayo1_rvla_rl_pai.yaml`                       | Hydra config for PAI dataset and preprocessing (see also `alpamayo1_5_rvla_rl_pai.yaml` for Alpamayo 1.5)                                                                           |
 | `launcher.py`                                                    | Shared launch logic that initializes state and calls the Cosmos worker                                                                                                              |
 | `rewards/aggregated_reward.py`                                   | Demo reward implementation (see [Reward](#reward) below)                                                                                                                            |
+| `../../scripts/README.md`                                        | Flag-level notes for PAI download, clip curation, release→training convert, and policy export                                                                                       |
 | `../../scripts/convert_cosmos_rl_checkpoint.py`                  | Converts a Cosmos-RL policy checkpoint into a HuggingFace checkpoint directory (see [step 7](#7-export-the-rl-checkpoint-for-inference))                                            |
 
 ### Key parameters

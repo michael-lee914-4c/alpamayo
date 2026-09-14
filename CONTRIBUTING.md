@@ -69,7 +69,7 @@ git push -u origin <local-branch>:<remote-branch>
 - At least one Alpamayo 1 researcher will be assigned for the review.
 - While under review, mark your PRs as work-in-progress by prefixing the PR title with [WIP].
 
-4. Since there is no CI/CD process in place yet, the PR will be accepted and the corresponding issue closed only after adequate testing has been completed, manually, by the developer and/or Alpamayo 1 researcher reviewing the code.
+4. Pull requests run [`.github/workflows/mlx-unit-tests.yml`](.github/workflows/mlx-unit-tests.yml). The required status check is **`macos-26 (no weights)`**: it installs the `mlx-ci` group from `pyproject.toml` (`uv pip install --group mlx-ci`, no CUDA extras) and runs `pytest mlx_port/tests -m "not slow"` with `ALPAMAYO_CI_NO_WEIGHTS=1`. Do not rename that job without updating the repository ruleset. CUDA SFT/RL paths are not exercised on that runner; the PR will be accepted and the corresponding issue closed only after adequate testing has been completed, including any CUDA or weight-load checks the change needs, by the developer and/or Alpamayo 1 researcher reviewing the code.
 
 #### Signing Your Work
 

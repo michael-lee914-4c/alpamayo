@@ -81,9 +81,13 @@ python src/alpamayo_r1/test_inference.py
 In case you would like to obtain more trajectories and reasoning traces, please feel free to change
 the `num_traj_samples=1` argument to a higher number (Line 60).
 
-### Interactive notebook
+### Interactive notebooks
 
-We provide a notebook with similar inference code at `notebook/inference.ipynb`.
+| Notebook | Purpose |
+| -------- | ------- |
+| [`notebooks/inference.ipynb`](notebooks/inference.ipynb) | Inference walkthrough (same path as `src/alpamayo_r1/test_inference.py`) |
+| [`notebooks/inspect_dataset.ipynb`](notebooks/inspect_dataset.ipynb) | Load a local PAI slice with `PAIDataset` and visualize cameras + GT ego |
+| [`finetune/rl/notebooks/rl_checkpoint_inference.ipynb`](finetune/rl/notebooks/rl_checkpoint_inference.ipynb) | Inference after exporting a Cosmos-RL policy checkpoint |
 
 ## Relationship with the Paper
 
@@ -110,9 +114,15 @@ This release includes the core model, SFT scripts, and the RL post-training pipe
 | ------- | -------------------------------------------------------- | --------------------------------- |
 | **SFT** | Supervised fine-tuning                                   | [SFT guide](docs/FINETUNE_SFT.md) |
 | **RL**  | Reinforcement learning-based post-training via Cosmos-RL | [RL guide](finetune/rl/README.md) |
+| **Data / ckpt** | Download PAI, curate clips, convert/export checkpoints | [Scripts](scripts/README.md) |
 
 Please refer to the linked guides for compute requirements, step-by-step
 instructions, and fine-tuning FAQ.
+
+An experimental Apple Silicon port lives in [`mlx_port/`](mlx_port/)
+(stage map: [`mlx_port/PORT.md`](mlx_port/PORT.md)). It is not installed
+by `uv sync` (that pulls the CUDA extras). macos-26 CI installs the
+`mlx-ci` group instead — see [CONTRIBUTING](CONTRIBUTING.md#pull-requests).
 
 ## Frequently Asked Questions (FAQ)
 
@@ -155,6 +165,8 @@ No. The model weights are released under a **non-commercial license**. This rele
 
 ```
 alpamayo/
+├── docs/
+│   └── FINETUNE_SFT.md                  # CUDA Hydra SFT guide
 ├── finetune/
 │   ├── rl/                              # RL post-training
 │   │   ├── models/                      # Model wrappers & Cosmos-RL entry scripts
@@ -162,30 +174,37 @@ alpamayo/
 │   │   ├── prefetch/                    # Shared-memory data prefetch server
 │   │   ├── toml/                        # Cosmos-RL training configs
 │   │   ├── hydra_configs/               # Dataset & preprocessing configs
+│   │   ├── notebooks/                   # RL checkpoint inference notebook
 │   │   └── README.md                    # RL post-training guide
 │   └── sft/                             # Supervised fine-tuning
 │       ├── configs/                     # Model configs
 │       ├── models/                      # Trainable wrappers
 │       ├── train_hf.py                  # Training script
 │       └── evaluate_hf.py               # Evaluation script
-├── notebook/
-│   └── inference.ipynb                  # Example notebook
+├── mlx_port/                            # Apple Silicon MLX port (see PORT.md)
+├── notebooks/
+│   ├── inference.ipynb                  # CUDA inference walkthrough
+│   └── inspect_dataset.ipynb            # Local PAI visualization
+├── scripts/
+│   └── README.md                        # PAI download + checkpoint converters
 ├── src/
 │   └── alpamayo_r1/
 │       ├── action_space/
 │       │   └── ...                      # Action space definitions
+│       ├── data/                        # PAIDataset + local PAI interface
 │       ├── diffusion/
 │       │   └── ...                      # Diffusion model components
 │       ├── geometry/
 │       │   └── ...                      # Geometry utilities and modules
 │       ├── models/
 │       │   ├── ...                      # Model components and utils functions
+│       ├── visualization/               # Camera / ego overlay helpers
 │       ├── __init__.py                  # Package marker
 │       ├── config.py                    # Model and experiment configuration
 │       ├── helper.py                    # Utility functions
 │       ├── load_physical_aiavdataset.py # Dataset loader
 │       ├── test_inference.py            # Inference test script
-├── pyproject.toml                       # Project dependencies
+├── pyproject.toml                       # Project dependencies (incl. mlx-ci group)
 └── uv.lock                              # Locked dependency versions
 ```
 
