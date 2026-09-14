@@ -2,7 +2,7 @@
 
 **The following examples were validated on 8× H100 GPUs with 80 GB each.**
 
-This guide explains how to run supervised fine-tuning (SFT) for the Alpamayo 1 model on the Physical AI AV dataset. The SFT scripts live under [finetune/sft](../finetune/sft/).
+This guide explains how to run supervised fine-tuning (SFT) for the Alpamayo 1 model on the Physical AI AV dataset. The SFT scripts live under [finetune/sft](../finetune/sft/). Dataset download flags and checkpoint converters are summarized in [scripts/README.md](../scripts/README.md). This is the CUDA Hydra path; the Apple Silicon smoke trainers are under [`mlx_port/scripts/`](../mlx_port/scripts/) (see [`mlx_port/PORT.md`](../mlx_port/PORT.md)).
 
 ## Features
 
