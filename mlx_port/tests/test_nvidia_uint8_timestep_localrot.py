@@ -36,7 +36,7 @@ def test_qwen_uint8_divides_by_255_float_passthrough(torch):
     src = (_SRC / "alpamayo_r1" / "processor" / "qwen_processor.py").read_text()
     assert "images.float() / 255.0" in src
     assert "do_rescale=False" in src
-    assert "images.flatten(0, 1)" in src
+    assert "images_for_vlm.flatten(0, 1)" in src
 
     raw = torch.tensor([0, 128, 255], dtype=torch.uint8)
     scaled = raw.float() / 255.0
@@ -67,11 +67,12 @@ def test_action_in_proj_encodes_last_timestep_dim_only(torch):
     )
     proj.eval()
     x = torch.zeros(2, 5, 2)
-    t_last = torch.zeros(2, 3, 4)
+    # Training data unsqueezes t to (B, 1, 1); the encoder reads [..., -1].
+    t_last = torch.zeros(2, 1, 2)
     t_last[..., -1] = 0.75
-    t_first = torch.zeros(2, 3, 4)
+    t_first = torch.zeros(2, 1, 2)
     t_first[..., 0] = 0.75
-    t_only_last = torch.zeros(2, 3, 4)
+    t_only_last = torch.zeros(2, 1, 2)
     t_only_last[..., -1] = 0.75
     with torch.no_grad():
         out_last = proj(x, t_last)
