@@ -7,6 +7,8 @@ These subclasses fix issues discovered during Alpamayo-R1-10B porting:
 
 2. get_input_embeddings / __call__: do not let pixel_values wipe cached
    3-row mRoPE; decode continues with arange(L) + cache_offset + rope_deltas.
+   A *new* vision prefill invalidates that cache so a later clip or SFT
+   batch cannot attend with the previous prompt's T/H/W positions.
 
 Only these two methods are overridden; everything else (vision tower,
 weight loading, KV cache, etc.) remains identical to mlx_vlm 0.5.0.
@@ -25,6 +27,76 @@ _DEBUG = os.environ.get("ALPAMAYO_DEBUG", "0") in ("1", "true", "True")
 def _dbg(msg: str) -> None:
     if _DEBUG:
         print(msg)
+
+
+def _arrays_equal(left: Any, right: Any) -> bool:
+    if left is None and right is None:
+        return True
+    if left is None or right is None:
+        return False
+    a = np.asarray(left)
+    b = np.asarray(right)
+    return a.shape == b.shape and np.array_equal(a, b)
+
+
+def invalidate_multimodal_rope(language_model: Any) -> None:
+    """Drop cached 3-row mRoPE so the next vision prefill recomputes it.
+
+    ``get_rope_index`` keeps an idempotency cache for the *same* prompt
+    (prefill, then a second base-class call). ``run_local_traj_sample`` and
+    SFT reuse one model across clips; without this, clip N attends with
+    clip 0's T/H/W positions and ``_rope_deltas``.
+    """
+    if language_model is None:
+        return
+    language_model._pos_valid = False
+    language_model._position_ids = None
+    language_model._rope_deltas = None
+    language_model._attention_mask = None
+    language_model._rope_cached_input_ids = None
+    language_model._rope_cached_image_grid = None
+    language_model._rope_cached_video_grid = None
+
+
+def _same_rope_prompt(
+    language_model: Any,
+    input_ids: Any,
+    image_grid_thw: Any,
+    video_grid_thw: Any,
+) -> bool:
+    if language_model is None:
+        return False
+    if not getattr(language_model, "_pos_valid", False):
+        return False
+    if getattr(language_model, "_position_ids", None) is None:
+        return False
+    return (
+        _arrays_equal(getattr(language_model, "_rope_cached_input_ids", None), input_ids)
+        and _arrays_equal(
+            getattr(language_model, "_rope_cached_image_grid", None), image_grid_thw
+        )
+        and _arrays_equal(
+            getattr(language_model, "_rope_cached_video_grid", None), video_grid_thw
+        )
+    )
+
+
+def _remember_rope_prompt(
+    language_model: Any,
+    input_ids: Any,
+    image_grid_thw: Any,
+    video_grid_thw: Any,
+) -> None:
+    language_model._rope_cached_input_ids = (
+        None if input_ids is None else np.asarray(input_ids).copy()
+    )
+    language_model._rope_cached_image_grid = (
+        None if image_grid_thw is None else np.asarray(image_grid_thw).copy()
+    )
+    language_model._rope_cached_video_grid = (
+        None if video_grid_thw is None else np.asarray(video_grid_thw).copy()
+    )
+
 
 from mlx_vlm.models.qwen3_vl.language import Attention, LanguageModel
 from mlx_vlm.models.qwen3_vl.qwen3_vl import Model, InputEmbeddingsFeatures
@@ -172,6 +244,12 @@ class AlpamayoLanguageModel(LanguageModel):
         # checking attribute presence, which can be affected by nn.Module internals)
         if not hasattr(base, "_pos_valid"):
             base._pos_valid = False
+        if not hasattr(base, "_rope_cached_input_ids"):
+            base._rope_cached_input_ids = None
+        if not hasattr(base, "_rope_cached_image_grid"):
+            base._rope_cached_image_grid = None
+        if not hasattr(base, "_rope_cached_video_grid"):
+            base._rope_cached_video_grid = None
         from mlx_port.models.compiled_backbone import install_compiled_prefill
 
         install_compiled_prefill(base)
@@ -274,7 +352,9 @@ class AlpamayoLanguageModel(LanguageModel):
     ) -> Tuple[mx.array, mx.array]:
         # Idempotency: prefill computes 3-row mRoPE once; decode uses
         # arange(L) + cache_offset + _rope_deltas in the base LanguageModel.
-        if getattr(self, "_pos_valid", False) and getattr(self, "_position_ids", None) is not None:
+        # Only reuse when the prompt/grid is the same — a later clip must not
+        # inherit this cache (run_local_traj_sample / SFT reuse one model).
+        if _same_rope_prompt(self, input_ids, image_grid_thw, video_grid_thw):
             _dbg("[ROPE_DEBUG] guard short-circuit (cached HF RoPE)")
             return self._position_ids, getattr(self, "_rope_deltas", None)
         if getattr(self, "_pos_valid", False) and getattr(self, "_position_ids", None) is None:
@@ -309,6 +389,7 @@ class AlpamayoLanguageModel(LanguageModel):
             self._position_ids = position_ids
             self._rope_deltas = mrope_position_deltas
             self._pos_valid = True
+            _remember_rope_prompt(self, input_ids, image_grid_thw, video_grid_thw)
             return position_ids, mrope_position_deltas
 
         if attention_mask is not None:
@@ -363,6 +444,10 @@ class AlpamayoModel(Model):
             return InputEmbeddingsFeatures(
                 inputs_embeds=self.language_model.model.embed_tokens(input_ids)
             )
+
+        # New vision prefill (new clip / train batch). Drop the previous
+        # prompt's mRoPE before get_rope_index; decode must not hit this path.
+        invalidate_multimodal_rope(self.language_model)
 
         # --- vision path unchanged ---
         dtype = self.vision_tower.patch_embed.proj.weight.dtype
