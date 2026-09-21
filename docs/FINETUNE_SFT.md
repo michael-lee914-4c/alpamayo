@@ -47,7 +47,7 @@ Point training at that directory: set `checkpoint_path` in [ar1_base.yaml](../fi
 
 ### Data loader
 
-After downloading PAI, set `local_dir` to the dataset root (e.g. `/path/to/pai_dataset`) and `chunk_ids` to a range string such as `"0-10"` in your Hydra config or overrides.
+After downloading PAI, set `local_dir` to the dataset root (e.g. `/path/to/pai_dataset`) and `chunk_ids` to a range string. Ranges are **end-exclusive**: `"0-10"` is chunks 0–9. The bundled configs use `train_dataset.chunk_ids: "0-99"` and `val_dataset.chunk_ids: "99-100"` with `use_default_keyframe: true` (every clip at 5.1 s, not the clip event). Shapes, cameras, and the event-t0 filter: [Inference and data](INFERENCE_AND_DATA.md).
 
 ### Start training
 
