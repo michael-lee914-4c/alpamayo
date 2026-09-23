@@ -20,6 +20,7 @@ from __future__ import annotations
 import torch
 from transformers import AutoConfig
 
+from alpamayo_r1.utils.vlm_mrope import apply_policy_ids_to_tokenized_data
 from rl.base_cosmos_wrapper import BaseCosmosWrapper
 from rl.utils.fsdp import shard_lm_layers, shard_visual_tower
 from rl.utils.weight_loading import copy_state_into_dtensor_shards, detect_fsdp2_active
@@ -102,12 +103,12 @@ class RVLACosmos(BaseCosmosWrapper):
         """Bridge Cosmos-RL inputs to the underlying ReasoningVLA forward pass."""
         td = kwargs.get("tokenized_data", None)
         if isinstance(td, dict):
-            if labels_mask is not None:
-                td["labels_mask"] = labels_mask
-            if position_ids is not None:
-                td["position_ids"] = position_ids
-            if input_ids is not None:
-                td["input_ids"] = input_ids
+            apply_policy_ids_to_tokenized_data(
+                td,
+                input_ids=input_ids,
+                labels_mask=labels_mask,
+                position_ids=position_ids,
+            )
 
             target_device = (
                 input_ids.device if input_ids is not None else next(self.parameters()).device
