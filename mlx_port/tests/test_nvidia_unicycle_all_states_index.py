@@ -26,8 +26,11 @@ def test_source_uses_leading_batch_slice_not_ellipsis():
     src = _UNI.read_text()
     assert "if not output_all_states:" in src
     assert "[v[:, :-1], accel, theta[:, :-1]]" in src
-    assert "v[..., :-1]" not in src
-    assert "theta[..., :-1]" not in src
+    extra = src.split("if not output_all_states:", 1)[1].split("def action_to_traj", 1)[0]
+    assert "v[:, :-1]" in extra
+    assert "theta[:, :-1]" in extra
+    assert "v[..., :-1]" not in extra
+    assert "theta[..., :-1]" not in extra
 
 
 def test_rank2_batch_matches_ellipsis_slice():
