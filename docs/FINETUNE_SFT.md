@@ -2,7 +2,7 @@
 
 **The following examples were validated on 8× H100 GPUs with 80 GB each.**
 
-This guide explains how to run supervised fine-tuning (SFT) for the Alpamayo 1 model on the Physical AI AV dataset. The SFT scripts live under [finetune/sft](../finetune/sft/).
+This guide explains how to run supervised fine-tuning (SFT) for the Alpamayo 1 model on the Physical AI AV dataset. The SFT scripts live under [finetune/sft](../finetune/sft/). Architecture, weight-load contracts, and train-vs-eval pitfalls: [finetune/sft/README.md](../finetune/sft/README.md).
 
 ## Features
 
@@ -95,6 +95,8 @@ torchrun --nproc_per_node 8 -m finetune.sft.train_hf --config-path pkg://finetun
 ```
 
 > model.pretrained_model_name_or_path must be the same local folder you used for Stage 1 (full base checkpoint on disk). model.stage1_vlm_checkpoint_path is your Stage 1 Trainer output, e.g. output_stage1/checkpoint-3500 (a directory containing model.safetensors.index.json and shards).
+
+> **Current main:** `TrainableAlpamayoR1.from_pretrained` does not apply that Stage-1 VLM. `__init__` loads `vlm.*` keys onto the inner Qwen module (`strict=False` hides the miss), then HuggingFace copies the release checkpoint over the overlay. The expert trains against Alpamayo-R1, not your Stage-1 run. Details and the open fix (PR #49): [finetune/sft/README.md](../finetune/sft/README.md#stage-2-vlm-overlay-current-main).
 
 You should see a loss curve similar to:
 
