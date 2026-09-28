@@ -35,6 +35,7 @@ from alpamayo_r1.models.base_model import (
 from alpamayo_r1.models.base_model import IGNORE_INDEX
 from alpamayo_r1.models.token_utils import extract_traj_tokens, extract_text_tokens
 from alpamayo_r1.common import logging
+from finetune.sft.models.vlm_keys import apply_aligned_vlm_state_dict
 
 logger = logging.RankedLogger(__name__, rank_zero_only=True)
 logger.setLevel("INFO")
@@ -99,9 +100,11 @@ def load_alpamayo1_vlm(checkpoint_path: str, model: Any):
     if not vlm_state_dict:
         raise ValueError(f"No vlm.* tensors found in checkpoint: {checkpoint_dir}")
 
-    load_result = model.load_state_dict(vlm_state_dict, strict=False, assign=True)
+    n_applied, load_result = apply_aligned_vlm_state_dict(
+        model, vlm_state_dict, checkpoint_dir
+    )
     logger.info(
-        f"Loaded {len(vlm_state_dict)} VLM tensors from {checkpoint_dir} (missing={len(load_result.missing_keys)}, unexpected={len(load_result.unexpected_keys)})",
+        f"Loaded {n_applied} VLM tensors from {checkpoint_dir} (missing={len(load_result.missing_keys)}, unexpected={len(load_result.unexpected_keys)})",
     )
 
     return model
