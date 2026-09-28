@@ -45,9 +45,13 @@ class TrainableAlpamayoR1(AlpamayoR1):
         self.cotrain_vlm = cotrain_vlm
         self.stop_grad_from_vlm = stop_grad_from_vlm
 
-        # we only need the text config for the expert model
+        # Overlay Stage-1 VLM weights when constructed directly (not via
+        # from_pretrained). Official Stage-2 uses from_pretrained, which
+        # applies this overlay after the base Alpamayo-R1 shards so they
+        # are not overwritten. Pass the full wrapper: Trainer shards are
+        # keyed ``vlm.*``, matching this module, not the inner Qwen VLM.
         if stage1_vlm_checkpoint_path is not None:
-            self.vlm = load_alpamayo1_vlm(stage1_vlm_checkpoint_path, self.vlm)
+            load_alpamayo1_vlm(stage1_vlm_checkpoint_path, self)
 
         if not self.cotrain_vlm:
             for param in self.vlm.parameters():
@@ -57,6 +61,22 @@ class TrainableAlpamayoR1(AlpamayoR1):
         param_count = misc.get_param_count(self)
         for key, value in param_count.items():
             logger.info(f"{key}: {value:,}")
+
+    @classmethod
+    def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
+        """Load Alpamayo-R1, then overlay Stage-1 ``vlm.*`` weights if given.
+
+        HuggingFace ``from_pretrained`` constructs the module (``__init__``)
+        and only then copies ``pretrained_model_name_or_path`` shards onto it.
+        A Stage-1 overlay inside ``__init__`` would be overwritten by the
+        release VLM. Pop the path so ``__init__`` skips that load, then apply
+        it after the base checkpoint is in place.
+        """
+        stage1_vlm_checkpoint_path = kwargs.pop("stage1_vlm_checkpoint_path", None)
+        model = super().from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
+        if stage1_vlm_checkpoint_path is not None:
+            load_alpamayo1_vlm(stage1_vlm_checkpoint_path, model)
+        return model
 
     def _process_traj_future_training(self, traj_data: dict[str, Any]) -> dict[str, Any]:
         """Process the trajectory future data for training."""
